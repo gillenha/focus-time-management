@@ -1,0 +1,139 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* Prevent scroll bars */
+}
+
+.background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/src/images/test.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: -1; /* Ensure the background is behind other elements */
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr; /* Three equal columns */
+  grid-template-rows: 1fr; /* One row */
+  height: 100%;
+  width: 100%;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  text-align: center;
+  grid-column: 2; /* Place in the middle column */
+  grid-row: 1; /* Place in the first row */
+}
+
+.navbar {
+  background-color: rgba(128, 128, 128, 0.5); /* Lightly transparent grey */
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.session-history-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 25%; 
+}
+
+.session-history {
+  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+  padding: 20px;
+  border-radius: 10px;
+  max-height: 50vh;
+  overflow-y: auto; /* Allow vertical scrolling if needed */
+}
+
+.session-history h2 {
+  margin-top: 0;
+}
+
+.session-history ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.session-history li {
+  margin: 5px 0;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.1); /* Lightly transparent white */
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  text-align: left; /* Ensure text is left-aligned */
+}
+
+.session-log-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.session-date,
+.session-time,
+.session-duration,
+.session-text {
+  margin: 2px 0;
+  color: white; /* Make all text white */
+}
+
+.session-date::before,
+.session-time::before,
+.session-duration::before,
+.session-text::before {
+  font-weight: bold;
+  content: attr(data-label);
+}
+
+.music-player.fade-in {
+  opacity: 1;
+  animation: fadeIn 1s ease-out forwards;
+}
+
+.music-player.fade-out {
+  animation: fadeOut 1s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.control-button i {
+  font-size: 36px;
+}

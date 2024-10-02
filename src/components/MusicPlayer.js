@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import './MusicPlayer.css';
 import ControlBar from './ControlBar';
 
-function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive }) {
+function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume }) {
   const [buttonVisible, setButtonVisible] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [audioFiles, setAudioFiles] = useState([]);
   const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false); // New state for play/pause
+  const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -41,9 +41,10 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive }) {
     if (currentAudioIndex < audioFiles.length) {
       const audio = new Audio(`http://localhost:5001/mp3s/${audioFiles[currentAudioIndex]}`);
       audioRef.current = audio;
+      audio.volume = volume; // Set initial volume
       audio.play();
       setIsPlaying(true);
-      setTimerActive(true); // Start the timer when audio starts playing
+      setTimerActive(true);
       audio.onended = () => {
         setCurrentAudioIndex(prevIndex => prevIndex + 1);
       };
@@ -54,10 +55,10 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive }) {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
-        setTimerActive(false); // Stop the timer when audio is paused
+        setTimerActive(false);
       } else {
         audioRef.current.play();
-        setTimerActive(true); // Start the timer when audio is playing
+        setTimerActive(true);
       }
       setIsPlaying(!isPlaying);
     }
@@ -65,7 +66,15 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive }) {
 
   const handleNextTrackClick = () => {
     console.log('Next track button clicked');
+    // Implement logic to play the next track
   };
+
+  // New useEffect to update volume when prop changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
 
   useEffect(() => {
     if (currentAudioIndex > 0 && currentAudioIndex < audioFiles.length) {
@@ -80,7 +89,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive }) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsPlaying(false);
-      setTimerActive(false); // Stop the timer when freeflow ends
+      setTimerActive(false);
     }
   }, [isFreeflow]);
 

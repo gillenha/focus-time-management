@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './ControlBar.css';
 
 function ControlBar({ onPlayPauseClick, isPlaying, onNextTrackClick }) {

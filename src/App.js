@@ -16,6 +16,7 @@ function App() {
   const [timerActive, setTimerActive] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [currentSessionText, setCurrentSessionText] = useState('');
+  const [volume, setVolume] = useState(1); // Volume state
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -79,6 +80,10 @@ function App() {
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  const handleVolumeChange = (newVolume) => {
+    setVolume(newVolume); // Update volume state
+  };
+
   return (
     <div className="grid-container">
       <div className="background"></div>
@@ -88,7 +93,15 @@ function App() {
             {isFreeflow ? "End Freeflow" : "Begin Freeflow"}
           </button>
         </div>
-        {showMusicPlayer && <MusicPlayer isFreeflow={isFreeflow} onBeginClick={handleBeginClick} setTimerActive={setTimerActive} />}
+        {showMusicPlayer && (
+          <MusicPlayer 
+            isFreeflow={isFreeflow} 
+            onBeginClick={handleBeginClick} 
+            stopAudio={setTimerActive} 
+            setTimerActive={setTimerActive} 
+            volume={volume} // Pass volume state to MusicPlayer
+          />        
+        )}
         <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
         <div className="session-history-container">
           <button onClick={handleClearHistory}>
@@ -109,6 +122,18 @@ function App() {
           </div>
         </div>
         <ToastContainer />
+      </div>
+      {/* Volume slider in the top-right corner */}
+      <div className="volume-slider-container">
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={volume}
+          onChange={(e) => handleVolumeChange(e.target.value)}
+          className="volume-slider"
+        />
       </div>
     </div>
   );

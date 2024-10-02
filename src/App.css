@@ -138,13 +138,24 @@ body, html {
   font-size: 36px;
 }
 
-.volume-slider-container {
+/* ... existing styles ... */
+
+.volume-bar-container {
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 1000;
+  display: flex;
+  align-items: center;
+  z-index: 10; /* Ensure it appears above other elements */
+}
+
+.volume-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
 }
 
 .volume-slider {
-  width: 150px;
+  width: 100px;
 }
+

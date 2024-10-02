@@ -5,6 +5,7 @@ import './components/HandleTimer.css';
 import './components/MusicPlayer.css';
 import HandleTimer from './components/HandleTimer';
 import MusicPlayer from './components/MusicPlayer';
+import VolumeBar from './components/VolumeBar'; // Import VolumeBar
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -16,7 +17,7 @@ function App() {
   const [timerActive, setTimerActive] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [currentSessionText, setCurrentSessionText] = useState('');
-  const [volume, setVolume] = useState(1); // Volume state
+  const [volume, setVolume] = useState(0.5); // Default volume to 50%
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -80,8 +81,8 @@ function App() {
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const handleVolumeChange = (newVolume) => {
-    setVolume(newVolume); // Update volume state
+  const handleVolumeChange = (event) => {
+    setVolume(event.target.value); // Update volume state
   };
 
   return (
@@ -124,17 +125,7 @@ function App() {
         <ToastContainer />
       </div>
       {/* Volume slider in the top-right corner */}
-      <div className="volume-slider-container">
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume}
-          onChange={(e) => handleVolumeChange(e.target.value)}
-          className="volume-slider"
-        />
-      </div>
+      <VolumeBar volume={volume} onVolumeChange={handleVolumeChange} />
     </div>
   );
 }

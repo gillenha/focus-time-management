@@ -21,3 +21,15 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Node modules
+node_modules/
+
+# Build directory
+build/
+
+# MP3 files
+mp3s/
+
+# Other large files or directories
+# Add any other large files or directories here

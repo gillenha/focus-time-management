@@ -10,6 +10,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
+  const [slideIn, setSlideIn] = useState(false);
 
   useEffect(() => {
     fetch('http://localhost:5001/mp3s')
@@ -26,6 +27,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     await audio.play();
     setTimeout(() => {
       setButtonVisible(false);
+      setSlideIn(true); // Trigger slide-in animation
       onBeginClick(inputValue);
       setTimeout(() => {
         playNextAudio();
@@ -95,7 +97,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   return (
     <div className={`music-player ${isFreeflow ? 'fade-in' : 'fade-out'}`}>
-      <p>Time to focus</p>
+      <p className={`focus-text ${slideIn ? 'slide-in' : ''}`}>Time to focus</p>
       {buttonVisible && (
         <>
           <textarea

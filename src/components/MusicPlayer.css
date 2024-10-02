@@ -119,3 +119,14 @@
 .fade-out {
   animation: buttonFadeOut 1s ease-out forwards;
 }
+
+.focus-text {
+  transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.focus-text.slide-in {
+  transform: translateY(100px); /* Adjust this value to match the height of the input field */
+  opacity: 1;
+}

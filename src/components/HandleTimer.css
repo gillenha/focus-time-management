@@ -1,0 +1,22 @@
+.timer {
+    font-size: 48px;
+    font-weight: bold;
+    color: white;
+    padding: 0; /* Ensure no padding */
+    margin: 0; /* Ensure no margin */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%; /* Full height of the parent */
+    width: 100%; /* Full width of the parent */
+    position: absolute; /* Position absolutely within the parent */
+    top: 50%; /* Center vertically */
+    left: 50%; /* Center horizontally */
+    transform: translate(-50%, -50%); /* Adjust for the element's own size */
+    transition: top 0.5s ease, transform 0.5s ease; /* Add transition for smooth sliding */
+}
+
+.timer.slide-up {
+    top: 0; /* Move to the top */
+    transform: translate(-50%, 0); /* Adjust transform to align correctly */
+}

@@ -1,0 +1,21 @@
+.navbar {
+  background-color: rgba(128, 128, 128, 0.5); /* Lightly transparent grey */
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center; /* Center the button horizontally */
+  align-items: center; /* Center the button vertically */
+  padding: 10px 0;
+}
+
+.freeflow-button {
+  background-color: black;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  /* Remove fixed positioning */
+}

@@ -1,0 +1,121 @@
+/* Timer animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.timer {
+  /* Removed animation property to eliminate sliding effect */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px; /* Adjust as needed */
+}
+
+/* MusicPlayer animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes buttonFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.music-player {
+  display: flex;
+  flex-direction: column; /* Added to arrange children vertically */
+  justify-content: space-between; /* Added to space out children */
+  padding: 20px; /* Added padding for better spacing */
+  width: 300px; /* Adjust as needed */
+  height: 300px; /* Adjust as needed */
+  margin: 0 auto;
+  background-color: rgba(0, 0, 0, 0.5); /* Changed to semi-transparent black */
+  border: 1px solid #333333; /* Same as Session History */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Same as Session History */
+  border-radius: 8px; /* Same as Session History */
+  position: absolute; /* Position absolutely within the parent */
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%); /* Adjust for the element's own size */
+  opacity: 0;
+}
+
+.music-player.fade-in {
+  animation: fadeIn 1s ease-out forwards;
+}
+
+.music-player.fade-out {
+  animation: fadeOut 1s ease-out forwards;
+}
+
+.music-player button {
+  align-self: center; /* Center the button horizontally */
+  margin-bottom: 20px; /* Place the button near the bottom */
+  padding: 10px 20px; /* Adjust padding as needed */
+  background-color: #333333; /* Button background color */
+  color: white; /* Button text color */
+  border: none; /* Remove default border */
+  border-radius: 4px; /* Rounded corners */
+  cursor: pointer; /* Pointer cursor on hover */
+}
+
+.music-player button:hover {
+  background-color: #555555; /* Darker background on hover */
+}
+
+.music-player button.fade-out {
+  animation: buttonFadeOut 1s ease-out forwards;
+}
+
+.music-player-input {
+  width: 100%; /* Stretch the input field */
+  height: 100%; /* Make the input field taller */
+  margin-bottom: 20px; /* Add some space below the input field */
+  box-sizing: border-box; /* Ensure padding and border are included in the element's total width and height */
+  border: 1px solid #333333;
+  border-radius: 4px;
+  resize: none; /* Prevent resizing */
+  overflow-wrap: break-word; /* Ensure text wraps */
+}
+
+.music-player-button {
+  width: 100%; /* Full width */
+  padding: 10px 20px; /* Adjust padding as needed */
+  background-color: #333333; /* Button background color */
+  color: white; /* Button text color */
+  border: none; /* Remove default border */
+  border-radius: 4px; /* Rounded corners */
+  cursor: pointer; /* Pointer cursor on hover */
+  margin-top: 10px; /* Space between input and button */
+}
+
+.music-player-button:hover {
+  background-color: #555555; /* Darker background on hover */
+}
+
+.fade-out {
+  animation: buttonFadeOut 1s ease-out forwards;
+}

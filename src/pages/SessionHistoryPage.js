@@ -12,7 +12,7 @@ function SessionHistoryPage({ sessionHistory, handleClearHistory, onClose }) {
 
   return (
     <div className={`session-history-page ${exitAnimation ? 'exit' : ''}`}>
-      <button onClick={handleClose} className="close-icon">×</button>
+      <span onClick={handleClose} className="close-icon">×</span>
       <SessionHistory 
         sessionHistory={sessionHistory} 
         onClearHistory={handleClearHistory} 

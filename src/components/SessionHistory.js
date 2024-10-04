@@ -11,7 +11,7 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose, totalFocusedT
     return (
         <div className={`session-history-drawer ${isExiting ? 'exit' : ''}`}>
             <div className="session-history-content">
-                <button className="close-button" onClick={onClose} aria-label="Close"></button>
+                <span className="close-button" onClick={onClose} aria-label="Close"></span>
                 <h2>Session History</h2>
                 <ul style={{ display: 'flex', flexDirection: 'column' }}>
                     {sessionHistory.slice().reverse().map((session, index) => {

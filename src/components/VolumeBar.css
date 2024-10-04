@@ -1,0 +1,64 @@
+.volume-bar-container.dimmed {
+  opacity: 0.5; /* Dims the whole volume bar */
+  transition: opacity 0.3s ease; /* Smooth transition when muting */
+}
+
+.volume-bar-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  z-index: 10; /* Ensure it appears above other elements */
+}
+
+.volume-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  color: white; /* Make the icon white */
+  cursor: pointer;
+}
+
+.volume-slider {
+  width: 150px;
+  -webkit-appearance: none; /* Remove default styling */
+  appearance: none; /* Remove default styling */
+  background: linear-gradient(to right, #614734 0%, #614734 var(--value, 50%), #b6aca8 var(--value, 50%), #b6aca8 100%) !important;
+  border-radius: 4px;
+  height: 8px;
+  outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background-color: #614734; /* Custom color for the thumb */
+  border-radius: 50%; /* Make the thumb circular */
+  cursor: grab;
+  position: relative;
+  top: -4px; /* Adjust to align with track */
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background-color: #614734; /* Custom color for the thumb */
+  border-radius: 50%; /* Make the thumb circular */
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 8px; /* Increase the height for a thicker track */
+  background: transparent; /* Ensure the track background is transparent */
+  border-radius: 4px; /* Adjust border-radius if needed */
+}
+
+.volume-slider::-moz-range-track {
+  width: 100%;
+  height: 8px; /* Increase the height for a thicker track */
+  background: transparent; /* Ensure the track background is transparent */
+  border-radius: 4px; /* Adjust border-radius if needed */
+}

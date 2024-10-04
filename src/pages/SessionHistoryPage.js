@@ -1,22 +1,23 @@
-import React, { useState } from 'react';
-import SessionHistory from '../components/SessionHistory';
+import React from 'react';
 import './SessionHistoryPage.css';
+import { Link } from 'react-router-dom';
 
-function SessionHistoryPage({ sessionHistory, handleClearHistory, onClose }) {
-  const [exitAnimation, setExitAnimation] = useState(false);
-
-  const handleClose = () => {
-    setExitAnimation(true);
-    setTimeout(onClose, 500); // Call onClose after animation
-  };
-
+function SessionHistoryPage({ sessionHistory, handleClearHistory }) {
   return (
-    <div className={`session-history-page ${exitAnimation ? 'exit' : ''}`}>
-      <span onClick={handleClose} className="close-icon">×</span>
-      <SessionHistory 
-        sessionHistory={sessionHistory} 
-        onClearHistory={handleClearHistory} 
-      />
+    <div className="session-history-page">
+      <h1>Session History</h1>
+      <button onClick={handleClearHistory}>Clear History</button>
+      <ul>
+        {sessionHistory.map((session, index) => (
+          <li key={index} className="session-log-item">
+            <span className="session-date" data-label="Date: ">{session.date}</span>
+            <span className="session-time" data-label="Time: ">{session.time}</span>
+            <span className="session-duration" data-label="Duration: ">{session.duration}</span>
+            <span className="session-text" data-label="Log: ">{session.text}</span>
+          </li>
+        ))}
+      </ul>
+      <Link to="/">Back to Home</Link>
     </div>
   );
 }

@@ -5,9 +5,10 @@ import './components/HandleTimer.css';
 import './components/MusicPlayer.css';
 import HandleTimer from './components/HandleTimer';
 import MusicPlayer from './components/MusicPlayer';
-import VolumeBar from './components/VolumeBar'; // Import VolumeBar
+import VolumeBar from './components/VolumeBar';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import SessionHistory from './components/SessionHistory';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -17,7 +18,10 @@ function App() {
   const [timerActive, setTimerActive] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [currentSessionText, setCurrentSessionText] = useState('');
-  const [volume, setVolume] = useState(0.5); // Default volume to 50%
+  const [volume, setVolume] = useState(0.5);
+  const [showSessionHistory, setShowSessionHistory] = useState(false);
+  const [totalFocusedTime, setTotalFocusedTime] = useState(0);
+  const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -82,50 +86,69 @@ function App() {
   };
 
   const handleVolumeChange = (event) => {
-    setVolume(event.target.value); // Update volume state
+    setVolume(event.target.value);
+  };
+
+  const toggleSessionHistory = () => {
+    if (showSessionHistory) {
+      setIsSessionHistoryExiting(true);
+      setTimeout(() => {
+        setShowSessionHistory(false);
+        setIsSessionHistoryExiting(false);
+      }, 500); // This should match the animation duration in SessionHistory.css
+    } else {
+      setShowSessionHistory(true);
+    }
+  };
+
+  const fetchTotalFocusTime = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/total-focus-time');
+      const data = await response.json();
+      setTotalFocusedTime(data.totalFocusTime);
+    } catch (error) {
+      console.error('Error fetching total focus time:', error);
+    }
   };
 
   return (
     <div className="grid-container">
       <div className="background"></div>
       <div className="app">
-        <div className="navbar">
+        <div className="top-bar">
+          <button className="history-button" onClick={toggleSessionHistory}>
+            {showSessionHistory ? "Hide History" : "Show History"}
+          </button>
+        </div>
+        {showMusicPlayer && (
+          <MusicPlayer
+            isFreeflow={isFreeflow}
+            onBeginClick={handleBeginClick}
+            stopAudio={setTimerActive}
+            setTimerActive={setTimerActive}
+            volume={volume}
+          />
+        )}
+        <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
+        <div className="bottom-bar">
           <button className="freeflow-button" onClick={handleFreeFlowClick}>
             {isFreeflow ? "End Freeflow" : "Begin Freeflow"}
           </button>
         </div>
-        {showMusicPlayer && (
-          <MusicPlayer 
-            isFreeflow={isFreeflow} 
-            onBeginClick={handleBeginClick} 
-            stopAudio={setTimerActive} 
-            setTimerActive={setTimerActive} 
-            volume={volume} // Pass volume state to MusicPlayer
-          />        
-        )}
-        <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
-        <div className="session-history-container">
-          <button onClick={handleClearHistory}>
-            Clear History
-          </button>
-          <div className="session-history">
-            <h2>Session History</h2>
-            <ul>
-              {sessionHistory.map((session, index) => (
-                <li key={index} className="session-log-item">
-                  <span className="session-date" data-label="Date: ">{session.date}</span>
-                  <span className="session-time" data-label="Time: ">{session.time}</span>
-                  <span className="session-duration" data-label="Duration: ">{session.duration}</span>
-                  <span className="session-text" data-label="Log: ">{session.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <ToastContainer />
       </div>
-      {/* Volume slider in the top-right corner */}
       <VolumeBar volume={volume} onVolumeChange={handleVolumeChange} />
+      {(showSessionHistory || isSessionHistoryExiting) && (
+        <SessionHistory
+          sessionHistory={sessionHistory}
+          onClearHistory={handleClearHistory}
+          onClose={toggleSessionHistory}
+          totalFocusedTime={totalFocusedTime}
+          isExiting={isSessionHistoryExiting}
+        />
+      )}
+      <nav
+        className="bottom-navbar">
+      </nav>
     </div>
   );
 }

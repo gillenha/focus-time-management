@@ -13,15 +13,18 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose, totalFocusedT
             <div className="session-history-content">
                 <button className="close-button" onClick={onClose} aria-label="Close"></button>
                 <h2>Session History</h2>
-                <ul>
-                    {sessionHistory.map((session, index) => (
-                        <li key={index} className="session-log-item">
-                            <span className="session-date" data-label="Date:">{session.date}</span>
-                            <span className="session-time" data-label="Time:">{session.time}</span>
-                            <span className="session-duration" data-label="Duration:">{session.duration}</span>
-                            <span className="session-text" data-label="Log:">{session.text}</span>
-                        </li>
-                    ))}
+                <ul style={{ display: 'flex', flexDirection: 'column' }}>
+                    {sessionHistory.slice().reverse().map((session, index) => {
+                        const reverseIndex = sessionHistory.length - 1 - index;
+                        return (
+                            <li key={`session-${reverseIndex}`} className="session-log-item">
+                                <span className="session-text" data-label="Log:">{session.text}</span>
+                                <span className="session-duration" data-label="Duration:">{session.duration}</span>
+                                <span className="session-time" data-label="Time:">{session.time}</span>
+                                <span className="session-date" data-label="Date:">{session.date}</span>
+                            </li>
+                        );
+                    })}
                 </ul>
                 <div className="total-focus-time">
                     <span>Total Focus Time: {formatTotalTime(totalFocusedTime)}</span>

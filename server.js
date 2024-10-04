@@ -3,9 +3,21 @@ const bodyParser = require('body-parser');
 const cors = require('cors'); // Import the cors package
 const fs = require('fs');
 const path = require('path');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 5001; // Ensure this matches the port in App.js
+
+// Add security headers
+app.use(helmet());
+
+// Limit CORS to specific origins
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
+}));
+
+// Limit JSON body size
+app.use(bodyParser.json({ limit: '10kb' }));
 
 // Middleware to enable CORS
 app.use(cors());
@@ -26,49 +38,48 @@ app.put('/api/freeflow', (req, res) => {
     return res.status(400).json({ error: 'Time is required' });
   }
 
-  console.log('Received time:', time);
-
   res.status(200).json({ message: 'Time received successfully', time });
 });
 
 // Route to get the list of .mp3 files
-app.get('/mp3s', (req, res) => {
+app.get('/mp3s', async (req, res) => {
   const mp3Dir = path.join(__dirname, 'mp3s');
 
-  fs.readdir(mp3Dir, (err, files) => {
-    if (err) {
-      return res.status(500).json({ error: 'Unable to scan directory' });
-    }
+  try {
+    const files = await fs.promises.readdir(mp3Dir);
     const mp3Files = files.filter(file => file.endsWith('.mp3'));
     res.json({ mp3s: mp3Files });
-  });
+  } catch (err) {
+    res.status(500).json({ error: 'Unable to scan directory' });
+  }
 });
 
 // Route to log session details
-app.post('/api/log-session', (req, res) => {
+app.post('/api/log-session', async (req, res) => {
   const sessionDetails = req.body;
 
   if (!sessionDetails || !sessionDetails.date || !sessionDetails.time || !sessionDetails.duration || !sessionDetails.text) {
     return res.status(400).json({ error: 'Incomplete session details' });
   }
 
-  // Log session details to the terminal
-  console.log('Logging session details:', sessionDetails);
+  const sessionsFilePath = path.join(__dirname, 'sessions.json');
+  let sessions = [];
 
-  const logDir = path.join(__dirname, 'logs');
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir);
-  }
-
-  const logFileName = `session_${Date.now()}.json`;
-  const logFilePath = path.join(logDir, logFileName);
-
-  fs.writeFile(logFilePath, JSON.stringify(sessionDetails, null, 2), (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Failed to log session details' });
+  try {
+    if (await fs.promises.access(sessionsFilePath).then(() => true).catch(() => false)) {
+      const fileContent = await fs.promises.readFile(sessionsFilePath, 'utf8');
+      sessions = JSON.parse(fileContent);
     }
-    res.status(200).json({ message: 'Session details logged successfully' });
-  });
+
+    sessions.push(sessionDetails);
+
+    await fs.promises.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2));
+
+    console.log('Session logged:', sessionDetails);
+    res.status(200).json({ message: 'Session details logged successfully', sessionDetails });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to log session details' });
+  }
 });
 
 // Start the server

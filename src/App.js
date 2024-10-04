@@ -8,7 +8,7 @@ import MusicPlayer from './components/MusicPlayer';
 import VolumeBar from './components/VolumeBar';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import SessionHistory from './components/SessionHistory';
+import SessionHistoryPage from './pages/SessionHistoryPage';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -138,7 +138,7 @@ function App() {
       </div>
       <VolumeBar volume={volume} onVolumeChange={handleVolumeChange} />
       {(showSessionHistory || isSessionHistoryExiting) && (
-        <SessionHistory
+        <SessionHistoryPage
           sessionHistory={sessionHistory}
           onClearHistory={handleClearHistory}
           onClose={toggleSessionHistory}
@@ -146,8 +146,7 @@ function App() {
           isExiting={isSessionHistoryExiting}
         />
       )}
-      <nav
-        className="bottom-navbar">
+      <nav className="bottom-navbar">
       </nav>
     </div>
   );

@@ -8,27 +8,36 @@ const helmet = require('helmet');
 const app = express();
 const PORT = process.env.PORT || 5001; // Ensure this matches the port in App.js
 
-// Add security headers
-app.use(helmet());
+// Add security headers, but disable some that might interfere with audio playback
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
-// Limit CORS to specific origins
+// Configure CORS
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*'
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Middleware to enable CORS
-app.use(cors());
-
-// Middleware to parse JSON bodies
-app.use(bodyParser.json());
-
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/effects', express.static(path.join(__dirname, 'public', 'effects')));
-app.use('/mp3s', express.static(path.join(__dirname, 'mp3s'))); // Serve from /mp3s directory
+
+// Serve MP3 files with proper headers
+app.use('/mp3s', (req, res, next) => {
+  res.set({
+    'Accept-Ranges': 'bytes',
+    'Content-Type': 'audio/mpeg',
+    'Cross-Origin-Resource-Policy': 'cross-origin'
+  });
+  express.static(path.join(__dirname, 'mp3s'))(req, res, next);
+});
 
 // Route to handle PUT requests for Freeflow
 app.put('/api/freeflow', (req, res) => {
@@ -54,6 +63,21 @@ app.get('/mp3s', async (req, res) => {
   }
 });
 
+// Helper function to format duration
+function formatDuration(duration) {
+  const [minutes, seconds] = duration.split(':').map(Number);
+  const totalMinutes = minutes + (seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = Math.floor(totalMinutes % 60);
+  const remainingSeconds = Math.round((totalMinutes % 1) * 60);
+
+  if (hours > 0) {
+    return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } else {
+    return duration;
+  }
+}
+
 // Route to log session details
 app.post('/api/log-session', async (req, res) => {
   const sessionDetails = req.body;
@@ -61,6 +85,9 @@ app.post('/api/log-session', async (req, res) => {
   if (!sessionDetails || !sessionDetails.date || !sessionDetails.time || !sessionDetails.duration || !sessionDetails.text) {
     return res.status(400).json({ error: 'Incomplete session details' });
   }
+
+  // Format the duration before logging
+  sessionDetails.duration = formatDuration(sessionDetails.duration);
 
   const sessionsFilePath = path.join(__dirname, 'sessions.json');
   let sessions = [];

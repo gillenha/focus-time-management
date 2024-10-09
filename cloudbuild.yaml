@@ -8,7 +8,8 @@ steps:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  serviceAccount: "harry-gillen-builder@appspot.gserviceaccount.com"
 
 images:
 - 'gcr.io/harry-gillen-builder/focus-music-image:$COMMIT_SHA'
+
+serviceAccount: "harry-gillen-builder@appspot.gserviceaccount.com"

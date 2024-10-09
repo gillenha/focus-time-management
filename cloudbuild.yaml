@@ -6,5 +6,8 @@ steps:
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['run', 'deploy', 'focus-music-app', '--image', 'gcr.io/harry-gillen-builder/focus-music-image:$COMMIT_SHA', '--region', 'us-central1', '--platform', 'managed']
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 images:
 - 'gcr.io/harry-gillen-builder/focus-music-image:$COMMIT_SHA'

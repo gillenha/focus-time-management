@@ -23,9 +23,10 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose, isExiting }) 
 
     const sendToServer = async (session) => {
         try {
-            console.log('Sending session to server:', session); // Log before sending
+            console.log('Sending session to server:', session);
 
-            const response = await fetch(`${API_BASE_URL}/api/log-session`, {
+            // Send to your existing server
+            const serverResponse = await fetch(`${API_BASE_URL}/api/log-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -33,11 +34,54 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose, isExiting }) 
                 body: JSON.stringify(session),
             });
             
-            if (!response.ok) {
-                throw new Error('Failed to log session');
+            if (!serverResponse.ok) {
+                throw new Error('Failed to log session to server');
             }
-            
-            const result = await response.json();
+
+            // Send to Notion
+            const notionResponse = await fetch(`${API_BASE_URL}/api/notion-log`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    properties: {
+                        Date: {
+                            type: "date",
+                            date: {
+                                start: new Date().toISOString()
+                            }
+                        },
+                        Time: {
+                            type: "rich_text",
+                            rich_text: [{
+                                type: "text",
+                                text: { content: session.time }
+                            }]
+                        },
+                        Duration: {
+                            type: "rich_text",
+                            rich_text: [{
+                                type: "text",
+                                text: { content: session.duration }
+                            }]
+                        },
+                        Notes: {
+                            type: "rich_text",
+                            rich_text: [{
+                                type: "text",
+                                text: { content: session.text }
+                            }]
+                        }
+                    }
+                }),
+            });
+
+            if (!notionResponse.ok) {
+                throw new Error('Failed to log session to Notion');
+            }
+
+            const result = await serverResponse.json();
             console.log('Server response:', result);
 
         } catch (error) {

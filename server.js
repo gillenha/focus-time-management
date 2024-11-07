@@ -1,12 +1,25 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors'); // Import the cors package
 const fs = require('fs');
 const path = require('path');
 const helmet = require('helmet');
+const { Client } = require('@notionhq/client');
 
 const app = express();
 const PORT = process.env.PORT || 5001; // Ensure this matches the port in App.js
+
+// Initialize Notion client
+let notion;
+try {
+    notion = new Client({
+        auth: process.env.NOTION_API_KEY
+    });
+    console.log('Notion client initialized successfully');
+} catch (error) {
+    console.error('Failed to initialize Notion client:', error);
+}
 
 // Add security headers, but disable some that might interfere with audio playback
 app.use(helmet({
@@ -115,6 +128,74 @@ app.post('/api/log-session', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to log session details' });
   }
+});
+
+// Add this new endpoint
+app.post('/api/notion-log', async (req, res) => {
+    if (!notion) {
+        return res.status(500).json({ error: 'Notion client not initialized' });
+    }
+
+    try {
+        console.log('Attempting to create Notion page with properties:', req.body.properties);
+        
+        const response = await notion.pages.create({
+            parent: {
+                database_id: process.env.NOTION_DATABASE_ID
+            },
+            properties: {
+                Name: {
+                    title: [
+                        {
+                            text: {
+                                content: "Focus Session"
+                            }
+                        }
+                    ]
+                },
+                ...req.body.properties
+            }
+        });
+
+        console.log('Notion page created successfully');
+        res.json({ success: true, notionResponse: response });
+    } catch (error) {
+        console.error('Detailed Notion error:', error);
+        res.status(500).json({ 
+            error: 'Failed to send to Notion', 
+            details: error.message,
+            code: error.code
+        });
+    }
+});
+
+// Add this test endpoint
+app.get('/api/notion-test', async (req, res) => {
+    if (!notion) {
+        return res.status(500).json({ error: 'Notion client not initialized' });
+    }
+
+    try {
+        // Try to query the database to verify connection
+        const response = await notion.databases.query({
+            database_id: process.env.NOTION_DATABASE_ID
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Notion connection successful',
+            databaseInfo: {
+                results: response.results.length,
+                hasMore: response.has_more
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Failed to connect to Notion', 
+            details: error.message,
+            code: error.code
+        });
+    }
 });
 
 // Start the server

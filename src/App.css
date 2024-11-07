@@ -11,10 +11,10 @@ body, html {
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: url('/src/images/test.jpg');
   background-size: cover;
   background-position: center;
-  z-index: -1; /* Ensure the background is behind other elements */
+  z-index: -1;
+  transition: background-image 0.3s ease-in-out;
 }
 
 .grid-container {
@@ -188,4 +188,30 @@ body, html {
   background-color: rgba(200, 200, 200, 0.7); /* Light grey with 70% opacity */
   backdrop-filter: blur(5px); /* Adds a blur effect to the background */
   z-index: 5; /* Ensure it's below the freeflow button */
+}
+
+.photo-attribution {
+  position: fixed;
+  bottom: 70px; /* Positioned above the bottom navbar */
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+.photo-attribution p {
+  margin: 0;
+  color: white;
+}
+
+.photo-attribution a {
+  color: white;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.photo-attribution a:hover {
+  border-bottom: 1px solid white;
 }

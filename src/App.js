@@ -22,6 +22,8 @@ function App() {
   const [showSessionHistory, setShowSessionHistory] = useState(false);
   const [totalFocusedTime, setTotalFocusedTime] = useState(0);
   const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
+  const [backgroundImage, setBackgroundImage] = useState('');
+  const [photographer, setPhotographer] = useState({ name: '', username: '', link: '' });
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -39,6 +41,37 @@ function App() {
     }
     return () => clearInterval(timer);
   }, [timerActive, time]);
+
+  useEffect(() => {
+    const fetchBackgroundImage = async () => {
+      try {
+        const response = await fetch(
+          `https://api.unsplash.com/photos/random?query=nature&orientation=landscape`,
+          {
+            headers: {
+              Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
+            }
+          }
+        );
+        const data = await response.json();
+        setBackgroundImage(data.urls.full);
+        setPhotographer({
+          name: data.user.name,
+          username: data.user.username,
+          link: data.links.html
+        });
+      } catch (error) {
+        console.error('Error fetching background image:', error);
+        setBackgroundImage('/src/images/test.jpg');
+        setPhotographer({ name: '', username: '', link: '' });
+      }
+    };
+
+    fetchBackgroundImage();
+    const interval = setInterval(fetchBackgroundImage, 1800000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleFreeFlowClick = () => {
     if (isFreeflow) {
@@ -113,7 +146,32 @@ function App() {
 
   return (
     <div className="grid-container">
-      <div className="background"></div>
+      <div 
+        className="background" 
+        style={{ backgroundImage: `url(${backgroundImage})` }}
+      ></div>
+      {photographer.name && (
+        <div className="photo-attribution">
+          <p>
+            Photo by{' '}
+            <a 
+              href={photographer.link} 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              {photographer.name}
+            </a>
+            {' '}on{' '}
+            <a 
+              href="https://unsplash.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              Unsplash
+            </a>
+          </p>
+        </div>
+      )}
       <div className="app">
         <div className="top-bar">
           <button className="history-button" onClick={toggleSessionHistory}>

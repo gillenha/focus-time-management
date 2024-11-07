@@ -14,9 +14,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   useEffect(() => {
     fetch('http://localhost:5001/mp3s')
-      .then(response => response.json())
-      .then(data => setAudioFiles(data.mp3s))
-      .catch(error => console.error('Error fetching audio files:', error));
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('Received audio files:', data.mp3s);
+        setAudioFiles(data.mp3s);
+      })
+      .catch(error => {
+        console.error('Error fetching audio files:', error);
+      });
   }, []);
 
   const handleClick = async () => {
@@ -27,7 +37,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     await audio.play();
     setTimeout(() => {
       setButtonVisible(false);
-      setSlideIn(true); // Trigger slide-in animation
+      setSlideIn(true);
       onBeginClick(inputValue);
       setTimeout(() => {
         playNextAudio();
@@ -41,10 +51,46 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   const playNextAudio = () => {
     if (currentAudioIndex < audioFiles.length) {
-      const audio = new Audio(`http://localhost:5001/mp3s/${audioFiles[currentAudioIndex]}`);
+      const audioPath = `/mp3s/${audioFiles[currentAudioIndex]}`;
+      console.log('Attempting to play:', audioPath);
+      
+      // Create audio element
+      const audio = new Audio();
+      
+      // Add load start listener
+      audio.addEventListener('loadstart', () => {
+        console.log('Audio loading started');
+      });
+      
+      // Add loaded data listener
+      audio.addEventListener('loadeddata', () => {
+        console.log('Audio data loaded successfully');
+      });
+      
+      // Add error listener with more details
+      audio.addEventListener('error', (e) => {
+        console.error('Audio loading error:', {
+          error: e,
+          code: audio.error ? audio.error.code : 'No error code',
+          message: audio.error ? audio.error.message : 'No error message',
+          networkState: audio.networkState,
+          readyState: audio.readyState
+        });
+      });
+      
+      // Set the source after adding listeners
+      audio.src = audioPath;
       audioRef.current = audio;
-      audio.volume = volume; // Set initial volume
-      audio.play();
+      audio.volume = volume;
+      
+      audio.play().catch(error => {
+        console.error('Error playing audio:', {
+          error: error,
+          message: error.message,
+          name: error.name
+        });
+      });
+      
       setIsPlaying(true);
       setTimerActive(true);
       audio.onended = () => {
@@ -71,7 +117,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     // Implement logic to play the next track
   };
 
-  // New useEffect to update volume when prop changes
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;

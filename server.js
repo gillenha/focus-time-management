@@ -30,13 +30,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/effects', express.static(path.join(__dirname, 'public', 'effects')));
 
 // Serve MP3 files with proper headers
-app.use('/mp3s', (req, res, next) => {
-  res.set({
-    'Accept-Ranges': 'bytes',
-    'Content-Type': 'audio/mpeg',
-    'Cross-Origin-Resource-Policy': 'cross-origin'
-  });
-  express.static(path.join(__dirname, 'mp3s'))(req, res, next);
+app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
+
+// Add a debug route to check MP3 files
+app.get('/debug/mp3s', async (req, res) => {
+  const mp3Dir = path.join(__dirname, 'mp3s');
+  try {
+    const files = await fs.promises.readdir(mp3Dir);
+    res.json({
+      directory: mp3Dir,
+      files: files,
+      exists: await fs.promises.access(mp3Dir).then(() => true).catch(() => false)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Route to handle PUT requests for Freeflow

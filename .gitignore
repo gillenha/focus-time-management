@@ -11,6 +11,7 @@
 # production
 /build
 /dist
+/mp3s
 
 # logs
 /logs

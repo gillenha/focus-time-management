@@ -48,20 +48,69 @@ function App() {
 
   useEffect(() => {
     const fetchBackgroundImage = async () => {
-      const savedImage = localStorage.getItem('backgroundImage');
-      const savedPhotographer = localStorage.getItem('photographer');
-      
-      if (savedImage && savedPhotographer) {
-        setBackgroundImage(savedImage);
-        setPhotographer(JSON.parse(savedPhotographer));
-        return;
-      }
+      console.log('Starting background image fetch process...');
 
-      setBackgroundImage('/images/test.jpg');
-      setPhotographer({ name: '', username: '', link: '' });
-      
-      localStorage.setItem('backgroundImage', '/images/test.jpg');
-      localStorage.setItem('photographer', JSON.stringify({ name: '', username: '', link: '' }));
+      // Retry logic for Unsplash API
+      const fetchUnsplashImage = async () => {
+        try {
+          console.log('Attempting to fetch image from Unsplash API...');
+          console.log('Using access key:', process.env.REACT_APP_UNSPLASH_ACCESS_KEY ? 'Key exists' : 'Key missing');
+          
+          const response = await fetch(`https://api.unsplash.com/photos/random?query=nature&orientation=landscape`, {
+            headers: {
+              'Authorization': `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
+            }
+          });
+          
+          console.log('Unsplash API response status:', response.status);
+          
+          if (response.status === 403) {
+            console.log('Rate limit exceeded (403). Checking for cached image...');
+            throw new Error('Rate limited');
+          }
+          
+          console.log('Successfully fetched image from Unsplash API!');
+          const data = await response.json();
+          setBackgroundImage(data.urls.regular);
+          setPhotographer({
+            name: data.user.name,
+            username: data.user.username,
+            link: data.user.links.html
+          });
+          
+          // Save to localStorage for future rate-limit cases
+          localStorage.setItem('backgroundImage', data.urls.regular);
+          localStorage.setItem('photographer', JSON.stringify({
+            name: data.user.name,
+            username: data.user.username,
+            link: data.user.links.html
+          }));
+        } catch (error) {
+          if (error.message === 'Rate limited') {
+            // Check for cached image first
+            const savedImage = localStorage.getItem('backgroundImage');
+            const savedPhotographer = localStorage.getItem('photographer');
+            
+            if (savedImage && savedPhotographer) {
+              console.log('Using cached image due to rate limit');
+              setBackgroundImage(savedImage);
+              setPhotographer(JSON.parse(savedPhotographer));
+            } else {
+              // If no cached image, use fallback
+              console.log('No cached image available, using fallback test.jpg');
+              setBackgroundImage('/images/test.jpg');
+              setPhotographer({ name: '', username: '', link: '' });
+            }
+          } else {
+            console.log('Other error occurred, retrying...', error);
+            // For other errors, retry after a delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetchUnsplashImage();
+          }
+        }
+      };
+
+      await fetchUnsplashImage();
     };
 
     fetchBackgroundImage();

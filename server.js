@@ -41,6 +41,14 @@ app.use(bodyParser.json({ limit: '10kb' }));
 // Serve static files from the React build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
+// Add this BEFORE the catch-all route
+app.get('/mp3s/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json([
+    "https://storage.googleapis.com/react-app-assets/the-social-network-soundtrack.mp3"
+  ]);
+});
+
 // Handle React routing, return all requests to React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
@@ -202,14 +210,13 @@ app.get('/api/notion-test', async (req, res) => {
     }
 });
 
-// Add this route to serve the manifest
-app.get('/mp3s/manifest.json', (req, res) => {
-  res.json([
-    "https://storage.googleapis.com/react-app-assets/the-social-network-soundtrack.mp3"
-  ]);
-});
-
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
 });

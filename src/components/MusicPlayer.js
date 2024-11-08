@@ -13,12 +13,18 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [slideIn, setSlideIn] = useState(false);
 
   useEffect(() => {
+    console.log('Attempting to fetch manifest from:', '/mp3s/manifest.json');
     fetch('/mp3s/manifest.json')
       .then(response => {
+        console.log('Manifest response:', response);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return response.json();
+        return response.text()  // Change to text() temporarily for debugging
+          .then(text => {
+            console.log('Raw response:', text);
+            return JSON.parse(text);
+          });
       })
       .then(urls => {
         console.log('Received audio URLs:', urls);
@@ -26,6 +32,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       })
       .catch(error => {
         console.error('Error fetching audio manifest:', error);
+        console.error('Error details:', error.message);
       });
   }, []);
 

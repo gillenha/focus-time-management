@@ -13,19 +13,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [slideIn, setSlideIn] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:5001/mp3s')
+    fetch('/mp3s/manifest.json')
       .then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
       })
-      .then(data => {
-        console.log('Received audio files:', data.mp3s);
-        setAudioFiles(data.mp3s);
+      .then(urls => {
+        console.log('Received audio URLs:', urls);
+        setAudioFiles(urls);
       })
       .catch(error => {
-        console.error('Error fetching audio files:', error);
+        console.error('Error fetching audio manifest:', error);
       });
   }, []);
 
@@ -51,23 +51,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   const playNextAudio = () => {
     if (currentAudioIndex < audioFiles.length) {
-      const audioPath = `/mp3s/${audioFiles[currentAudioIndex]}`;
-      console.log('Attempting to play:', audioPath);
+      const audioUrl = audioFiles[currentAudioIndex];
+      console.log('Attempting to play:', audioUrl);
       
-      // Create audio element
-      const audio = new Audio();
+      const audio = new Audio(audioUrl);
       
-      // Add load start listener
       audio.addEventListener('loadstart', () => {
         console.log('Audio loading started');
       });
       
-      // Add loaded data listener
       audio.addEventListener('loadeddata', () => {
         console.log('Audio data loaded successfully');
       });
       
-      // Add error listener with more details
       audio.addEventListener('error', (e) => {
         console.error('Audio loading error:', {
           error: e,
@@ -78,17 +74,11 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         });
       });
       
-      // Set the source after adding listeners
-      audio.src = audioPath;
       audioRef.current = audio;
       audio.volume = volume;
       
       audio.play().catch(error => {
-        console.error('Error playing audio:', {
-          error: error,
-          message: error.message,
-          name: error.name
-        });
+        console.error('Error playing audio:', error);
       });
       
       setIsPlaying(true);

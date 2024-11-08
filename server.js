@@ -198,6 +198,13 @@ app.get('/api/notion-test', async (req, res) => {
     }
 });
 
+// Add this route to serve the manifest
+app.get('/mp3s/manifest.json', (req, res) => {
+  res.json([
+    "https://storage.googleapis.com/react-app-assets/the-social-network-soundtrack.mp3"
+  ]);
+});
+
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

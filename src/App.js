@@ -11,6 +11,7 @@ import VolumeBar from './components/VolumeBar';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import SessionHistoryPage from './pages/SessionHistoryPage';
+import Menu from './components/Menu';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -26,6 +27,7 @@ function App() {
   const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState('');
   const [photographer, setPhotographer] = useState({ name: '', username: '', link: '' });
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -46,33 +48,23 @@ function App() {
 
   useEffect(() => {
     const fetchBackgroundImage = async () => {
-      try {
-        const response = await fetch(
-          `https://api.unsplash.com/photos/random?query=nature&orientation=landscape`,
-          {
-            headers: {
-              Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
-            }
-          }
-        );
-        const data = await response.json();
-        setBackgroundImage(data.urls.full);
-        setPhotographer({
-          name: data.user.name,
-          username: data.user.username,
-          link: data.links.html
-        });
-      } catch (error) {
-        console.error('Error fetching background image:', error);
-        setBackgroundImage('/src/images/test.jpg');
-        setPhotographer({ name: '', username: '', link: '' });
+      const savedImage = localStorage.getItem('backgroundImage');
+      const savedPhotographer = localStorage.getItem('photographer');
+      
+      if (savedImage && savedPhotographer) {
+        setBackgroundImage(savedImage);
+        setPhotographer(JSON.parse(savedPhotographer));
+        return;
       }
+
+      setBackgroundImage('/images/test.jpg');
+      setPhotographer({ name: '', username: '', link: '' });
+      
+      localStorage.setItem('backgroundImage', '/images/test.jpg');
+      localStorage.setItem('photographer', JSON.stringify({ name: '', username: '', link: '' }));
     };
 
     fetchBackgroundImage();
-    const interval = setInterval(fetchBackgroundImage, 1800000);
-
-    return () => clearInterval(interval);
   }, []);
 
   const handleFreeFlowClick = () => {
@@ -130,7 +122,7 @@ function App() {
       setTimeout(() => {
         setShowSessionHistory(false);
         setIsSessionHistoryExiting(false);
-      }, 500); // This should match the animation duration in SessionHistory.css
+      }); // This should match the animation duration in SessionHistory.css
     } else {
       setShowSessionHistory(true);
     }
@@ -175,11 +167,23 @@ function App() {
         </div>
       )}
       <div className="app">
-        <div className="top-bar">
-          <button className="history-button" onClick={toggleSessionHistory}>
-            {showSessionHistory ? "Hide History" : "Show History"}
+        <div className="tw-fixed tw-top-0 tw-left-0 tw-z-50">
+          <button 
+            className="tw-p-4 tw-cursor-pointer tw-transition-all tw-duration-200 tw-ease-in-out tw-bg-transparent tw-border-0"
+            onClick={() => setIsMenuOpen(true)}
+          >
+            <div className="tw-space-y-2">
+              <span className="tw-block tw-h-0.5 tw-w-5 tw-bg-white"></span>
+              <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
+              <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
+            </div>
           </button>
         </div>
+        <Menu 
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          onShowHistory={toggleSessionHistory}
+        />
         {showMusicPlayer && (
           <MusicPlayer
             isFreeflow={isFreeflow}

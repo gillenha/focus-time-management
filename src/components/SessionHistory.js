@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import './SessionHistory.css';
 
-const API_BASE_URL = 'http://localhost:5001'; // Add this line
+const API_BASE_URL = 'http://localhost:5001';
 
-const SessionHistory = ({ sessionHistory, onClearHistory, onClose, isExiting }) => {
+const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
     const [editingIndex, setEditingIndex] = useState(null);
     const [editText, setEditText] = useState('');
 
@@ -101,39 +100,102 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose, isExiting }) 
     };
 
     return (
-        <div className={`session-history-drawer ${isExiting ? 'exit' : ''}`}>
-            <div className="session-history-content">
-                <span className="close-button" onClick={onClose} aria-label="Close"></span>
-                <h2>Session History</h2>
-                <ul style={{ display: 'flex', flexDirection: 'column' }}>
-                    {sessionHistory.slice().reverse().map((session, index) => {
-                        const reverseIndex = sessionHistory.length - 1 - index;
-                        return (
-                            <li key={`session-${reverseIndex}`} className="session-log-item">
-                                <span className="session-date" data-label="Date:">{session.date}</span>
-                                <span className="session-time" data-label="Time:">{session.time}</span>
-                                <span className="session-duration" data-label="Duration:">{formatDuration(session.duration)}</span>
-                                {editingIndex === reverseIndex ? (
-                                    <input
-                                        type="text"
-                                        value={editText}
-                                        onChange={(e) => setEditText(e.target.value)}
-                                        onBlur={() => saveEdit(reverseIndex)}
-                                        autoFocus
-                                    />
-                                ) : (
-                                    <span className="session-text" data-label="Log:">{session.text}</span>
-                                )}
-                                <button onClick={() => sendToServer(session)}>Log to Server</button>
-                                <button onClick={() => startEditing(reverseIndex, session.text)}>
-                                    {editingIndex === reverseIndex ? 'Save' : 'Edit'}
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ul>
-                <button onClick={onClearHistory}>Clear History</button>
-                <button onClick={() => console.log("Data sent to Notion")}>Send to Notion</button>
+            <div className="tw-fixed tw-inset-0 tw-bg-white tw-z-50">
+            <div className="tw-h-full tw-overflow-y-auto">
+                <div className="tw-p-6">
+                    {/* Header */}
+                    <div className="tw-flex tw-items-center tw-mb-6">
+                        <button 
+                            onClick={onClose}
+                            className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-gray-500 tw-cursor-pointer"
+                        >
+                            <svg 
+                                xmlns="http://www.w3.org/2000/svg" 
+                                width="24" 
+                                height="24" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                                className="tw-w-6 tw-h-6"
+                            >
+                                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                            </svg>
+                        </button>
+                        <h2 className="tw-text-xl tw-font-bold tw-text-gray-800">Session History</h2>
+                    </div>
+
+                    {/* Session List */}
+                    <div className="tw-mb-20">
+                        <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
+                            {sessionHistory.slice().reverse().map((session, index) => {
+                                const reverseIndex = sessionHistory.length - 1 - index;
+                                return (
+                                    <li key={`session-${reverseIndex}`} 
+                                        onClick={() => console.log('Session clicked:', session)}
+                                        className="tw-bg-gray-50 tw-rounded-lg tw-p-4 tw-cursor-pointer hover:tw-bg-gray-100"
+                                    >
+                                        <div className="tw-flex tw-gap-8">
+                                            {/* Left Column - Date, Time, Duration */}
+                                            <div className="tw-space-y-2">
+                                                <div className="tw-flex tw-items-center">
+                                                    <span className="tw-text-sm tw-text-gray-500">Date: </span>
+                                                    <span className="tw-font-medium tw-ml-1">{session.date}</span>
+                                                </div>
+                                                <div className="tw-flex tw-items-center">
+                                                    <span className="tw-text-sm tw-text-gray-500">Time: </span>
+                                                    <span className="tw-font-medium tw-ml-1">{session.time}</span>
+                                                </div>
+                                                <div className="tw-flex tw-items-center">
+                                                    <span className="tw-text-sm tw-text-gray-500">Duration: </span>
+                                                    <span className="tw-font-medium tw-ml-1">{formatDuration(session.duration)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Right Column - Notes */}
+                                            <div className="tw-flex tw-flex-col tw-items-start">
+                                                <span className="tw-text-sm tw-text-gray-500">Notes: </span>
+                                                <span className="tw-font-medium tw-mt-1">{session.text}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="tw-flex tw-gap-2 tw-mt-4">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    sendToServer(session);
+                                                }}
+                                                className="tw-px-3 tw-py-1 tw-text-sm tw-text-gray-600 tw-bg-gray-100 tw-rounded hover:tw-bg-gray-200 tw-transition-colors"
+                                            >
+                                                Log to Server
+                                            </button>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+
+                    {/* Footer Actions - Now fixed at bottom */}
+                    <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-4 tw-border-t tw-border-gray-200">
+                        <div className="tw-flex tw-justify-end tw-space-x-3">
+                            <button
+                                onClick={onClearHistory}
+                                className="tw-px-4 tw-py-2 tw-text-sm tw-text-red-600 tw-bg-red-50 tw-rounded hover:tw-bg-red-100 tw-transition-colors"
+                            >
+                                Clear History
+                            </button>
+                            <button
+                                onClick={() => console.log("Data sent to Notion")}
+                                className="tw-px-4 tw-py-2 tw-text-sm tw-text-gray-600 tw-bg-gray-100 tw-rounded hover:tw-bg-gray-200 tw-transition-colors"
+                            >
+                                Send to Notion
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

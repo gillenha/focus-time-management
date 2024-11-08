@@ -49,6 +49,11 @@ function App() {
   useEffect(() => {
     const fetchBackgroundImage = async () => {
       console.log('Starting background image fetch process...');
+      console.log('Environment:', process.env.NODE_ENV);
+      console.log('All env variables:', {
+        REACT_APP_UNSPLASH_ACCESS_KEY: process.env.REACT_APP_UNSPLASH_ACCESS_KEY ? 'exists' : 'missing',
+        // Log other env variables if needed
+      });
 
       // Check if we have a recent image (less than 30 minutes old)
       const lastFetchTime = localStorage.getItem('lastImageFetch');
@@ -70,14 +75,26 @@ function App() {
       // Retry logic for Unsplash API
       const fetchUnsplashImage = async () => {
         try {
+          if (!process.env.REACT_APP_UNSPLASH_ACCESS_KEY) {
+            console.log('No API key found, using fallback image');
+            setBackgroundImage('/images/test.jpg');
+            setPhotographer({ name: '', username: '', link: '' });
+            return;
+          }
+
           console.log('Attempting to fetch image from Unsplash API...');
-          console.log('Using access key:', process.env.REACT_APP_UNSPLASH_ACCESS_KEY ? 'Key exists' : 'Key missing');
-          
           const response = await fetch(`https://api.unsplash.com/photos/random?query=nature&orientation=landscape`, {
             headers: {
               'Authorization': `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
             }
           });
+          
+          if (response.status === 401) {
+            console.log('Unauthorized: API key invalid');
+            setBackgroundImage('/images/test.jpg');
+            setPhotographer({ name: '', username: '', link: '' });
+            return;
+          }
           
           console.log('Unsplash API response status:', response.status);
           

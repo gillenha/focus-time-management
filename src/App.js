@@ -50,6 +50,23 @@ function App() {
     const fetchBackgroundImage = async () => {
       console.log('Starting background image fetch process...');
 
+      // Check if we have a recent image (less than 24 hours old)
+      const lastFetchTime = localStorage.getItem('lastImageFetch');
+      const savedImage = localStorage.getItem('backgroundImage');
+      const savedPhotographer = localStorage.getItem('photographer');
+      const ONE_DAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+      if (lastFetchTime && savedImage && savedPhotographer) {
+        const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
+        if (timeSinceLastFetch < ONE_DAY) {
+          console.log('Using recently cached image (less than 24h old)');
+          setBackgroundImage(savedImage);
+          setPhotographer(JSON.parse(savedPhotographer));
+          return;
+        }
+        console.log('Cached image is older than 24h, fetching new image');
+      }
+
       // Retry logic for Unsplash API
       const fetchUnsplashImage = async () => {
         try {
@@ -71,39 +88,35 @@ function App() {
           
           console.log('Successfully fetched image from Unsplash API!');
           const data = await response.json();
-          setBackgroundImage(data.urls.regular);
+          setBackgroundImage(data.urls.full);
           setPhotographer({
             name: data.user.name,
             username: data.user.username,
             link: data.user.links.html
           });
           
-          // Save to localStorage for future rate-limit cases
+          // Save to localStorage with timestamp
           localStorage.setItem('backgroundImage', data.urls.regular);
           localStorage.setItem('photographer', JSON.stringify({
             name: data.user.name,
             username: data.user.username,
             link: data.user.links.html
           }));
+          localStorage.setItem('lastImageFetch', Date.now().toString());
         } catch (error) {
           if (error.message === 'Rate limited') {
-            // Check for cached image first
-            const savedImage = localStorage.getItem('backgroundImage');
-            const savedPhotographer = localStorage.getItem('photographer');
-            
+            // Check for any cached image regardless of age
             if (savedImage && savedPhotographer) {
-              console.log('Using cached image due to rate limit');
+              console.log('Rate limited: Using cached image');
               setBackgroundImage(savedImage);
               setPhotographer(JSON.parse(savedPhotographer));
             } else {
-              // If no cached image, use fallback
               console.log('No cached image available, using fallback test.jpg');
               setBackgroundImage('/images/test.jpg');
               setPhotographer({ name: '', username: '', link: '' });
             }
           } else {
             console.log('Other error occurred, retrying...', error);
-            // For other errors, retry after a delay
             await new Promise(resolve => setTimeout(resolve, 1000));
             return fetchUnsplashImage();
           }

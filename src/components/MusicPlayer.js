@@ -195,15 +195,14 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           tw-flex-col 
           tw-items-center 
           tw-justify-center 
-          tw-gap-8
+          tw-gap-2
           tw-absolute 
-          tw-top-[45%]         // Position below the "Time to focus" text which slides to top-1/3
+          tw-top-[40%]         // Position below the "Time to focus" text which slides to top-1/3
           tw-left-1/2 
           tw--translate-x-1/2 
           tw--translate-y-1/2  // Center vertically relative to its position
           tw-w-full
           tw-transition-all
-          tw-mb-20            // Add margin to ensure space above control bar
           ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
         `}>
           {/* Connect to Spotify Button - no need for absolute positioning */}
@@ -232,7 +231,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
             onChange={handleInputChange}
             placeholder="What do you want to focus on?"
             className={`
-              tw-w-[83%]
+              tw-w-[83%]\
+              tw-mt-0
+              tw-mb-0
               tw-h-32
               tw-bg-white
               tw-rounded-lg

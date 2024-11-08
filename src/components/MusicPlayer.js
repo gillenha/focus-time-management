@@ -11,6 +11,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
   const [slideIn, setSlideIn] = useState(false);
+  const [isConnectedToSpotify, setIsConnectedToSpotify] = useState(false);
+  const [userPlaylists, setUserPlaylists] = useState([]);
 
   useEffect(() => {
     console.log('Attempting to fetch manifest from:', '/mp3s/manifest.json');
@@ -114,9 +116,97 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     // Implement logic to play the next track
   };
 
+  useEffect(() => {
+    // Check if we're handling a callback from Spotify
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+
+    if (code) {
+      // Exchange code for access token
+      const getAccessToken = async () => {
+        try {
+          console.log('Sending token request with:', {
+            code,
+            redirect_uri: process.env.REACT_APP_REDIRECT_URI
+          });
+
+          const tokenRequestBody = new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: process.env.REACT_APP_REDIRECT_URI
+          });
+
+          console.log('Request body:', tokenRequestBody.toString());
+          console.log('Authorization header:', 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`));
+
+          const response = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`)
+            },
+            body: tokenRequestBody
+          });
+
+          const responseText = await response.text();
+          console.log('Response status:', response.status);
+          console.log('Response text:', responseText);
+
+          const data = JSON.parse(responseText);
+          
+          localStorage.setItem('spotifyAccessToken', data.access_token);
+          localStorage.setItem('spotifyRefreshToken', data.refresh_token);
+          
+          // After successfully getting the token, fetch playlists
+          await fetchUserPlaylists();
+          
+          window.history.replaceState({}, document.title, "/");
+        } catch (error) {
+          console.error('Error getting access token:', error);
+        }
+      };
+
+      getAccessToken();
+    } else {
+      // Check if we're already connected when component mounts
+      const accessToken = localStorage.getItem('spotifyAccessToken');
+      if (accessToken) {
+        fetchUserPlaylists();
+      }
+    }
+  }, []);
+
+  const fetchUserPlaylists = async () => {
+    try {
+      const accessToken = localStorage.getItem('spotifyAccessToken');
+      if (!accessToken) return;
+
+      const response = await fetch('https://api.spotify.com/v1/me/playlists', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.items) {
+        setUserPlaylists(data.items);
+        setIsConnectedToSpotify(true);
+      } else {
+        console.error('No playlists found in response:', data);
+        setUserPlaylists([]);
+      }
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+      setUserPlaylists([]);
+    }
+  };
+
   const handleConnectToSpotify = () => {
-    console.log('Connect to Spotify button clicked');
-    // Implement logic to connect to Spotify
+    const scope = 'user-read-private user-read-email user-read-playback-state user-modify-playback-state';
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${process.env.REACT_APP_SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${process.env.REACT_APP_REDIRECT_URI}&scope=${encodeURIComponent(scope)}`;
+    
+    // Redirect user to Spotify login
+    window.location.href = authUrl;
   };
 
   useEffect(() => {
@@ -206,24 +296,50 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
         `}>
           {/* Connect to Spotify Button - no need for absolute positioning */}
-          <button 
-            onClick={handleConnectToSpotify}
-            className={`
-              tw-mt-16
-              tw-px-4
-              tw-py-2
-              tw-bg-green-500
-              tw-text-white
-              tw-rounded-full
-              tw-font-medium
-              hover:tw-bg-green-600
-              tw-transition-colors
-              tw-border-0
-              tw-cursor-pointer
-            `}
-          >
-            Connect to Spotify
-          </button>
+          {isConnectedToSpotify ? (
+            <select
+              className={`
+                tw-mt-16
+                tw-px-4
+                tw-py-2
+                tw-bg-green-500
+                tw-text-white
+                tw-rounded-full
+                tw-font-medium
+                hover:tw-bg-green-600
+                tw-transition-colors
+                tw-border-0
+                tw-cursor-pointer
+                tw-w-64
+              `}
+            >
+              <option value="">Select a Playlist</option>
+              {userPlaylists && userPlaylists.map(playlist => (
+                <option key={playlist.id} value={playlist.id}>
+                  {playlist.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <button 
+              onClick={handleConnectToSpotify}
+              className={`
+                tw-mt-16
+                tw-px-4
+                tw-py-2
+                tw-bg-green-500
+                tw-text-white
+                tw-rounded-full
+                tw-font-medium
+                hover:tw-bg-green-600
+                tw-transition-colors
+                tw-border-0
+                tw-cursor-pointer
+              `}
+            >
+              Connect to Spotify
+            </button>
+          )}
 
           {/* Textarea - no need for absolute positioning */}
           <textarea

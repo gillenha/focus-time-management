@@ -268,5 +268,11 @@
     "time": "12:03 pm",
     "duration": "00:25",
     "text": "test "
+  },
+  {
+    "date": "Nov 8, 2024",
+    "time": "4:53 pm",
+    "duration": "49:20",
+    "text": "Going to work some more on the Spotify integration"
   }
 ]

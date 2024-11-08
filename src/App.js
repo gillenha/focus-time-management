@@ -50,21 +50,21 @@ function App() {
     const fetchBackgroundImage = async () => {
       console.log('Starting background image fetch process...');
 
-      // Check if we have a recent image (less than 24 hours old)
+      // Check if we have a recent image (less than 30 minutes old)
       const lastFetchTime = localStorage.getItem('lastImageFetch');
       const savedImage = localStorage.getItem('backgroundImage');
       const savedPhotographer = localStorage.getItem('photographer');
-      const ONE_DAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes in milliseconds
 
       if (lastFetchTime && savedImage && savedPhotographer) {
         const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
-        if (timeSinceLastFetch < ONE_DAY) {
-          console.log('Using recently cached image (less than 24h old)');
+        if (timeSinceLastFetch < THIRTY_MINUTES) {
+          console.log('Using recently cached image (less than 30m old)');
           setBackgroundImage(savedImage);
           setPhotographer(JSON.parse(savedPhotographer));
           return;
         }
-        console.log('Cached image is older than 24h, fetching new image');
+        console.log('Cached image is older than 30m, fetching new image');
       }
 
       // Retry logic for Unsplash API

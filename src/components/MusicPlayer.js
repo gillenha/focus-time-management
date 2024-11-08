@@ -114,6 +114,11 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     // Implement logic to play the next track
   };
 
+  const handleConnectToSpotify = () => {
+    console.log('Connect to Spotify button clicked');
+    // Implement logic to connect to Spotify
+  };
+
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
@@ -184,8 +189,31 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           }`}>
           Time to focus
         </p>
+        
+        <div className="tw-flex tw-flex-row tw-items-center tw-justify-center tw-gap-4">
+          {/* Connect to Spotify Button */}
+        <button 
+          onClick={handleConnectToSpotify}
+          className={`
+            tw-absolute
+            tw-bottom-0
+            tw-left-1/8
+            tw--translate-x-1/8
+            tw-px-4
+            tw-py-2
+            tw-bg-green-500
+            tw-text-white
+            tw-rounded-full
+            tw-font-medium
+            tw-border-0
+            hover:tw-bg-green-600
+            tw-cursor-pointer
+            tw-transition-colors
+          `}
+        >
+          Connect to Spotify
+        </button>
 
-        {/* Text Input - Positioned above Begin Button */}
         <textarea
           value={inputValue}
           onChange={handleInputChange}
@@ -255,7 +283,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           `}
         >
           Begin Session
-        </button>
+          </button>
+        </div>
 
         {/* Control Bar - Fixed at bottom */}
         <div className="

@@ -29,6 +29,9 @@ function App() {
   const [photographer, setPhotographer] = useState({ name: '', username: '', link: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Get the Unsplash API key based on environment
+  const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
+
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
     setSessionHistory(savedHistory);
@@ -50,16 +53,12 @@ function App() {
     const fetchBackgroundImage = async () => {
       console.log('Starting background image fetch process...');
       console.log('Environment:', process.env.NODE_ENV);
-      console.log('All env variables:', {
-        REACT_APP_UNSPLASH_ACCESS_KEY: process.env.REACT_APP_UNSPLASH_ACCESS_KEY ? 'exists' : 'missing',
-        // Log other env variables if needed
-      });
+      console.log('Unsplash API Key exists:', !!UNSPLASH_ACCESS_KEY);
 
-      // Check if we have a recent image (less than 30 minutes old)
       const lastFetchTime = localStorage.getItem('lastImageFetch');
       const savedImage = localStorage.getItem('backgroundImage');
       const savedPhotographer = localStorage.getItem('photographer');
-      const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes in milliseconds
+      const THIRTY_MINUTES = 30 * 60 * 1000;
 
       if (lastFetchTime && savedImage && savedPhotographer) {
         const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
@@ -72,79 +71,63 @@ function App() {
         console.log('Cached image is older than 30m, fetching new image');
       }
 
-      // Retry logic for Unsplash API
-      const fetchUnsplashImage = async () => {
-        try {
-          if (!process.env.REACT_APP_UNSPLASH_ACCESS_KEY) {
-            console.log('No API key found, using fallback image');
-            setBackgroundImage('/images/test.jpg');
-            setPhotographer({ name: '', username: '', link: '' });
-            return;
-          }
-
-          console.log('Attempting to fetch image from Unsplash API...');
-          const response = await fetch(`https://api.unsplash.com/photos/random?query=nature&orientation=landscape`, {
-            headers: {
-              'Authorization': `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
-            }
-          });
-          
-          if (response.status === 401) {
-            console.log('Unauthorized: API key invalid');
-            setBackgroundImage('/images/test.jpg');
-            setPhotographer({ name: '', username: '', link: '' });
-            return;
-          }
-          
-          console.log('Unsplash API response status:', response.status);
-          
-          if (response.status === 403) {
-            console.log('Rate limit exceeded (403). Checking for cached image...');
-            throw new Error('Rate limited');
-          }
-          
-          console.log('Successfully fetched image from Unsplash API!');
-          const data = await response.json();
-          setBackgroundImage(data.urls.full);
-          setPhotographer({
-            name: data.user.name,
-            username: data.user.username,
-            link: data.user.links.html
-          });
-          
-          // Save to localStorage with timestamp
-          localStorage.setItem('backgroundImage', data.urls.regular);
-          localStorage.setItem('photographer', JSON.stringify({
-            name: data.user.name,
-            username: data.user.username,
-            link: data.user.links.html
-          }));
-          localStorage.setItem('lastImageFetch', Date.now().toString());
-        } catch (error) {
-          if (error.message === 'Rate limited') {
-            // Check for any cached image regardless of age
-            if (savedImage && savedPhotographer) {
-              console.log('Rate limited: Using cached image');
-              setBackgroundImage(savedImage);
-              setPhotographer(JSON.parse(savedPhotographer));
-            } else {
-              console.log('No cached image available, using fallback test.jpg');
-              setBackgroundImage('/images/test.jpg');
-              setPhotographer({ name: '', username: '', link: '' });
-            }
-          } else {
-            console.log('Other error occurred, retrying...', error);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            return fetchUnsplashImage();
-          }
+      try {
+        if (!UNSPLASH_ACCESS_KEY) {
+          throw new Error('No Unsplash API key found');
         }
-      };
 
-      await fetchUnsplashImage();
+        console.log('Fetching new image from Unsplash...');
+        const response = await fetch(
+          'https://api.unsplash.com/photos/random?query=nature&orientation=landscape',
+          {
+            headers: {
+              'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Unsplash API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Save the new image and photographer info
+        setBackgroundImage(data.urls.full);
+        setPhotographer({
+          name: data.user.name,
+          username: data.user.username,
+          link: data.user.links.html
+        });
+
+        // Cache the results
+        localStorage.setItem('backgroundImage', data.urls.regular);
+        localStorage.setItem('photographer', JSON.stringify({
+          name: data.user.name,
+          username: data.user.username,
+          link: data.user.links.html
+        }));
+        localStorage.setItem('lastImageFetch', Date.now().toString());
+
+      } catch (error) {
+        console.error('Error fetching background image:', error);
+        
+        // If we have cached data, use it as fallback
+        if (savedImage && savedPhotographer) {
+          console.log('Using cached image as fallback');
+          setBackgroundImage(savedImage);
+          setPhotographer(JSON.parse(savedPhotographer));
+        } else {
+          // Ultimate fallback to local image
+          console.log('Using local fallback image');
+          setBackgroundImage('/images/test.jpg');
+          setPhotographer({ name: '', username: '', link: '' });
+        }
+      }
     };
 
     fetchBackgroundImage();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleFreeFlowClick = () => {
     if (isFreeflow) {

@@ -1,0 +1,5 @@
+window.env = {
+  "REACT_APP_SPOTIFY_CLIENT_ID": "1300c4daadb2448393a2c0b9203f1c16",
+  "REACT_APP_SPOTIFY_CLIENT_SECRET": "30bd6a8fb2524dc1a38c49af31d90a69",
+  "REACT_APP_REDIRECT_URI": "http://localhost:3000/callback"
+};

@@ -190,105 +190,86 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           Time to focus
         </p>
         
-        <div className="tw-flex tw-flex-row tw-items-center tw-justify-center tw-gap-4">
-          {/* Connect to Spotify Button */}
-        <button 
-          onClick={handleConnectToSpotify}
-          className={`
-            tw-absolute
-            tw-bottom-0
-            tw-left-1/8
-            tw--translate-x-1/8
-            tw-px-4
-            tw-py-2
-            tw-bg-green-500
-            tw-text-white
-            tw-rounded-full
-            tw-font-medium
-            tw-border-0
-            hover:tw-bg-green-600
-            tw-cursor-pointer
-            tw-transition-colors
-          `}
-        >
-          Connect to Spotify
-        </button>
+        <div className={`
+          tw-flex 
+          tw-flex-col 
+          tw-items-center 
+          tw-justify-center 
+          tw-gap-8
+          tw-absolute 
+          tw-top-[45%]         // Position below the "Time to focus" text which slides to top-1/3
+          tw-left-1/2 
+          tw--translate-x-1/2 
+          tw--translate-y-1/2  // Center vertically relative to its position
+          tw-w-full
+          tw-transition-all
+          tw-mb-20            // Add margin to ensure space above control bar
+          ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
+        `}>
+          {/* Connect to Spotify Button - no need for absolute positioning */}
+          <button 
+            onClick={handleConnectToSpotify}
+            className={`
+              tw-mt-16
+              tw-px-4
+              tw-py-2
+              tw-bg-green-500
+              tw-text-white
+              tw-rounded-full
+              tw-font-medium
+              hover:tw-bg-green-600
+              tw-transition-colors
+              tw-border-0
+              tw-cursor-pointer
+            `}
+          >
+            Connect to Spotify
+          </button>
 
-        <textarea
-          value={inputValue}
-          onChange={handleInputChange}
-          placeholder="What do you want to focus on?"
-          className={`
-            // Positioning
-            tw-absolute
-            tw-bottom-44        // 176px from bottom
-            tw-left-1/2
-            tw--translate-x-1/2
-            
-            // Dimensions
-            tw-w-[83%]
-            tw-h-32
-            
-            // Styling
-            tw-bg-white
-            tw-rounded-lg
-            tw-p-4
-            
-            // Typography
-            tw-font-sans
-            tw-text-lg
-            tw-text-gray-800
-            
-            // Behavior
-            tw-resize-none
-            tw-outline-none
-            tw-transition-all
-            
-            // Animation
-            ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
-          `}
-        />
+          {/* Textarea - no need for absolute positioning */}
+          <textarea
+            value={inputValue}
+            onChange={handleInputChange}
+            placeholder="What do you want to focus on?"
+            className={`
+              tw-w-[83%]
+              tw-h-32
+              tw-bg-white
+              tw-rounded-lg
+              tw-p-4
+              tw-font-sans
+              tw-text-lg
+              tw-text-gray-800
+              tw-resize-none
+              tw-outline-none
+            `}
+          />
 
-        {/* Begin Button - Positioned above Control Bar */}
-        <button
-          onClick={handleClick}
-          className={`
-            // Positioning
-            tw-absolute
-            tw-bottom-24        // 96px from bottom
-            tw-left-1/2
-            tw--translate-x-1/2
-            
-            // Dimensions
-            tw-w-[90%]
-            tw-py-3
-            
-            // Styling
-            tw-bg-gray-700
-            tw-rounded-lg
-            tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-            
-            // Typography
-            tw-font-sans
-            tw-text-lg
-            tw-text-white
-            
-            // Behavior
-            tw-cursor-pointer
-            tw-border-0
-            tw-transition-all
-            
-            // Animation
-            ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
-          `}
-        >
-          Begin Session
+          {/* Begin Button - no need for absolute positioning */}
+          <button
+            onClick={handleClick}
+            className={`
+              tw-w-[90%]
+              tw-py-3
+              tw-bg-gray-700
+              tw-rounded-lg
+              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
+              tw-font-sans
+              tw-text-lg
+              tw-text-white
+              tw-cursor-pointer
+              tw-border-0
+              tw-transition-all
+            `}
+          >
+            Begin Session
           </button>
         </div>
 
         {/* Control Bar - Fixed at bottom */}
         <div className="
           // Positioning
+          tw-mt-16
           tw-absolute
           tw-bottom-8         // 32px from bottom
           tw-left-0

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import './styles/tailwind.css';
 import './App.css';
+import './index.css';
 import './components/HandleFreeFlow.css';
 import './components/HandleTimer.css';
 import './components/MusicPlayer.css';

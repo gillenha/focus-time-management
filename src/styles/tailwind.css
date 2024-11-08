@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add any custom utilities here using @layer */
+@layer utilities {
+  .slide-down {
+    @apply tw-transform tw-transition-all tw-duration-500;
+  }
+} 

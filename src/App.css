@@ -215,3 +215,12 @@ body, html {
 .photo-attribution a:hover {
   border-bottom: 1px solid white;
 }
+
+.scale-after-slide {
+  transition: transform 0.3s ease-out;
+  transform: scale(0.75);
+}
+
+.slide-in.scale-after-slide {
+  transform: scale(1);
+}

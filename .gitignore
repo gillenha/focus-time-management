@@ -11,7 +11,6 @@
 # production
 /build
 /dist
-/mp3s
 
 # logs
 /logs
@@ -35,7 +34,6 @@ node_modules/
 build/
 
 # MP3 files
-mp3s/
 
 # Other large files or directories
 # Add any other large files or directories here

@@ -138,6 +138,12 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    console.log('App mounted');
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Public URL:', process.env.PUBLIC_URL);
+  }, []);
+
   return (
     <div className="grid-container">
       <div 

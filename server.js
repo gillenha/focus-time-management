@@ -8,7 +8,7 @@ const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 
 const app = express();
-const PORT = process.env.PORT || 5001; // Ensure this matches the port in App.js
+const PORT = process.env.PORT || 8080; // Change from 5001 to 8080
 
 // Initialize Notion client
 let notion;
@@ -38,9 +38,13 @@ app.use(cors({
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/effects', express.static(path.join(__dirname, 'public', 'effects')));
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 // Serve MP3 files with proper headers
 app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));

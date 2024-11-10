@@ -1,42 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './MusicPlayer.css';
-import ControlBar from './ControlBar';
+
+const refreshAccessToken = async (refreshToken) => {
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`)
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to refresh token');
+    
+    const data = await response.json();
+    localStorage.setItem('spotifyAccessToken', data.access_token);
+    return data.access_token;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    handleDisconnectSpotify();
+    return null;
+  }
+};
 
 function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume }) {
-  const [buttonVisible, setButtonVisible] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [audioFiles, setAudioFiles] = useState([]);
-  const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
   const [slideIn, setSlideIn] = useState(false);
   const [isConnectedToSpotify, setIsConnectedToSpotify] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState([]);
-
-  useEffect(() => {
-    console.log('Attempting to fetch manifest from:', '/mp3s/manifest.json');
-    fetch('/mp3s/manifest.json')
-      .then(response => {
-        console.log('Manifest response:', response);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text()  // Change to text() temporarily for debugging
-          .then(text => {
-            console.log('Raw response:', text);
-            return JSON.parse(text);
-          });
-      })
-      .then(urls => {
-        console.log('Received audio URLs:', urls);
-        setAudioFiles(urls);
-      })
-      .catch(error => {
-        console.error('Error fetching audio manifest:', error);
-        console.error('Error details:', error.message);
-      });
-  }, []);
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [player, setPlayer] = useState(null);
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -45,12 +46,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     const audio = new Audio('/effects/bell.mp3');
     await audio.play();
     setTimeout(() => {
-      setButtonVisible(false);
       setSlideIn(true);
       onBeginClick(inputValue);
-      setTimeout(() => {
-        playNextAudio();
-      }, 3000);
     }, 1000);
   };
 
@@ -58,143 +55,145 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     setInputValue(event.target.value);
   };
 
-  const playNextAudio = () => {
-    if (currentAudioIndex < audioFiles.length) {
-      const audioUrl = audioFiles[currentAudioIndex];
-      console.log('Attempting to play:', audioUrl);
-      
-      const audio = new Audio(audioUrl);
-      
-      audio.addEventListener('loadstart', () => {
-        console.log('Audio loading started');
+  const handlePlaylistSelect = async (event) => {
+    const playlistId = event.target.value;
+    if (!playlistId) return;
+
+    try {
+      let accessToken = localStorage.getItem('spotifyAccessToken');
+      let response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
-      
-      audio.addEventListener('loadeddata', () => {
-        console.log('Audio data loaded successfully');
-      });
-      
-      audio.addEventListener('error', (e) => {
-        console.error('Audio loading error:', {
-          error: e,
-          code: audio.error ? audio.error.code : 'No error code',
-          message: audio.error ? audio.error.message : 'No error message',
-          networkState: audio.networkState,
-          readyState: audio.readyState
+
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('spotifyRefreshToken');
+        accessToken = await refreshAccessToken(refreshToken);
+        if (!accessToken) return;
+
+        response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         });
-      });
+      }
+
+      if (!response.ok) throw new Error('Failed to fetch playlist tracks');
       
-      audioRef.current = audio;
-      audio.volume = volume;
+      const data = await response.json();
+      setSelectedPlaylist(data.items);
+      setCurrentTrackIndex(0);
       
-      audio.play().catch(error => {
-        console.error('Error playing audio:', error);
-      });
-      
-      setIsPlaying(true);
-      setTimerActive(true);
-      audio.onended = () => {
-        setCurrentAudioIndex(prevIndex => prevIndex + 1);
-      };
+      if (data.items.length > 0) {
+        const trackUri = data.items[0].track.uri;
+        await startPlayback(trackUri);
+      }
+    } catch (error) {
+      console.error('Error fetching playlist tracks:', error);
     }
   };
 
-  const handlePlayPauseClick = () => {
-    if (audioRef.current) {
+  const handlePlayPauseClick = async () => {
+    if (!player) return;
+    
+    try {
       if (isPlaying) {
-        audioRef.current.pause();
-        setTimerActive(false);
+        await player.pause();
       } else {
-        audioRef.current.play();
-        setTimerActive(true);
+        await player.resume();
       }
       setIsPlaying(!isPlaying);
+    } catch (error) {
+      console.error('Error toggling playback:', error);
     }
   };
 
-  const handleNextTrackClick = () => {
-    console.log('Next track button clicked');
-    // Implement logic to play the next track
+  const handleNextTrackClick = async () => {
+    if (!selectedPlaylist || currentTrackIndex >= selectedPlaylist.length - 1) return;
+    
+    const nextIndex = currentTrackIndex + 1;
+    const nextTrack = selectedPlaylist[nextIndex].track;
+    
+    try {
+      await startPlayback(nextTrack.uri);
+      setCurrentTrackIndex(nextIndex);
+    } catch (error) {
+      console.error('Error playing next track:', error);
+    }
   };
 
   useEffect(() => {
-    // Check if we're handling a callback from Spotify
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-
+    
+    // Clear URL parameters immediately
     if (code) {
-      // Exchange code for access token
+      window.history.replaceState({}, document.title, "/");
+    }
+
+    // Check if we already have valid tokens
+    const existingToken = localStorage.getItem('spotifyAccessToken');
+    if (existingToken) {
+      setIsConnectedToSpotify(true);
+      fetchUserPlaylists();
+      return;
+    }
+
+    // Only proceed with token exchange if we have a new code
+    if (code) {
       const getAccessToken = async () => {
         try {
-          console.log('Sending token request with:', {
-            code,
-            redirect_uri: process.env.REACT_APP_REDIRECT_URI
-          });
-
-          const tokenRequestBody = new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: process.env.REACT_APP_REDIRECT_URI
-          });
-
-          console.log('Request body:', tokenRequestBody.toString());
-          console.log('Authorization header:', 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`));
-
           const response = await fetch('https://accounts.spotify.com/api/token', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
               'Authorization': 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`)
             },
-            body: tokenRequestBody
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: code,
+              redirect_uri: process.env.REACT_APP_REDIRECT_URI
+            })
           });
 
-          const responseText = await response.text();
-          console.log('Response status:', response.status);
-          console.log('Response text:', responseText);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Token exchange failed');
+          }
 
-          const data = JSON.parse(responseText);
-          
+          const data = await response.json();
           localStorage.setItem('spotifyAccessToken', data.access_token);
           localStorage.setItem('spotifyRefreshToken', data.refresh_token);
-          
-          // After successfully getting the token, fetch playlists
+          setIsConnectedToSpotify(true);
           await fetchUserPlaylists();
-          
-          window.history.replaceState({}, document.title, "/");
         } catch (error) {
-          console.error('Error getting access token:', error);
+          console.error('Auth error:', error);
+          handleDisconnectSpotify();
         }
       };
 
       getAccessToken();
-    } else {
-      // Check if we're already connected when component mounts
-      const accessToken = localStorage.getItem('spotifyAccessToken');
-      if (accessToken) {
-        fetchUserPlaylists();
-      }
     }
   }, []);
 
   const fetchUserPlaylists = async () => {
     try {
-      const accessToken = localStorage.getItem('spotifyAccessToken');
-      if (!accessToken) return;
-
-      const response = await fetch('https://api.spotify.com/v1/me/playlists', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+      let accessToken = localStorage.getItem('spotifyAccessToken');
+      let response = await fetch('https://api.spotify.com/v1/me/playlists', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
 
-      const data = await response.json();
-      if (data.items) {
-        setUserPlaylists(data.items);
-        setIsConnectedToSpotify(true);
-      } else {
-        console.error('No playlists found in response:', data);
-        setUserPlaylists([]);
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('spotifyRefreshToken');
+        accessToken = await refreshAccessToken(refreshToken);
+        if (!accessToken) return;
+
+        response = await fetch('https://api.spotify.com/v1/me/playlists', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
       }
+
+      if (!response.ok) throw new Error('Failed to fetch playlists');
+      
+      const data = await response.json();
+      setUserPlaylists(data.items || []);
     } catch (error) {
       console.error('Error fetching playlists:', error);
       setUserPlaylists([]);
@@ -202,10 +201,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   };
 
   const handleConnectToSpotify = () => {
-    const scope = 'user-read-private user-read-email user-read-playback-state user-modify-playback-state';
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${process.env.REACT_APP_SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${process.env.REACT_APP_REDIRECT_URI}&scope=${encodeURIComponent(scope)}`;
+    const scopes = [
+      'streaming',
+      'user-read-email',
+      'user-read-private',
+      'user-read-playback-state',
+      'user-modify-playback-state',
+      'playlist-read-private',
+      'app-remote-control'
+    ].join(' ');
     
-    // Redirect user to Spotify login
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${process.env.REACT_APP_SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(process.env.REACT_APP_REDIRECT_URI)}&scope=${encodeURIComponent(scopes)}`;
+    
+    console.log('Authorizing with scopes:', scopes); // Debug log
     window.location.href = authUrl;
   };
 
@@ -216,14 +224,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   }, [volume]);
 
   useEffect(() => {
-    if (currentAudioIndex > 0 && currentAudioIndex < audioFiles.length) {
-      setTimeout(() => {
-        playNextAudio();
-      }, 3000);
-    }
-  }, [currentAudioIndex]);
-
-  useEffect(() => {
     if (!isFreeflow && audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -231,6 +231,83 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       setTimerActive(false);
     }
   }, [isFreeflow]);
+
+  useEffect(() => {
+    if (!isConnectedToSpotify) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://sdk.scdn.co/spotify-player.js';
+    script.async = true;
+
+    document.body.appendChild(script);
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const newPlayer = new window.Spotify.Player({
+        name: 'Focus Timer Web Player',
+        getOAuthToken: cb => { 
+          const token = localStorage.getItem('spotifyAccessToken');
+          if (token) cb(token);
+        },
+        volume: 0.5,
+        enableMediaSession: true,
+        robustnessLevel: 'premium'
+      });
+
+      // Player state changes
+      newPlayer.addListener('player_state_changed', state => {
+        if (state) {
+          setIsPlaying(!state.paused);
+          // Auto-play next track when current track ends
+          if (state.track_window.previous_tracks.length) {
+            handleNextTrackClick();
+          }
+        }
+      });
+
+      // Ready
+      newPlayer.addListener('ready', ({ device_id }) => {
+        console.log('Ready with Device ID', device_id);
+        localStorage.setItem('spotifyDeviceId', device_id);
+      });
+
+      newPlayer.connect();
+      setPlayer(newPlayer);
+    };
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [isConnectedToSpotify]);
+
+  // Add disconnect function
+  const handleDisconnectSpotify = () => {
+    localStorage.removeItem('spotifyAccessToken');
+    localStorage.removeItem('spotifyRefreshToken');
+    localStorage.removeItem('spotifyDeviceId');
+    setIsConnectedToSpotify(false);
+    setUserPlaylists([]);
+  };
+
+  const startPlayback = async (trackUri) => {
+    try {
+      const deviceId = localStorage.getItem('spotifyDeviceId');
+      const accessToken = localStorage.getItem('spotifyAccessToken');
+      
+      await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uris: [trackUri]
+        })
+      });
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Error starting playback:', error);
+    }
+  };
 
   return (
     <div className={`
@@ -297,45 +374,29 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         `}>
           {/* Connect to Spotify Button - no need for absolute positioning */}
           {isConnectedToSpotify ? (
-            <select
-              className={`
-                tw-mt-16
-                tw-px-4
-                tw-py-2
-                tw-bg-green-500
-                tw-text-white
-                tw-rounded-full
-                tw-font-medium
-                hover:tw-bg-green-600
-                tw-transition-colors
-                tw-border-0
-                tw-cursor-pointer
-                tw-w-64
-              `}
-            >
-              <option value="">Select a Playlist</option>
-              {userPlaylists && userPlaylists.map(playlist => (
-                <option key={playlist.id} value={playlist.id}>
-                  {playlist.name}
-                </option>
-              ))}
-            </select>
+            <div className="tw-flex tw-flex-row tw-gap-2 tw-items-center">
+              <select
+                onChange={handlePlaylistSelect}
+                className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-green-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-green-600 tw-transition-colors tw-border-0 tw-cursor-pointer tw-w-64"
+              >
+                <option value="">Select a Playlist</option>
+                {userPlaylists && userPlaylists.map(playlist => (
+                  <option key={playlist.id} value={playlist.id}>
+                    {playlist.name}
+                  </option>
+                ))}
+              </select>
+              <button 
+                onClick={handleDisconnectSpotify}
+                className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-red-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-red-600 tw-transition-colors tw-border-0 tw-cursor-pointer"
+              >
+                Disconnect
+              </button>
+            </div>
           ) : (
             <button 
               onClick={handleConnectToSpotify}
-              className={`
-                tw-mt-16
-                tw-px-4
-                tw-py-2
-                tw-bg-green-500
-                tw-text-white
-                tw-rounded-full
-                tw-font-medium
-                hover:tw-bg-green-600
-                tw-transition-colors
-                tw-border-0
-                tw-cursor-pointer
-              `}
+              className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-green-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-green-600 tw-transition-colors tw-border-0 tw-cursor-pointer"
             >
               Connect to Spotify
             </button>

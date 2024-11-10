@@ -228,9 +228,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [isInitializing, setIsInitializing] = useState(false);
   const initializationRef = useRef(false);
 
-  // Separate SDK initialization into its own effect
+  // Update the SDK initialization effect
   useEffect(() => {
-    // Prevent multiple initializations
     if (!isConnectedToSpotify || initializationRef.current) return;
     
     const initializeSDK = () => {
@@ -238,7 +237,12 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       setIsInitializing(true);
       console.log('Initializing Spotify Web Playback SDK...');
 
-      // Remove any existing SDK script
+      // Define callback before loading script
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        console.log('SDK script loaded and ready');
+        initializationRef.current = true;
+      };
+
       const existingScript = document.getElementById('spotify-sdk');
       if (existingScript) {
         document.body.removeChild(existingScript);
@@ -249,23 +253,20 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       script.src = 'https://sdk.scdn.co/spotify-player.js';
       script.async = true;
 
-      script.onload = () => {
-        console.log('SDK script loaded');
-        initializationRef.current = true;
-      };
-
+      // Remove the script.onload handler since we're using the SDK's callback
       document.body.appendChild(script);
     };
 
     initializeSDK();
 
-    // Cleanup function
     return () => {
       console.log('Cleaning up SDK initialization...');
       const script = document.getElementById('spotify-sdk');
       if (script) {
         document.body.removeChild(script);
       }
+      // Clean up the callback
+      window.onSpotifyWebPlaybackSDKReady = null;
       initializationRef.current = false;
       setIsInitializing(false);
     };

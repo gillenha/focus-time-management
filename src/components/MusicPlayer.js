@@ -418,29 +418,31 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           />
 
           {/* Begin Button - no need for absolute positioning */}
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            handleBeginSession(inputValue);
-          }}>
-            <button
-              onClick={handleClick}
-              className={`
-                tw-w-[90%]
-                tw-py-3
-                tw-bg-gray-700
-                tw-rounded-lg
-                tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-                tw-font-sans
-                tw-text-lg
-                tw-text-white
-                tw-cursor-pointer
-                tw-border-0
-                tw-transition-all
-              `}
-            >
-              Begin Session
-            </button>
-          </form>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              handleClick();
+              handleBeginSession(inputValue);
+            }}
+            className={`
+              tw-py-3
+              tw-px-6
+              tw-bg-gray-700
+              tw-rounded-lg
+              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
+              tw-font-sans
+              tw-text-lg
+              tw-text-white
+              tw-cursor-pointer
+              tw-border-0
+              tw-transition-all
+              hover:tw-bg-gray-600
+              active:tw-transform
+              active:tw-scale-95
+            `}
+          >
+            Begin Session
+          </button>
         </div>
 
         {/* Control Bar - Fixed at bottom */}

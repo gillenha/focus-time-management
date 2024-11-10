@@ -1,31 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './MusicPlayer.css';
-
-const refreshAccessToken = async (refreshToken) => {
-  try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + btoa(`${process.env.REACT_APP_SPOTIFY_CLIENT_ID}:${process.env.REACT_APP_SPOTIFY_CLIENT_SECRET}`)
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken
-      })
-    });
-
-    if (!response.ok) throw new Error('Failed to refresh token');
-    
-    const data = await response.json();
-    localStorage.setItem('spotifyAccessToken', data.access_token);
-    return data.access_token;
-  } catch (error) {
-    console.error('Error refreshing token:', error);
-    handleDisconnectSpotify();
-    return null;
-  }
-};
+import { useSpotify } from '../context/SpotifyContext';
 
 function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume }) {
   const [fadeOut, setFadeOut] = useState(false);
@@ -33,7 +8,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
   const [slideIn, setSlideIn] = useState(false);
-  const [isConnectedToSpotify, setIsConnectedToSpotify] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -41,6 +15,12 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [playerVolume, setPlayerVolume] = useState(volume);
   const [sdkReady, setSdkReady] = useState(false);
   const [pendingTrack, setPendingTrack] = useState(null);
+  const { 
+    isConnectedToSpotify, 
+    setIsConnectedToSpotify, 
+    handleDisconnectSpotify,
+    refreshAccessToken 
+  } = useSpotify();
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -280,15 +260,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     };
   }, [isConnectedToSpotify]);
 
-  // Add disconnect function
-  const handleDisconnectSpotify = () => {
-    localStorage.removeItem('spotifyAccessToken');
-    localStorage.removeItem('spotifyRefreshToken');
-    localStorage.removeItem('spotifyDeviceId');
-    setIsConnectedToSpotify(false);
-    setUserPlaylists([]);
-  };
-
   const startPlayback = async (trackUri) => {
     try {
       const deviceId = localStorage.getItem('spotifyDeviceId');
@@ -415,12 +386,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
                   </option>
                 ))}
               </select>
-              <button 
-                onClick={handleDisconnectSpotify}
-                className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-red-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-red-600 tw-transition-colors tw-border-0 tw-cursor-pointer"
-              >
-                Disconnect
-              </button>
             </div>
           ) : (
             <button 

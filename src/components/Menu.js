@@ -1,6 +1,9 @@
 import React from 'react';
+import { useSpotify } from '../context/SpotifyContext';
 
 function Menu({ isOpen, onClose, onShowHistory }) {
+  const { isConnectedToSpotify, handleDisconnectSpotify } = useSpotify();
+
   return (
     <>
       {/* Overlay */}
@@ -68,6 +71,29 @@ function Menu({ isOpen, onClose, onShowHistory }) {
                   <span className="tw-text-gray-400">📊</span>
                 </a>
               </li>
+            </ul>
+          </div>
+
+          {/* Music Section */}
+          <div className="tw-mb-6">
+            <p className="tw-text-xs tw-text-left tw-text-gray-500 tw-mb-2">MUSIC</p>
+            <ul className="tw-list-none tw-p-0 tw-m-0">
+              {isConnectedToSpotify && (
+                <li>
+                  <a 
+                    href="#" 
+                    className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-red-600 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDisconnectSpotify();
+                      onClose();
+                    }}
+                  >
+                    <span>Disconnect Spotify</span>
+                    <span className="tw-text-gray-400">🎵</span>
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>

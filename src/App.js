@@ -12,6 +12,8 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import SessionHistoryPage from './pages/SessionHistoryPage';
 import Menu from './components/Menu';
+import { SpotifyProvider } from './context/SpotifyContext';
+
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -207,6 +209,8 @@ function App() {
   }, []);
 
   return (
+    <SpotifyProvider>
+
     <div className="grid-container">
       <div 
         className="background" 
@@ -281,6 +285,7 @@ function App() {
       <nav className="bottom-navbar">
       </nav>
     </div>
+    </SpotifyProvider>
   );
 }
 

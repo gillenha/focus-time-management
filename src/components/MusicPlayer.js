@@ -246,25 +246,32 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     document.body.appendChild(script);
 
     window.onSpotifyWebPlaybackSDKReady = () => {
-      spotifyPlayer = new window.Spotify.Player({
-        name: 'Focus Timer Web Player',
-        getOAuthToken: cb => { 
-          const token = localStorage.getItem('spotifyAccessToken');
-          if (token) cb(token);
-        },
-        volume: volume,
-        enableMediaSession: true,
-        robustnessLevel: 'premium'
-      });
+      try {
+        spotifyPlayer = new window.Spotify.Player({
+          name: 'Focus Timer Web Player',
+          getOAuthToken: cb => { 
+            const token = localStorage.getItem('spotifyAccessToken');
+            if (token) cb(token);
+          },
+          volume: volume,
+          enableMediaSession: true,
+          robustnessLevel: 'premium'
+        });
 
-      spotifyPlayer.addListener('ready', ({ device_id }) => {
-        console.log('Player ready');
-        localStorage.setItem('spotifyDeviceId', device_id);
-        setPlayer(spotifyPlayer);
-        setSdkReady(true);
-      });
+        spotifyPlayer.addListener('ready', ({ device_id }) => {
+          console.log('Player ready');
+          localStorage.setItem('spotifyDeviceId', device_id);
+          setPlayer(spotifyPlayer);
+          setSdkReady(true);
+        });
 
-      spotifyPlayer.connect();
+        spotifyPlayer.connect();
+      } catch (error) {
+        console.error('SDK initialization error:', error);
+        if (isConnectedToSpotify) {
+          handleDisconnectSpotify();
+        }
+      }
     };
 
     return () => {
@@ -312,12 +319,15 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           await player.setVolume(volume);
         } catch (error) {
           console.error('Volume control error:', error);
+          if (isConnectedToSpotify) {
+            handleDisconnectSpotify();
+          }
         }
       }
     };
 
     handleVolumeChange();
-  }, [volume, player, sdkReady]);
+  }, [volume, player, sdkReady, isConnectedToSpotify]);
 
   return (
     <div className={`

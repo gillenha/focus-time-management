@@ -38,6 +38,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [player, setPlayer] = useState(null);
+  const [playerVolume, setPlayerVolume] = useState(volume);
+  const [sdkReady, setSdkReady] = useState(false);
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -234,7 +236,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   useEffect(() => {
     if (!isConnectedToSpotify) return;
-
+    
+    let spotifyPlayer = null;
+    
     const script = document.createElement('script');
     script.src = 'https://sdk.scdn.co/spotify-player.js';
     script.async = true;
@@ -242,39 +246,31 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     document.body.appendChild(script);
 
     window.onSpotifyWebPlaybackSDKReady = () => {
-      const newPlayer = new window.Spotify.Player({
+      spotifyPlayer = new window.Spotify.Player({
         name: 'Focus Timer Web Player',
         getOAuthToken: cb => { 
           const token = localStorage.getItem('spotifyAccessToken');
           if (token) cb(token);
         },
-        volume: 0.5,
+        volume: volume,
         enableMediaSession: true,
         robustnessLevel: 'premium'
       });
 
-      // Player state changes
-      newPlayer.addListener('player_state_changed', state => {
-        if (state) {
-          setIsPlaying(!state.paused);
-          // Auto-play next track when current track ends
-          if (state.track_window.previous_tracks.length) {
-            handleNextTrackClick();
-          }
-        }
-      });
-
-      // Ready
-      newPlayer.addListener('ready', ({ device_id }) => {
-        console.log('Ready with Device ID', device_id);
+      spotifyPlayer.addListener('ready', ({ device_id }) => {
+        console.log('Player ready');
         localStorage.setItem('spotifyDeviceId', device_id);
+        setPlayer(spotifyPlayer);
+        setSdkReady(true);
       });
 
-      newPlayer.connect();
-      setPlayer(newPlayer);
+      spotifyPlayer.connect();
     };
 
     return () => {
+      if (spotifyPlayer) {
+        spotifyPlayer.disconnect();
+      }
       document.body.removeChild(script);
     };
   }, [isConnectedToSpotify]);
@@ -308,6 +304,20 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       console.error('Error starting playback:', error);
     }
   };
+
+  useEffect(() => {
+    const handleVolumeChange = async () => {
+      if (player && sdkReady) {
+        try {
+          await player.setVolume(volume);
+        } catch (error) {
+          console.error('Volume control error:', error);
+        }
+      }
+    };
+
+    handleVolumeChange();
+  }, [volume, player, sdkReady]);
 
   return (
     <div className={`

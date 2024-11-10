@@ -40,6 +40,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [player, setPlayer] = useState(null);
   const [playerVolume, setPlayerVolume] = useState(volume);
   const [sdkReady, setSdkReady] = useState(false);
+  const [pendingTrack, setPendingTrack] = useState(null);
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -49,7 +50,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     await audio.play();
     setTimeout(() => {
       setSlideIn(true);
-      onBeginClick(inputValue);
+      handleBeginSession(inputValue);
     }, 1000);
   };
 
@@ -81,11 +82,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       
       const data = await response.json();
       setSelectedPlaylist(data.items);
-      setCurrentTrackIndex(0);
-      
       if (data.items.length > 0) {
-        const trackUri = data.items[0].track.uri;
-        await startPlayback(trackUri);
+        setPendingTrack(data.items[0].track.uri);
       }
     } catch (error) {
       console.error('Error fetching playlist tracks:', error);
@@ -329,6 +327,17 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     handleVolumeChange();
   }, [volume, player, sdkReady, isConnectedToSpotify]);
 
+  const handleBeginSession = async (inputText) => {
+    if (pendingTrack) {
+      try {
+        await startPlayback(pendingTrack);
+      } catch (error) {
+        console.error('Error starting playback:', error);
+      }
+    }
+    onBeginClick(inputText);
+  };
+
   return (
     <div className={`
       tw-relative 
@@ -444,24 +453,29 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           />
 
           {/* Begin Button - no need for absolute positioning */}
-          <button
-            onClick={handleClick}
-            className={`
-              tw-w-[90%]
-              tw-py-3
-              tw-bg-gray-700
-              tw-rounded-lg
-              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-              tw-font-sans
-              tw-text-lg
-              tw-text-white
-              tw-cursor-pointer
-              tw-border-0
-              tw-transition-all
-            `}
-          >
-            Begin Session
-          </button>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            handleBeginSession(inputValue);
+          }}>
+            <button
+              onClick={handleClick}
+              className={`
+                tw-w-[90%]
+                tw-py-3
+                tw-bg-gray-700
+                tw-rounded-lg
+                tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
+                tw-font-sans
+                tw-text-lg
+                tw-text-white
+                tw-cursor-pointer
+                tw-border-0
+                tw-transition-all
+              `}
+            >
+              Begin Session
+            </button>
+          </form>
         </div>
 
         {/* Control Bar - Fixed at bottom */}

@@ -13,6 +13,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import SessionHistoryPage from './pages/SessionHistoryPage';
 import Menu from './components/Menu';
 import { SpotifyProvider } from './context/SpotifyContext';
+import { SessionProvider } from './context/SessionContext';
+
 
 
 function App() {
@@ -210,7 +212,7 @@ function App() {
 
   return (
     <SpotifyProvider>
-
+      <SessionProvider> 
     <div className="grid-container">
       <div 
         className="background" 
@@ -285,6 +287,7 @@ function App() {
       <nav className="bottom-navbar">
       </nav>
     </div>
+    </SessionProvider>
     </SpotifyProvider>
   );
 }

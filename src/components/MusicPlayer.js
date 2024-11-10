@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './MusicPlayer.css';
 import { useSpotify } from '../context/SpotifyContext';
+import { useSession } from '../context/SessionContext';
 
 function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume }) {
   const [fadeOut, setFadeOut] = useState(false);
@@ -15,12 +16,14 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [playerVolume, setPlayerVolume] = useState(volume);
   const [sdkReady, setSdkReady] = useState(false);
   const [pendingTrack, setPendingTrack] = useState(null);
+  const [sdkInstance, setSdkInstance] = useState(null);
   const { 
     isConnectedToSpotify, 
     setIsConnectedToSpotify, 
     handleDisconnectSpotify,
     refreshAccessToken 
   } = useSpotify();
+  const { sessionState, startSession, resetSession, updatePlayback } = useSession();
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -71,22 +74,36 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   };
 
   const handlePlayPauseClick = async () => {
-    if (!player) return;
+    if (!player || !sdkReady) {
+      console.log('Player not ready');
+      return;
+    }
     
     try {
       if (isPlaying) {
+        console.log('Pausing playback...');
         await player.pause();
       } else {
+        console.log('Resuming playback...');
         await player.resume();
       }
       setIsPlaying(!isPlaying);
+      updatePlayback({ isPlaying: !isPlaying });
     } catch (error) {
       console.error('Error toggling playback:', error);
+      // Attempt to reconnect player if playback control fails
+      if (sdkInstance) {
+        console.log('Attempting to reconnect player...');
+        sdkInstance.connect();
+      }
     }
   };
 
   const handleNextTrackClick = async () => {
-    if (!selectedPlaylist || currentTrackIndex >= selectedPlaylist.length - 1) return;
+    if (!selectedPlaylist || currentTrackIndex >= selectedPlaylist.length - 1) {
+      console.log('No next track available');
+      return;
+    }
     
     const nextIndex = currentTrackIndex + 1;
     const nextTrack = selectedPlaylist[nextIndex].track;
@@ -94,6 +111,10 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     try {
       await startPlayback(nextTrack.uri);
       setCurrentTrackIndex(nextIndex);
+      updatePlayback({
+        currentTrack: nextTrack.uri,
+        isPlaying: true
+      });
     } catch (error) {
       console.error('Error playing next track:', error);
     }
@@ -203,62 +224,142 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   }, [volume]);
 
+  // Add initialization tracking
+  const [isInitializing, setIsInitializing] = useState(false);
+  const initializationRef = useRef(false);
+
+  // Separate SDK initialization into its own effect
   useEffect(() => {
-    if (!isFreeflow && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setTimerActive(false);
+    // Prevent multiple initializations
+    if (!isConnectedToSpotify || initializationRef.current) return;
+    
+    const initializeSDK = () => {
+      if (isInitializing) return;
+      setIsInitializing(true);
+      console.log('Initializing Spotify Web Playback SDK...');
+
+      // Remove any existing SDK script
+      const existingScript = document.getElementById('spotify-sdk');
+      if (existingScript) {
+        document.body.removeChild(existingScript);
+      }
+
+      const script = document.createElement('script');
+      script.id = 'spotify-sdk';
+      script.src = 'https://sdk.scdn.co/spotify-player.js';
+      script.async = true;
+
+      script.onload = () => {
+        console.log('SDK script loaded');
+        initializationRef.current = true;
+      };
+
+      document.body.appendChild(script);
+    };
+
+    initializeSDK();
+
+    // Cleanup function
+    return () => {
+      console.log('Cleaning up SDK initialization...');
+      const script = document.getElementById('spotify-sdk');
+      if (script) {
+        document.body.removeChild(script);
+      }
+      initializationRef.current = false;
+      setIsInitializing(false);
+    };
+  }, [isConnectedToSpotify]);
+
+  // Separate player initialization
+  useEffect(() => {
+    if (!isConnectedToSpotify || !initializationRef.current || !window.Spotify) return;
+
+    console.log('Creating new player instance...');
+    const spotifyPlayer = new window.Spotify.Player({
+      name: 'Focus Timer Web Player',
+      getOAuthToken: cb => { 
+        const token = localStorage.getItem('spotifyAccessToken');
+        if (token) {
+          console.log('Token provided to SDK');
+          cb(token);
+        }
+      },
+      volume: volume,
+      enableMediaSession: true,
+      robustnessLevel: 'premium'
+    });
+
+    // Store SDK instance
+    setSdkInstance(spotifyPlayer);
+
+    // Event Listeners
+    spotifyPlayer.addListener('initialization_error', ({ message }) => {
+      console.error('SDK Init Error:', message);
+      cleanupPlayer();
+    });
+
+    spotifyPlayer.addListener('authentication_error', ({ message }) => {
+      console.error('SDK Auth Error:', message);
+      cleanupPlayer();
+    });
+
+    spotifyPlayer.addListener('ready', ({ device_id }) => {
+      console.log('SDK Ready with Device ID:', device_id);
+      localStorage.setItem('spotifyDeviceId', device_id);
+      setPlayer(spotifyPlayer);
+      setSdkReady(true);
+    });
+
+    spotifyPlayer.connect().then(success => {
+      if (success) {
+        console.log('Successfully connected to Spotify Web Playback SDK');
+      } else {
+        console.error('Failed to connect to Spotify Web Playback SDK');
+        cleanupPlayer();
+      }
+    });
+
+    return () => {
+      cleanupPlayer();
+    };
+  }, [isConnectedToSpotify, initializationRef.current]);
+
+  // Add cleanup function
+  const cleanupPlayer = () => {
+    console.log('Cleaning up player...');
+    if (player) {
+      player.disconnect();
+      setPlayer(null);
+    }
+    if (sdkInstance) {
+      sdkInstance.disconnect();
+      setSdkInstance(null);
+    }
+    setSdkReady(false);
+    setIsPlaying(false);
+  };
+
+  // Update session end handler
+  useEffect(() => {
+    if (!isFreeflow) {
+      console.log('Session ended, performing cleanup...');
+      cleanupPlayer();
+      setCurrentTrackIndex(0);
+      setPendingTrack(null);
+      setSelectedPlaylist(null);
+      resetSession();
+      initializationRef.current = false;
     }
   }, [isFreeflow]);
 
+  // Add component unmount cleanup
   useEffect(() => {
-    if (!isConnectedToSpotify) return;
-    
-    let spotifyPlayer = null;
-    
-    const script = document.createElement('script');
-    script.src = 'https://sdk.scdn.co/spotify-player.js';
-    script.async = true;
-
-    document.body.appendChild(script);
-
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      try {
-        spotifyPlayer = new window.Spotify.Player({
-          name: 'Focus Timer Web Player',
-          getOAuthToken: cb => { 
-            const token = localStorage.getItem('spotifyAccessToken');
-            if (token) cb(token);
-          },
-          volume: volume,
-          enableMediaSession: true,
-          robustnessLevel: 'premium'
-        });
-
-        spotifyPlayer.addListener('ready', ({ device_id }) => {
-          console.log('Player ready');
-          localStorage.setItem('spotifyDeviceId', device_id);
-          setPlayer(spotifyPlayer);
-          setSdkReady(true);
-        });
-
-        spotifyPlayer.connect();
-      } catch (error) {
-        console.error('SDK initialization error:', error);
-        if (isConnectedToSpotify) {
-          handleDisconnectSpotify();
-        }
-      }
-    };
-
     return () => {
-      if (spotifyPlayer) {
-        spotifyPlayer.disconnect();
-      }
-      document.body.removeChild(script);
+      cleanupPlayer();
+      initializationRef.current = false;
     };
-  }, [isConnectedToSpotify]);
+  }, []);
 
   const startPlayback = async (trackUri) => {
     try {
@@ -285,29 +386,42 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     const handleVolumeChange = async () => {
       if (player && sdkReady) {
         try {
+          console.log('Setting volume:', volume);
           await player.setVolume(volume);
         } catch (error) {
           console.error('Volume control error:', error);
-          if (isConnectedToSpotify) {
-            handleDisconnectSpotify();
+          // Attempt to reconnect player if volume control fails
+          if (sdkInstance) {
+            console.log('Attempting to reconnect player...');
+            sdkInstance.connect();
           }
         }
       }
     };
 
     handleVolumeChange();
-  }, [volume, player, sdkReady, isConnectedToSpotify]);
+  }, [volume, player, sdkReady]);
 
   const handleBeginSession = async (inputText) => {
-    if (pendingTrack) {
-      try {
+    console.log('Beginning session with input:', inputText);
+    try {
+      if (pendingTrack) {
         await startPlayback(pendingTrack);
-      } catch (error) {
-        console.error('Error starting playback:', error);
+        updatePlayback({
+          isPlaying: true,
+          currentTrack: pendingTrack,
+          playlist: selectedPlaylist
+        });
       }
+      startSession(inputText);
+      onBeginClick(inputText);
+    } catch (error) {
+      console.error('Failed to start session:', error);
     }
-    onBeginClick(inputText);
   };
+
+  // Add control rendering check
+  const canRenderControls = player && sdkReady && isConnectedToSpotify;
 
   return (
     <div className={`
@@ -446,106 +560,22 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         </div>
 
         {/* Control Bar - Fixed at bottom */}
-        <div className="
-          // Positioning
-          tw-mt-16
-          tw-absolute
-          tw-bottom-8         // 32px from bottom
-          tw-left-0
-          tw-right-0
-          
-          // Layout
-          tw-flex
-          tw-justify-center
-          tw-gap-4
-          
-          // Dimensions
-          tw-h-[10%]
-        ">
-          <button 
-            onClick={handlePlayPauseClick}
-            className="
-              // Dimensions
-              tw-w-12
-              tw-h-12
-              
-              // Layout
-              tw-flex
-              tw-items-center
-              tw-justify-center
-              
-              // Styling
-              tw-bg-gray-600
-              tw-rounded-full
-              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-              
-              // Behavior
-              tw-border-0
-              tw-outline-none
-              focus:tw-outline-none
-              hover:tw-cursor-pointer
-              tw-transition-all
-            "
-          >
-            {isPlaying ? (
-              // Pause SVG
-              <svg 
-                stroke="currentColor" 
-                fill="currentColor" 
-                strokeWidth="0" 
-                viewBox="0 0 448 512" 
-                className="tw-text-slate-200 tw-scale-105"
-                height="1em" 
-                width="1em" 
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z" />
-              </svg>
-            ) : (
-              // Play SVG
-              <svg 
-                stroke="currentColor" 
-                fill="currentColor" 
-                strokeWidth="0" 
-                viewBox="0 0 448 512" 
-                className="tw-text-slate-200 tw-scale-105"
-                height="1em" 
-                width="1em" 
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z" />
-              </svg>
-            )}
-          </button>
-          <button 
-            onClick={handleNextTrackClick}
-            className="
-              tw-w-12 
-              tw-h-12 
-              tw-flex 
-              tw-flex-row 
-              tw-items-center 
-              tw-gap-2 
-              tw-justify-center 
-              tw-bg-gray-600
-              tw-rounded-full 
-              hover:tw-cursor-pointer 
-              tw-transition-all
-              tw-border-0
-              tw-outline-none
-              focus:tw-outline-none
-              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-            "
-          >
-            {/* Next Track SVG */}
-            <svg 
-              className="tw-w-6 tw-h-6 tw-fill-white" 
-              viewBox="0 0 24 24"
+        {canRenderControls && (
+          <div className="tw-mt-16 tw-absolute tw-bottom-8 tw-left-0 tw-right-0 tw-flex tw-justify-center tw-gap-4 tw-h-[10%]">
+            <button 
+              onClick={handlePlayPauseClick}
+              className="tw-w-12 tw-h-12 tw-flex tw-items-center tw-justify-center tw-bg-gray-600 tw-rounded-full tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0 tw-outline-none focus:tw-outline-none hover:tw-cursor-pointer tw-transition-all"
             >
-              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-            </svg>
-          </button>
-        </div>
+              {/* Play/Pause button content */}
+            </button>
+            <button 
+              onClick={handleNextTrackClick}
+              className="tw-w-12 tw-h-12 tw-flex tw-flex-row tw-items-center tw-gap-2 tw-justify-center tw-bg-gray-600 tw-rounded-full hover:tw-cursor-pointer tw-transition-all tw-border-0 tw-outline-none focus:tw-outline-none tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]"
+            >
+              {/* Next track button content */}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

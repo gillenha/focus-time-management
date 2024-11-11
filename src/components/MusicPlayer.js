@@ -48,12 +48,20 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     console.log('Begin button clicked');
     console.log('Input value:', inputValue);
     setFadeOut(true);
+    
+    // Play bell chime
     const audio = new Audio('/effects/bell.mp3');
     await audio.play();
+
+    // Start visual transition
     setTimeout(() => {
       setSlideIn(true);
-      handleBeginSession(inputValue);
     }, 1000);
+
+    // Delay playlist start
+    setTimeout(() => {
+      handleBeginSession(inputValue);
+    }, 3000);
   };
 
   const handleInputChange = (event) => {
@@ -368,6 +376,14 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   }, [isFreeflow]);
 
+  // Remove duplicate session start
+  const handleBeginButton = (e) => {
+    e.preventDefault();
+    handleClick();
+    // Remove this line since handleClick now handles session start
+    // handleBeginSession(inputValue);
+  };
+
   return (
     <div className={`
       tw-relative 
@@ -478,11 +494,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
           {/* Begin Button - no need for absolute positioning */}
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              handleClick();
-              handleBeginSession(inputValue);
-            }}
+            onClick={handleBeginButton}
             className={`
               tw-py-3
               tw-px-6

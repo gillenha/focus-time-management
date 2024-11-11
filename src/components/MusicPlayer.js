@@ -29,7 +29,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     updateAudioVolume(volume);
   }, [volume, updateAudioVolume]);
 
-  // Memoized playNextAudio function to prevent unnecessary recreations
+  // Modified playNextAudio to handle volume more safely
   const playNextAudio = useCallback(() => {
     if (currentAudioIndex >= audioFiles.length) return;
 

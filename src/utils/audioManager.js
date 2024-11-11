@@ -21,28 +21,46 @@ class AudioManager {
         // Create new promise for manifest fetch
         this.manifestPromise = (async () => {
             try {
-                const response = await fetch(`${apiUrl}/mp3s/manifest.json`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch audio manifest');
-                }
-                const audioFiles = await response.json();
-                
-                // Validate paths based on environment
-                if (process.env.NODE_ENV === 'development') {
+                if (process.env.NODE_ENV === 'production') {
+                    // In production, fetch bucket contents directly
+                    const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch bucket contents');
+                    }
+                    const data = await response.json();
+                    
+                    // Filter for mp3 files and extract names
+                    const audioFiles = data.items
+                        .filter(item => item.name.endsWith('.mp3'))
+                        .map(item => item.name);
+                    
+                    // Cache the result
+                    this.manifestCache = audioFiles;
+                    console.log('Production: Loaded audio files from GCS:', audioFiles);
+                    return audioFiles;
+                    
+                } else {
+                    // In development, use local manifest
+                    const response = await fetch(`${apiUrl}/mp3s/manifest.json`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch audio manifest');
+                    }
+                    const audioFiles = await response.json();
+                    
+                    // Validate development paths
                     const isLocalPath = audioFiles.every(path => path.startsWith('/mp3s/'));
                     if (!isLocalPath) {
                         throw new Error('Invalid paths for development environment');
                     }
+                    
+                    // Cache the result
+                    this.manifestCache = audioFiles;
+                    console.log('Development: Using local files:', audioFiles);
+                    return audioFiles;
                 }
-                
-                // Cache the result
-                this.manifestCache = audioFiles;
-                console.log(`${process.env.NODE_ENV} environment - Manifest loaded:`, audioFiles);
-                return audioFiles;
                 
             } catch (error) {
                 console.error('Error in getManifest:', error);
-                // Clear the promise on error so it can be retried
                 this.manifestPromise = null;
                 throw error;
             }

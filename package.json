@@ -21,13 +21,16 @@
     "react-dom": "^18.3.1",
     "react-scripts": "5.0.1",
     "react-toastify": "^10.0.5",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "@google-cloud/storage": "^7.7.0"
   },
   "scripts": {
     "start": "react-scripts start",
-    "electron": "electron .",
-    "build": "react-scripts build",
-    "dist": "electron-builder"
+    "start:dev": "NODE_ENV=development react-scripts start",
+    "start:server:dev": "NODE_ENV=development SERVER_PORT=8080 node server.js",
+    "build": "NODE_ENV=production react-scripts build",
+    "dist": "electron-builder",
+    "deploy": "gcloud app deploy"
   },
   "eslintConfig": {
     "extends": [
@@ -64,6 +67,5 @@
     "mac": {
       "category": "public.app-category.productivity"
     }
-  },
-  "proxy": "http://localhost:5001"
+  }
 }

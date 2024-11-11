@@ -7,8 +7,15 @@ const path = require('path');
 const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 
+// Only import Storage when in production
+let Storage;
+if (process.env.NODE_ENV === 'production') {
+    const { Storage: GCPStorage } = require('@google-cloud/storage');
+    Storage = GCPStorage;
+}
+
 const app = express();
-const PORT = process.env.PORT || 8080; // Change from 5001 to 8080
+const PORT = process.env.SERVER_PORT || 8080; // Change from 5001 to 8080
 
 // Initialize Notion client
 let notion;
@@ -30,7 +37,7 @@ app.use(helmet({
 
 // Configure CORS
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  origin: process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ALLOWED_ORIGINS.split(','),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -38,24 +45,111 @@ app.use(cors({
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Serve static files from the React build directory
+// Define the manifest route BEFORE any static middleware
+app.get('/mp3s/manifest.json', async (req, res) => {
+    try {
+        const env = process.env.NODE_ENV || 'development';
+        console.log(`Serving audio files in ${env} environment`);
+        
+        if (env === 'development') {
+            // Directly read from mp3s directory for development
+            const mp3Dir = path.join(__dirname, 'mp3s');
+            const files = await fs.promises.readdir(mp3Dir);
+            const audioFiles = files
+                .filter(file => file.endsWith('.mp3'))
+                .map(file => `/mp3s/${file}`);
+            
+            console.log('Development: Serving local files:', audioFiles);
+            return res.json(audioFiles);
+        } else {
+            // Production: Use Google Cloud Storage
+            const storage = new Storage();
+            const bucket = storage.bucket('react-app-assets');
+            const [files] = await bucket.getFiles({ prefix: 'audio/' });
+            const audioFiles = files
+                .filter(file => file.name.endsWith('.mp3'))
+                .map(file => `https://storage.googleapis.com/react-app-assets/${file.name}`);
+            
+            console.log('Production: Serving GCS files:', audioFiles);
+            return res.json(audioFiles);
+        }
+    } catch (error) {
+        console.error(`Error fetching audio files in ${process.env.NODE_ENV}:`, error);
+        res.status(500).json({ error: 'Failed to fetch audio files' });
+    }
+});
+
+// AFTER the manifest route, set up static file serving
+app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
+app.use('/effects', express.static(path.join(__dirname, 'effects')));
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Add this BEFORE the catch-all route
-app.get('/mp3s/manifest.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.json([
-    "https://storage.googleapis.com/react-app-assets/the-social-network-soundtrack.mp3"
-  ]);
-});
+// Add this configuration at the top of server.js
+const config = {
+    development: {
+        getAudioFiles: async () => {
+            const mp3Dir = path.join(__dirname, 'mp3s');
+            try {
+                const files = await fs.promises.readdir(mp3Dir);
+                console.log('Development: Reading local MP3 files from:', mp3Dir);
+                // Return only the filenames for local development
+                const audioFiles = files
+                    .filter(file => file.endsWith('.mp3'))
+                    .map(file => `/mp3s/${file}`);
+                console.log('Development: Found audio files:', audioFiles);
+                return audioFiles;
+            } catch (error) {
+                console.error('Development: Error reading mp3s directory:', error);
+                return [];
+            }
+        }
+    },
+    production: {
+        getAudioFiles: async () => {
+            if (!Storage) {
+                console.error('Storage is not initialized in production');
+                return [];
+            }
+            try {
+                console.log('Production: Fetching files from Google Cloud Storage');
+                const storage = new Storage();
+                const bucket = storage.bucket('react-app-assets');
+                const [files] = await bucket.getFiles({ prefix: 'audio/' });
+                const audioFiles = files
+                    .filter(file => file.name.endsWith('.mp3'))
+                    .map(file => `https://storage.googleapis.com/react-app-assets/${file.name}`);
+                console.log('Production: Found audio files:', audioFiles);
+                return audioFiles;
+            } catch (error) {
+                console.error('Production: Error fetching from GCS:', error);
+                return [];
+            }
+        }
+    }
+};
 
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+// Update the manifest route to be environment-aware
+app.get('/mp3s/manifest.json', async (req, res) => {
+    try {
+        // Force development environment when running locally
+        const env = process.env.NODE_ENV || 'development';
+        console.log(`Serving audio files in ${env} environment`);
+        
+        // Get the appropriate configuration based on environment
+        const envConfig = config[env];
+        if (!envConfig) {
+            throw new Error(`Invalid environment: ${env}`);
+        }
+        
+        const audioFiles = await envConfig.getAudioFiles();
+        console.log(`${env}: Sending manifest response:`, audioFiles);
+        
+        res.json(audioFiles);
+    } catch (error) {
+        console.error(`Error fetching audio files in ${process.env.NODE_ENV}:`, error);
+        res.status(500).json({ error: 'Failed to fetch audio files' });
+    }
 });
-
-// Serve MP3 files with proper headers
-app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
 
 // Add a debug route to check MP3 files
 app.get('/debug/mp3s', async (req, res) => {
@@ -208,6 +302,16 @@ app.get('/api/notion-test', async (req, res) => {
             code: error.code
         });
     }
+});
+
+// Move the catch-all route to the end
+app.get('*', (req, res) => {
+  // In development, don't try to serve index.html
+  if (process.env.NODE_ENV === 'development') {
+    res.status(404).send('Not found in development mode');
+    return;
+  }
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 // Start the server

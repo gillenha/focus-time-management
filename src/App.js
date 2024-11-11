@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './styles/tailwind.css';
 import './App.css';
 import './index.css';
@@ -191,9 +191,11 @@ function App() {
     return `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const handleVolumeChange = (event) => {
-    setVolume(event.target.value);
-  };
+  const handleVolumeChange = useCallback((newVolume) => {
+    setVolume(newVolume);
+    // Store in localStorage for persistence
+    localStorage.setItem('userVolume', newVolume.toString());
+  }, []);
 
   const toggleSessionHistory = () => {
     if (showSessionHistory) {
@@ -276,6 +278,7 @@ function App() {
             stopAudio={setTimerActive}
             setTimerActive={setTimerActive}
             volume={volume}
+            onVolumeChange={handleVolumeChange}
           />
         )}
         <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
@@ -285,7 +288,10 @@ function App() {
           </button>
         </div>
       </div>
-      <VolumeBar volume={volume} onVolumeChange={handleVolumeChange} />
+      <VolumeBar 
+        volume={volume} 
+        onVolumeChange={handleVolumeChange} 
+      />
       {(showSessionHistory || isSessionHistoryExiting) && (
         <SessionHistoryPage
           sessionHistory={sessionHistory}

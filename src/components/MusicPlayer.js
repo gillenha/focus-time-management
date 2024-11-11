@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './MusicPlayer.css';
 import ControlBar from './ControlBar';
+import AudioManager from '../utils/audioManager';
 
-function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume }) {
+function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume, onVolumeChange }) {
   const [buttonVisible, setButtonVisible] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -12,88 +13,149 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const audioRef = useRef(null);
   const [slideIn, setSlideIn] = useState(false);
 
-  useEffect(() => {
-    console.log('Attempting to fetch manifest from:', '/mp3s/manifest.json');
-    fetch('/mp3s/manifest.json')
-      .then(response => {
-        console.log('Manifest response:', response);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text()  // Change to text() temporarily for debugging
-          .then(text => {
-            console.log('Raw response:', text);
-            return JSON.parse(text);
-          });
-      })
-      .then(urls => {
-        console.log('Received audio URLs:', urls);
-        setAudioFiles(urls);
-      })
-      .catch(error => {
-        console.error('Error fetching audio manifest:', error);
-        console.error('Error details:', error.message);
-      });
+  // Simplified volume handling
+  const updateAudioVolume = useCallback((newVolume) => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.volume = newVolume;
+      } catch (error) {
+        console.warn('Could not update audio volume:', error);
+      }
+    }
   }, []);
+
+  // Effect to handle volume changes
+  useEffect(() => {
+    updateAudioVolume(volume);
+  }, [volume, updateAudioVolume]);
+
+  // Memoized playNextAudio function to prevent unnecessary recreations
+  const playNextAudio = useCallback(() => {
+    if (currentAudioIndex >= audioFiles.length) return;
+
+    // Cleanup previous audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+
+    const relativePath = audioFiles[currentAudioIndex];
+    const audioUrl = AudioManager.getFullAudioUrl(relativePath);
+    
+    const audio = new Audio(audioUrl);
+    
+    // Set up audio before playing
+    audio.volume = volume;
+
+    const listeners = {
+      loadeddata: () => {
+        audio.play()
+          .then(() => {
+            setIsPlaying(true);
+            setTimerActive(true);
+          })
+          .catch(error => {
+            console.error('Play error:', error);
+            setIsPlaying(false);
+            setTimerActive(false);
+          });
+      },
+      error: (e) => {
+        console.error('Audio error:', {
+          error: e,
+          state: audio.readyState,
+          volume: audio.volume,
+          url: audioUrl
+        });
+      },
+      ended: () => setCurrentAudioIndex(prev => prev + 1)
+    };
+
+    // Attach listeners
+    Object.entries(listeners).forEach(([event, handler]) => {
+      audio.addEventListener(event, handler);
+    });
+
+    audioRef.current = audio;
+
+    // Return cleanup function
+    return () => {
+      Object.entries(listeners).forEach(([event, handler]) => {
+        audio.removeEventListener(event, handler);
+      });
+      audio.pause();
+      audio.src = '';
+    };
+  }, [currentAudioIndex, audioFiles, volume, setTimerActive]);
+
+  // Initial audio files fetch
+  useEffect(() => {
+    let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    const fetchAudioFiles = async () => {
+      try {
+        const files = await AudioManager.getManifest();
+        if (mounted) {
+          setAudioFiles(files);
+        }
+      } catch (error) {
+        console.error('Manifest fetch error:', error);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(fetchAudioFiles, 1000 * retryCount);
+        }
+      }
+    };
+
+    fetchAudioFiles();
+
+    return () => {
+      mounted = false;
+    };
+  }, []); // Only fetch on mount
 
   const handleClick = async () => {
     console.log('Begin button clicked');
     console.log('Input value:', inputValue);
     setFadeOut(true);
-    const audio = new Audio('/effects/bell.mp3');
-    await audio.play();
-    setTimeout(() => {
-      setButtonVisible(false);
-      setSlideIn(true);
-      onBeginClick(inputValue);
-      setTimeout(() => {
-        playNextAudio();
-      }, 3000);
-    }, 1000);
+    
+    const bellUrl = AudioManager.getBellAudioUrl();
+    console.log('Playing bell sound from:', bellUrl);
+    
+    try {
+        // Verify the bell sound exists before playing
+        const isValid = await AudioManager.verifyAudio(bellUrl);
+        if (!isValid) {
+            console.warn('Bell sound not found, continuing without sound');
+        } else {
+            const audio = new Audio(bellUrl);
+            await audio.play();
+        }
+        
+        setTimeout(() => {
+            setButtonVisible(false);
+            setSlideIn(true);
+            onBeginClick(inputValue);
+            setTimeout(() => {
+                playNextAudio();
+            }, 3000);
+        }, 1000);
+    } catch (error) {
+        console.error('Error playing bell sound:', error);
+        // Continue with the flow even if bell sound fails
+        setButtonVisible(false);
+        setSlideIn(true);
+        onBeginClick(inputValue);
+        setTimeout(() => {
+            playNextAudio();
+        }, 3000);
+    }
   };
 
   const handleInputChange = (event) => {
     setInputValue(event.target.value);
-  };
-
-  const playNextAudio = () => {
-    if (currentAudioIndex < audioFiles.length) {
-      const audioUrl = audioFiles[currentAudioIndex];
-      console.log('Attempting to play:', audioUrl);
-      
-      const audio = new Audio(audioUrl);
-      
-      audio.addEventListener('loadstart', () => {
-        console.log('Audio loading started');
-      });
-      
-      audio.addEventListener('loadeddata', () => {
-        console.log('Audio data loaded successfully');
-      });
-      
-      audio.addEventListener('error', (e) => {
-        console.error('Audio loading error:', {
-          error: e,
-          code: audio.error ? audio.error.code : 'No error code',
-          message: audio.error ? audio.error.message : 'No error message',
-          networkState: audio.networkState,
-          readyState: audio.readyState
-        });
-      });
-      
-      audioRef.current = audio;
-      audio.volume = volume;
-      
-      audio.play().catch(error => {
-        console.error('Error playing audio:', error);
-      });
-      
-      setIsPlaying(true);
-      setTimerActive(true);
-      audio.onended = () => {
-        setCurrentAudioIndex(prevIndex => prevIndex + 1);
-      };
-    }
   };
 
   const handlePlayPauseClick = () => {
@@ -113,29 +175,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     console.log('Next track button clicked');
     // Implement logic to play the next track
   };
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  useEffect(() => {
-    if (currentAudioIndex > 0 && currentAudioIndex < audioFiles.length) {
-      setTimeout(() => {
-        playNextAudio();
-      }, 3000);
-    }
-  }, [currentAudioIndex]);
-
-  useEffect(() => {
-    if (!isFreeflow && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setTimerActive(false);
-    }
-  }, [isFreeflow]);
 
   return (
     <div className={`
@@ -256,7 +295,13 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         >
           Begin Session
         </button>
-
+        <ControlBar
+        isPlaying={isPlaying}
+        onPlayPauseClick={handlePlayPauseClick}
+        onNextTrackClick={handleNextTrackClick}
+        volume={volume}
+        onVolumeChange={onVolumeChange}
+      />
         {/* Control Bar - Fixed at bottom */}
         <div className="
           // Positioning
@@ -358,6 +403,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           </button>
         </div>
       </div>
+
     </div>
   );
 }

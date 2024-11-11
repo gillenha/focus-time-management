@@ -1,53 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faVolumeMute, faVolumeUp } from '@fortawesome/free-solid-svg-icons';
 import './VolumeBar.css';
 
 function VolumeBar({ volume, onVolumeChange }) {
-  const [isMuted, setIsMuted] = useState(false);
-  const [previousVolume, setPreviousVolume] = useState(volume);
+  const sliderRef = useRef(null);
+  const previousVolumeRef = useRef(volume);
 
-  useEffect(() => {
-    const slider = document.querySelector('.volume-slider');
-    slider.style.setProperty('--value', `${volume * 100}%`); // Convert to percentage for CSS
-  }, [volume]);
-
-  const handleIconClick = () => {
-    if (isMuted) {
-      onVolumeChange({ target: { value: previousVolume } });
+  const handleMuteToggle = useCallback(() => {
+    if (volume === 0) {
+      // Unmute to previous volume
+      onVolumeChange(previousVolumeRef.current);
     } else {
-      setPreviousVolume(volume);
-      onVolumeChange({ target: { value: 0 } }); // Mute the audio
+      // Store current volume before muting
+      previousVolumeRef.current = volume;
+      onVolumeChange(0);
     }
-    setIsMuted(!isMuted);
-  };
+  }, [volume, onVolumeChange]);
 
-  const handleDoubleClick = () => {
-    onVolumeChange({ target: { value: 0.5 } }); // Reset volume to 50% (0.5 in range [0, 1])
-  };
-
-  const handleVolumeChange = (event) => {
-    const newVolume = event.target.value / 100; // Convert to range [0, 1]
-    onVolumeChange({ target: { value: newVolume } });
-  };
+  const handleSliderChange = useCallback((event) => {
+    const newVolume = parseFloat(event.target.value) / 100;
+    onVolumeChange(newVolume);
+  }, [onVolumeChange]);
 
   return (
-    <div className={`volume-bar-container ${isMuted ? 'dimmed' : ''}`}>
-      <div className="volume-icon" onClick={handleIconClick}>
-        {isMuted ? (
-          <FontAwesomeIcon icon={faVolumeMute} style={{ color: 'white' }} />
-        ) : (
-          <FontAwesomeIcon icon={faVolumeUp} style={{ color: 'white' }} />
-        )}
-      </div>
+    <div className="volume-bar-container">
+      <button 
+        className="volume-icon" 
+        onClick={handleMuteToggle}
+        aria-label={volume === 0 ? "Unmute" : "Mute"}
+      >
+        <FontAwesomeIcon 
+          icon={volume === 0 ? faVolumeMute : faVolumeUp} 
+          style={{ color: 'white' }} 
+        />
+      </button>
       <input
+        ref={sliderRef}
         type="range"
         className="volume-slider"
         min="0"
         max="100"
-        value={volume * 100} // Convert to range [0, 100] for display
-        onChange={handleVolumeChange}
-        onDoubleClick={handleDoubleClick}
+        value={volume * 100}
+        onChange={handleSliderChange}
+        aria-label="Volume Control"
+        style={{ '--value': `${volume * 100}%` }}
       />
     </div>
   );

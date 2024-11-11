@@ -40,6 +40,22 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   // Simplify state management
   const [sessionStarted, setSessionStarted] = useState(false);
 
+  // 1. First, add playlist caching
+  const [lastPlaylistFetch, setLastPlaylistFetch] = useState(0);
+  const PLAYLIST_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Add this near your other state declarations
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Add this function to handle manual refresh
+  const handleRefreshPlaylists = async () => {
+    setIsRefreshing(true);
+    // Force a fresh fetch by resetting lastPlaylistFetch
+    setLastPlaylistFetch(0);
+    await fetchUserPlaylists();
+    setIsRefreshing(false);
+  };
+
   const handleClick = async () => {
     console.log('Begin button clicked');
     console.log('Input value:', inputValue);
@@ -92,14 +108,31 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   };
 
+  // 2. Update the fetchUserPlaylists function with caching
   const fetchUserPlaylists = useCallback(async () => {
     if (!isConnectedToSpotify) return;
+    
+    // Check cache time
+    const now = Date.now();
+    if (userPlaylists.length > 0 && (now - lastPlaylistFetch) < PLAYLIST_CACHE_DURATION) {
+      console.log('Using cached playlists');
+      return;
+    }
     
     try {
       let accessToken = localStorage.getItem('spotifyAccessToken');
       let response = await fetch('https://api.spotify.com/v1/me/playlists', {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
+
+      // Handle rate limiting
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After') || 300; // Default 5 min
+        console.log(`Rate limited. Retry after ${retryAfter} seconds`);
+        // Use cached playlists if available
+        if (userPlaylists.length > 0) return;
+        throw new Error('Rate limited');
+      }
 
       if (response.status === 401) {
         const refreshToken = localStorage.getItem('spotifyRefreshToken');
@@ -115,12 +148,17 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
       const data = await response.json();
       setUserPlaylists(data.items || []);
+      setLastPlaylistFetch(now);
     } catch (error) {
       console.error('Error fetching playlists:', error);
-      setUserPlaylists([]);
+      // Don't clear playlists on error if we have cached ones
+      if (!userPlaylists.length) {
+        setUserPlaylists([]);
+      }
     }
-  }, [isConnectedToSpotify, refreshAccessToken]);
+  }, [isConnectedToSpotify, refreshAccessToken, userPlaylists.length, lastPlaylistFetch]);
 
+  // 3. Update the auth effect to avoid unnecessary fetches
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -129,7 +167,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       window.history.replaceState({}, document.title, "/");
     }
 
-    if (localStorage.getItem('spotifyAccessToken')) {
+    // Only fetch if we don't have playlists cached
+    if (localStorage.getItem('spotifyAccessToken') && !userPlaylists.length) {
       setIsConnectedToSpotify(true);
       fetchUserPlaylists();
       return;
@@ -168,7 +207,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       };
       getAccessToken();
     }
-  }, [fetchUserPlaylists]);
+  }, [fetchUserPlaylists, userPlaylists.length]);
 
   const handleConnectToSpotify = () => {
     const scopes = [
@@ -429,18 +468,54 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         `}>
           {/* Connect to Spotify Button - no need for absolute positioning */}
           {isConnectedToSpotify ? (
-            <div className="tw-flex tw-flex-row tw-gap-2 tw-items-center">
-              <select
-                onChange={handlePlaylistSelect}
-                className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-green-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-green-600 tw-transition-colors tw-border-0 tw-cursor-pointer tw-w-64"
-              >
-                <option value="">Select a Playlist</option>
-                {userPlaylists && userPlaylists.map(playlist => (
-                  <option key={playlist.id} value={playlist.id}>
-                    {playlist.name}
-                  </option>
-                ))}
-              </select>
+            <div className="tw-flex tw-flex-col tw-gap-2 tw-items-center">
+              <div className="tw-flex tw-flex-row tw-gap-2 tw-items-center">
+                <select
+                  onChange={handlePlaylistSelect}
+                  className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-green-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-green-600 tw-transition-colors tw-border-0 tw-cursor-pointer tw-w-64"
+                >
+                  <option value="">Select a Playlist</option>
+                  {userPlaylists && userPlaylists.map(playlist => (
+                    <option key={playlist.id} value={playlist.id}>
+                      {playlist.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleRefreshPlaylists}
+                  disabled={isRefreshing}
+                  className={`
+                    tw-mt-16 
+                    tw-p-2 
+                    tw-rounded-full 
+                    tw-bg-green-500 
+                    hover:tw-bg-green-600 
+                    tw-transition-colors
+                    tw-border-0
+                    ${isRefreshing ? 'tw-opacity-50' : ''}
+                  `}
+                  title="Refresh Playlists"
+                >
+                  <svg
+                    className={`tw-w-5 tw-h-5 tw-text-white ${isRefreshing ? 'tw-animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
+              {isRefreshing && (
+                <span className="tw-text-white tw-text-sm tw-opacity-70">
+                  Refreshing playlists...
+                </span>
+              )}
             </div>
           ) : (
             <button

@@ -37,7 +37,9 @@ app.use(helmet({
 
 // Configure CORS
 app.use(cors({
-  origin: process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : process.env.ALLOWED_ORIGINS.split(','),
+  origin: process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:3000' 
+    : process.env.ALLOWED_ORIGINS?.split(',') || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));

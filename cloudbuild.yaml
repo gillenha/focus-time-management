@@ -26,8 +26,8 @@ steps:
       - '--allow-unauthenticated'
 
 options:
-  logging: CLOUD_LOGGING_ONLY  # Specify logging option
-  machineType: 'N1_HIGHCPU_8'  # Optional: specify machine type for faster builds
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
 
 substitutions:
   _REACT_APP_API_URL: 'https://focus-music-app-368754647823.us-central1.run.app'
@@ -35,4 +35,4 @@ substitutions:
 images:
   - 'gcr.io/$PROJECT_ID/react-app'
 
-serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-service-account@$PROJECT_ID.iam.gserviceaccount.com'
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/focus-music-app@$PROJECT_ID.iam.gserviceaccount.com'

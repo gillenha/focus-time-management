@@ -40,22 +40,17 @@ steps:
           exit 1
         fi
 
-  # Optional cleanup step (only runs if previous steps succeed)
+  # Cleanup old images (simplified)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
+    entrypoint: 'gcloud'
     args:
-      - '-c'
-      - |
-        echo "Starting cleanup of old images..."
-        OLD_IMAGES=$(gcloud container images list-tags gcr.io/$PROJECT_ID/react-app \
-          --format="get(digest)" --sort-by=~timestamp \
-          --limit=unlimited | tail -n +6)
-        if [ ! -z "$OLD_IMAGES" ]; then
-          echo "$OLD_IMAGES" | xargs -I {} gcloud container images delete \
-            gcr.io/$PROJECT_ID/react-app@{} --quiet || true
-        else
-          echo "No old images to clean up"
-        fi
+      - 'container'
+      - 'images'
+      - 'list-tags'
+      - 'gcr.io/$PROJECT_ID/react-app'
+      - '--limit=5'
+      - '--format=get(digest)'
+      - '--sort-by=~timestamp'
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -65,4 +60,4 @@ images:
   - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
 
 serviceAccount: 'harry-gillen-builder@appspot.gserviceaccount.com'
-timeout: '1200s'  # Set 20 minute timeout
+timeout: '1200s'

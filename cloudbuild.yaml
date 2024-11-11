@@ -17,36 +17,45 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA']
 
-  # Deploy container image to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: gcloud
-    args:
-      - 'run'
-      - 'deploy'
-      - 'react-app'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
-      - '--region'
-      - 'us-central1'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--set-env-vars'
-      - 'NODE_ENV=production'
-      - '--service-account'
-      - 'harry-gillen-builder@appspot.gserviceaccount.com'
-
-  # Cleanup old images (keep last 5 versions)
+  # Deploy container image to Cloud Run with error handling
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        gcloud container images list-tags gcr.io/$PROJECT_ID/react-app \
+        echo "Starting deployment to Cloud Run..."
+        if gcloud run deploy react-app \
+          --image=gcr.io/$PROJECT_ID/react-app:$SHORT_SHA \
+          --region=us-central1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --set-env-vars=NODE_ENV=production,NOTION_API_KEY=${_NOTION_API_KEY},NOTION_DATABASE_ID=${_NOTION_DATABASE_ID},ALLOWED_ORIGINS=https://focus-music-app-368754647823.us-central1.run.app \
+          --service-account=harry-gillen-builder@appspot.gserviceaccount.com; then
+          echo "Deployment successful!"
+        else
+          echo "Deployment failed. Checking service account and permissions..."
+          gcloud projects get-iam-policy $PROJECT_ID \
+            --flatten="bindings[].members" \
+            --filter="bindings.members:harry-gillen-builder@appspot.gserviceaccount.com"
+          exit 1
+        fi
+
+  # Optional cleanup step (only runs if previous steps succeed)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Starting cleanup of old images..."
+        OLD_IMAGES=$(gcloud container images list-tags gcr.io/$PROJECT_ID/react-app \
           --format="get(digest)" --sort-by=~timestamp \
-          --limit=unlimited | tail -n +6 | \
-        xargs -I {} gcloud container images delete \
-          gcr.io/$PROJECT_ID/react-app@{} --quiet
+          --limit=unlimited | tail -n +6)
+        if [ ! -z "$OLD_IMAGES" ]; then
+          echo "$OLD_IMAGES" | xargs -I {} gcloud container images delete \
+            gcr.io/$PROJECT_ID/react-app@{} --quiet || true
+        else
+          echo "No old images to clean up"
+        fi
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -56,3 +65,4 @@ images:
   - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
 
 serviceAccount: 'harry-gillen-builder@appspot.gserviceaccount.com'
+timeout: '1200s'  # Set 20 minute timeout

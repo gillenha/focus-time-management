@@ -6,16 +6,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy environment files before building
-COPY .env.production .env
-COPY .env.development ./
-
-# Copy remaining source files
+# Copy source files
 COPY . .
 
 # Set production environment
 ENV NODE_ENV=production
-ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+ENV REACT_APP_API_URL=https://focus-music-app-368754647823.us-central1.run.app
 
 # Build the app
 RUN npm run build

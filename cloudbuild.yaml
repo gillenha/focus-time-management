@@ -29,7 +29,7 @@ steps:
           --region=us-central1 \
           --platform=managed \
           --allow-unauthenticated \
-          --set-env-vars=NODE_ENV=production,NOTION_API_KEY=${_NOTION_API_KEY},NOTION_DATABASE_ID=${_NOTION_DATABASE_ID},ALLOWED_ORIGINS=https://focus-music-app-368754647823.us-central1.run.app \
+          --set-env-vars=NODE_ENV=production \
           --service-account=harry-gillen-builder@appspot.gserviceaccount.com; then
           echo "Deployment successful!"
         else

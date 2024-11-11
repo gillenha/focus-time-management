@@ -17,13 +17,16 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [sdkReady, setSdkReady] = useState(false);
   const [pendingTrack, setPendingTrack] = useState(null);
   const [sdkInstance, setSdkInstance] = useState(null);
-  const { 
-    isConnectedToSpotify, 
-    setIsConnectedToSpotify, 
+  const {
+    isConnectedToSpotify,
+    setIsConnectedToSpotify,
     handleDisconnectSpotify,
-    refreshAccessToken 
+    refreshAccessToken
   } = useSpotify();
   const { sessionState, startSession, resetSession, updatePlayback } = useSession();
+
+  // Add state for session started
+  const [sessionStarted, setSessionStarted] = useState(false);
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -62,7 +65,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       }
 
       if (!response.ok) throw new Error('Failed to fetch playlist tracks');
-      
+
       const data = await response.json();
       setSelectedPlaylist(data.items);
       if (data.items.length > 0) {
@@ -78,7 +81,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       console.log('Player not ready');
       return;
     }
-    
+
     try {
       if (isPlaying) {
         console.log('Pausing playback...');
@@ -104,10 +107,10 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       console.log('No next track available');
       return;
     }
-    
+
     const nextIndex = currentTrackIndex + 1;
     const nextTrack = selectedPlaylist[nextIndex].track;
-    
+
     try {
       await startPlayback(nextTrack.uri);
       setCurrentTrackIndex(nextIndex);
@@ -123,7 +126,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    
+
     // Clear URL parameters immediately
     if (code) {
       window.history.replaceState({}, document.title, "/");
@@ -192,7 +195,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       }
 
       if (!response.ok) throw new Error('Failed to fetch playlists');
-      
+
       const data = await response.json();
       setUserPlaylists(data.items || []);
     } catch (error) {
@@ -211,9 +214,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
       'playlist-read-private',
       'app-remote-control'
     ].join(' ');
-    
+
     const authUrl = `https://accounts.spotify.com/authorize?client_id=${process.env.REACT_APP_SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(process.env.REACT_APP_REDIRECT_URI)}&scope=${encodeURIComponent(scopes)}`;
-    
+
     console.log('Authorizing with scopes:', scopes); // Debug log
     window.location.href = authUrl;
   };
@@ -231,7 +234,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   // Update the SDK initialization effect
   useEffect(() => {
     if (!isConnectedToSpotify || initializationRef.current) return;
-    
+
     const initializeSDK = () => {
       if (isInitializing) return;
       setIsInitializing(true);
@@ -279,7 +282,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     console.log('Creating new player instance...');
     const spotifyPlayer = new window.Spotify.Player({
       name: 'Focus Timer Web Player',
-      getOAuthToken: cb => { 
+      getOAuthToken: cb => {
         const token = localStorage.getItem('spotifyAccessToken');
         if (token) {
           console.log('Token provided to SDK');
@@ -366,7 +369,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     try {
       const deviceId = localStorage.getItem('spotifyDeviceId');
       const accessToken = localStorage.getItem('spotifyAccessToken');
-      
+
       await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
         method: 'PUT',
         headers: {
@@ -414,6 +417,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           playlist: selectedPlaylist
         });
       }
+      setSessionStarted(true); // Set session started to true
       startSession(inputText);
       onBeginClick(inputText);
     } catch (error) {
@@ -422,7 +426,15 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   };
 
   // Add control rendering check
-  const canRenderControls = player && sdkReady && isConnectedToSpotify;
+  const canRenderControls = player && sdkReady && isConnectedToSpotify && sessionStarted;
+
+  // Reset session started state when session ends
+  useEffect(() => {
+    if (!isFreeflow) {
+      setSessionStarted(false);
+      // ... rest of cleanup code ...
+    }
+  }, [isFreeflow]);
 
   return (
     <div className={`
@@ -464,14 +476,14 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           tw-duration-500
           tw-ease-out
           tw--translate-x-1/2  // Center horizontally (offset)
-          ${slideIn ? 
+          ${slideIn ?
             'tw-top-1/3 tw-scale-150 tw-opacity-100'  // Slide to 25% from top
-            : 
+            :
             'tw-top-0 tw-scale-100 tw-opacity-70'     // Start at top
           }`}>
           Time to focus
         </p>
-        
+
         <div className={`
           tw-flex 
           tw-flex-col 
@@ -503,7 +515,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
               </select>
             </div>
           ) : (
-            <button 
+            <button
               onClick={handleConnectToSpotify}
               className="tw-mt-16 tw-px-4 tw-py-2 tw-bg-green-500 tw-text-white tw-rounded-full tw-font-medium hover:tw-bg-green-600 tw-transition-colors tw-border-0 tw-cursor-pointer"
             >
@@ -560,56 +572,83 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           </button>
         </div>
 
-        {/* Control Bar - Fixed at bottom */}
+        {/* Control Bar - Only shows after session starts */}
         {canRenderControls && (
-          <div className="tw-mt-16 tw-absolute tw-bottom-8 tw-left-0 tw-right-0 tw-flex tw-justify-center tw-gap-4 tw-h-[10%]">
-            <button 
+          <div className={`
+            tw-mt-16 
+            tw-absolute 
+            tw-bottom-8 
+            tw-left-0 
+            tw-right-0 
+            tw-flex 
+            tw-justify-center 
+            tw-gap-4 
+            tw-h-[10%]
+            tw-animate-fadeIn
+            tw-transition-opacity
+            tw-duration-500
+            tw-ease-in-out
+          `}>
+            <button
               onClick={handlePlayPauseClick}
-              className="tw-w-12 tw-h-12 tw-flex tw-items-center tw-justify-center tw-bg-gray-600 tw-rounded-full tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0 tw-outline-none focus:tw-outline-none hover:tw-cursor-pointer tw-transition-all"
+              className="tw-w-12 
+              tw-h-12
+              tw-flex 
+              tw-items-center
+              tw-justify-center 
+              tw-bg-gray-600 
+              tw-rounded-full 
+              tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] 
+              tw-border-0 
+              tw-outline-none 
+              focus:tw-outline-none 
+              hover:tw-cursor-pointer 
+              tw-transition-all
+              "
             >
               {isPlaying ? (
                 // Pause icon
-                <svg 
-                  stroke="currentColor" 
-                  fill="currentColor" 
-                  strokeWidth="0" 
-                  viewBox="0 0 448 512" 
-                  className="tw-text-slate-200 tw-scale-105" 
-                  height="1em" 
-                  width="1em" 
+                <svg
+                  stroke="currentColor"
+                  fill="currentColor"
+                  strokeWidth="0"
+                  viewBox="0 0 448 512"
+                  className="tw-text-slate-200 tw-scale-105"
+                  height="1em"
+                  width="1em"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path d="M144 479H48c-26.5 0-48-21.5-48-48V79c0-26.5 21.5-48 48-48h96c26.5 0 48 21.5 48 48v352c0 26.5-21.5 48-48 48zm304-48V79c0-26.5-21.5-48-48-48h-96c-26.5 0-48 21.5-48 48v352c0 26.5 21.5 48 48 48h96c26.5 0 48-21.5 48-48z" />
                 </svg>
               ) : (
                 // Play icon
-                <svg 
-                  stroke="currentColor" 
-                  fill="currentColor" 
-                  strokeWidth="0" 
-                  viewBox="0 0 448 512" 
-                  className="tw-text-slate-200 tw-scale-105" 
-                  height="1em" 
-                  width="1em" 
+                <svg
+                  stroke="currentColor"
+                  fill="currentColor"
+                  strokeWidth="0"
+                  viewBox="0 0 448 512"
+                  className="tw-text-slate-200 tw-scale-105"
+                  height="1em"
+                  width="1em"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z" />
                 </svg>
               )}
             </button>
-            <button 
+            <button
               onClick={handleNextTrackClick}
               className="tw-w-12 tw-h-12 tw-flex tw-flex-row tw-items-center tw-gap-2 tw-justify-center tw-bg-gray-600 tw-rounded-full hover:tw-cursor-pointer tw-transition-all tw-border-0 tw-outline-none focus:tw-outline-none tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]"
             >
               {/* Next Track icon */}
-              <svg 
-                stroke="currentColor" 
-                fill="currentColor" 
-                strokeWidth="0" 
-                viewBox="0 0 448 512" 
-                className="tw-text-slate-200 tw-scale-105" 
-                height="1em" 
-                width="1em" 
+              <svg
+                stroke="currentColor"
+                fill="currentColor"
+                strokeWidth="0"
+                viewBox="0 0 448 512"
+                className="tw-text-slate-200 tw-scale-105"
+                height="1em"
+                width="1em"
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <path d="M384 44v424c0 6.6-5.4 12-12 12h-48c-6.6 0-12-5.4-12-12V291.6l-195.5 181C95.9 489.7 64 475.4 64 448V64c0-27.4 31.9-41.7 52.5-24.6L312 219.3V44c0-6.6 5.4-12 12-12h48c6.6 0 12 5.4 12 12z" />

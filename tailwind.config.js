@@ -17,7 +17,7 @@ module.exports = {
         }
       },
       animation: {
-        fadeIn: 'fadeIn 1s ease-out forwards',
+        fadeIn: 'fadeIn 0.5s ease-in-out forwards',
         fadeOut: 'fadeOut 1s ease-out forwards'
       },
       backdropBlur: {

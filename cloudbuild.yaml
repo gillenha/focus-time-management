@@ -25,7 +25,7 @@ steps:
       - 'deploy'
       - 'react-app'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'  # Use specific version
+      - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -33,6 +33,8 @@ steps:
       - '--allow-unauthenticated'
       - '--set-env-vars'
       - 'NODE_ENV=production'
+      - '--service-account'
+      - 'harry-gillen-builder@appspot.gserviceaccount.com'
 
   # Cleanup old images (keep last 5 versions)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -53,4 +55,4 @@ images:
   - 'gcr.io/$PROJECT_ID/react-app:latest'
   - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
 
-serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/focus-music-app@$PROJECT_ID.iam.gserviceaccount.com'
+serviceAccount: 'harry-gillen-builder@appspot.gserviceaccount.com'

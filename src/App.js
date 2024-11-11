@@ -179,7 +179,8 @@ function App() {
   };
 
   const handleVolumeChange = (event) => {
-    setVolume(event.target.value);
+    const newVolume = Math.max(0, Math.min(1, parseFloat(event.target.value)));
+    setVolume(newVolume);
   };
 
   const toggleSessionHistory = () => {
@@ -274,7 +275,10 @@ function App() {
           </button>
         </div>
       </div>
-      <VolumeBar volume={volume} onVolumeChange={handleVolumeChange} />
+      <VolumeBar 
+        volume={volume} 
+        onVolumeChange={handleVolumeChange} 
+      />
       {(showSessionHistory || isSessionHistoryExiting) && (
         <SessionHistoryPage
           sessionHistory={sessionHistory}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './MusicPlayer.css';
 import { useSpotify } from '../context/SpotifyContext';
 import { useSession } from '../context/SessionContext';
@@ -26,7 +26,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [player, setPlayer] = useState(null);
-  const [playerVolume, setPlayerVolume] = useState(volume);
   const [sdkReady, setSdkReady] = useState(false);
   const [pendingTrack, setPendingTrack] = useState(null);
   const [sdkInstance, setSdkInstance] = useState(null);
@@ -40,9 +39,6 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
 
   // Simplify state management
   const [sessionStarted, setSessionStarted] = useState(false);
-
-  // Add track end state
-  const [isTrackEnding, setIsTrackEnding] = useState(false);
 
   const handleClick = async () => {
     console.log('Begin button clicked');
@@ -96,24 +92,49 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   };
 
+  const fetchUserPlaylists = useCallback(async () => {
+    if (!isConnectedToSpotify) return;
+    
+    try {
+      let accessToken = localStorage.getItem('spotifyAccessToken');
+      let response = await fetch('https://api.spotify.com/v1/me/playlists', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+
+      if (response.status === 401) {
+        const refreshToken = localStorage.getItem('spotifyRefreshToken');
+        accessToken = await refreshAccessToken(refreshToken);
+        if (!accessToken) return;
+
+        response = await fetch('https://api.spotify.com/v1/me/playlists', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+      }
+
+      if (!response.ok) throw new Error('Failed to fetch playlists');
+
+      const data = await response.json();
+      setUserPlaylists(data.items || []);
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+      setUserPlaylists([]);
+    }
+  }, [isConnectedToSpotify, refreshAccessToken]);
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
-    // Clear URL parameters immediately
     if (code) {
       window.history.replaceState({}, document.title, "/");
     }
 
-    // Check if we already have valid tokens
-    const existingToken = localStorage.getItem('spotifyAccessToken');
-    if (existingToken) {
+    if (localStorage.getItem('spotifyAccessToken')) {
       setIsConnectedToSpotify(true);
       fetchUserPlaylists();
       return;
     }
 
-    // Only proceed with token exchange if we have a new code
     if (code) {
       const getAccessToken = async () => {
         try {
@@ -145,37 +166,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           handleDisconnectSpotify();
         }
       };
-
       getAccessToken();
     }
-  }, []);
-
-  const fetchUserPlaylists = async () => {
-    try {
-      let accessToken = localStorage.getItem('spotifyAccessToken');
-      let response = await fetch('https://api.spotify.com/v1/me/playlists', {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-
-      if (response.status === 401) {
-        const refreshToken = localStorage.getItem('spotifyRefreshToken');
-        accessToken = await refreshAccessToken(refreshToken);
-        if (!accessToken) return;
-
-        response = await fetch('https://api.spotify.com/v1/me/playlists', {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-      }
-
-      if (!response.ok) throw new Error('Failed to fetch playlists');
-
-      const data = await response.json();
-      setUserPlaylists(data.items || []);
-    } catch (error) {
-      console.error('Error fetching playlists:', error);
-      setUserPlaylists([]);
-    }
-  };
+  }, [fetchUserPlaylists]);
 
   const handleConnectToSpotify = () => {
     const scopes = [
@@ -207,80 +200,54 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   // Update the SDK initialization effect
   useEffect(() => {
     if (!isConnectedToSpotify || initializationRef.current) return;
-
-    const initializeSDK = () => {
-      if (isInitializing) return;
+    
+    const initializeSpotifySDK = async () => {
+      if (isInitializing || window.Spotify) return;
       setIsInitializing(true);
-      console.log('Initializing Spotify Web Playback SDK...');
-
-      // Define callback before loading script
+      
       window.onSpotifyWebPlaybackSDKReady = () => {
-        console.log('SDK script loaded and ready');
-        initializationRef.current = true;
-      };
+        if (!window.Spotify) return;
+        
+        const spotifyPlayer = new window.Spotify.Player({
+          name: 'Focus Timer Web Player',
+          getOAuthToken: cb => cb(localStorage.getItem('spotifyAccessToken')),
+          volume: volume
+        });
 
-      const existingScript = document.getElementById('spotify-sdk');
-      if (existingScript) {
-        document.body.removeChild(existingScript);
-      }
+        spotifyPlayer.addListener('ready', ({ device_id }) => {
+          console.log('Player ready with device ID:', device_id);
+          localStorage.setItem('spotifyDeviceId', device_id);
+          setPlayer(spotifyPlayer);
+          setSdkReady(true);
+          setSdkInstance(spotifyPlayer);
+        });
+
+        spotifyPlayer.addListener('player_state_changed', state => {
+          if (state) setIsPlaying(!state.paused);
+        });
+
+        spotifyPlayer.connect();
+      };
 
       const script = document.createElement('script');
       script.id = 'spotify-sdk';
       script.src = 'https://sdk.scdn.co/spotify-player.js';
       script.async = true;
-
-      // Remove the script.onload handler since we're using the SDK's callback
       document.body.appendChild(script);
     };
 
-    initializeSDK();
+    initializeSpotifySDK();
 
     return () => {
-      console.log('Cleaning up SDK initialization...');
+      if (sdkInstance) {
+        sdkInstance.disconnect();
+      }
       const script = document.getElementById('spotify-sdk');
       if (script) {
         document.body.removeChild(script);
       }
-      // Clean up the callback
-      window.onSpotifyWebPlaybackSDKReady = null;
       initializationRef.current = false;
       setIsInitializing(false);
-    };
-  }, [isConnectedToSpotify]);
-
-  // Single initialization effect
-  useEffect(() => {
-    if (!isConnectedToSpotify || !window.Spotify) return;
-    
-    console.log('Creating new player instance...');
-    const spotifyPlayer = new window.Spotify.Player({
-      name: 'Focus Timer Web Player',
-      getOAuthToken: cb => { 
-        const token = localStorage.getItem('spotifyAccessToken');
-        cb(token);
-      },
-      volume: volume
-    });
-
-    // Single event listener for state changes
-    spotifyPlayer.addListener('player_state_changed', state => {
-      if (!state) return;
-      setIsPlaying(!state.paused);
-    });
-
-    spotifyPlayer.addListener('ready', ({ device_id }) => {
-      console.log('SDK Ready with Device ID:', device_id);
-      localStorage.setItem('spotifyDeviceId', device_id);
-      setPlayer(spotifyPlayer);
-      setSdkReady(true);
-    });
-
-    spotifyPlayer.connect();
-
-    return () => {
-      spotifyPlayer.disconnect();
-      setPlayer(null);
-      setSdkReady(false);
     };
   }, [isConnectedToSpotify]);
 
@@ -302,15 +269,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   };
 
-  // Clean up on session end
+  // Combine session-related effects
   useEffect(() => {
-    if (!isFreeflow) {
-      setSessionStarted(false);
-      setIsPlaying(false);
-      if (player) {
-        player.pause();
+    const handleSessionState = async () => {
+      if (!isFreeflow) {
+        setSessionStarted(false);
+        setIsPlaying(false);
+        if (player) {
+          await player.pause();
+        }
       }
-    }
+    };
+
+    handleSessionState();
   }, [isFreeflow, player]);
 
   // Add component unmount cleanup
@@ -345,24 +316,33 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   };
 
+  // Simplify the volume control effect
   useEffect(() => {
-    const handleVolumeChange = async () => {
-      if (player && sdkReady) {
-        try {
-          console.log('Setting volume:', volume);
-          await player.setVolume(volume);
-        } catch (error) {
-          console.error('Volume control error:', error);
-          // Attempt to reconnect player if volume control fails
-          if (sdkInstance) {
-            console.log('Attempting to reconnect player...');
-            sdkInstance.connect();
+    const setPlayerVolume = async () => {
+      if (!player || !sdkReady) {
+        console.log('Player not ready for volume change');
+        return;
+      }
+
+      try {
+        await player.setVolume(volume);
+        console.log('Volume set:', volume);
+      } catch (error) {
+        console.error('Volume control error:', error);
+        
+        // Simple recovery attempt
+        if (error.message.includes('disconnected')) {
+          try {
+            await player.connect();
+            await player.setVolume(volume);
+          } catch (recoveryError) {
+            console.error('Volume recovery failed:', recoveryError);
           }
         }
       }
     };
 
-    handleVolumeChange();
+    setPlayerVolume();
   }, [volume, player, sdkReady]);
 
   // Add control rendering check

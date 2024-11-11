@@ -5,7 +5,6 @@ steps:
     env:
       - 'NODE_ENV=production'
       - 'REACT_APP_API_URL=${_REACT_APP_API_URL}'
-      - 'AUDIO_STORAGE_PATH=${_AUDIO_STORAGE_PATH}'
 
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -21,14 +20,19 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/react-app'
       - '--region'
-      - 'us-east4'
+      - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
 
+options:
+  logging: CLOUD_LOGGING_ONLY  # Specify logging option
+  machineType: 'N1_HIGHCPU_8'  # Optional: specify machine type for faster builds
+
 substitutions:
-  _REACT_APP_API_URL: 'https://your-production-url.app'
-  _AUDIO_STORAGE_PATH: 'https://storage.googleapis.com/react-app-assets/audio'
+  _REACT_APP_API_URL: 'https://focus-music-app-368754647823.us-central1.run.app'
 
 images:
   - 'gcr.io/$PROJECT_ID/react-app'
+
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/your-service-account@$PROJECT_ID.iam.gserviceaccount.com'

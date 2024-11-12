@@ -107,8 +107,7 @@ class AudioManager {
     }
 
     static getBellAudioUrl() {
-        const apiUrl = process.env.REACT_APP_API_URL;
-        return `${apiUrl}/effects/bell.mp3`;
+        return '/effects/bell.mp3';
     }
 
     static async verifyAudio(url) {

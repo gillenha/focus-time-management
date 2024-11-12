@@ -24,7 +24,7 @@ steps:
       - '-c'
       - |
         echo "Starting deployment to Cloud Run..."
-        if gcloud run deploy react-app \
+        if gcloud run deploy focus-music-app \
           --image=gcr.io/$PROJECT_ID/react-app:$SHORT_SHA \
           --region=us-central1 \
           --platform=managed \

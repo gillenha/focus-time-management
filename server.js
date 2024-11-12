@@ -20,10 +20,14 @@ const PORT = process.env.SERVER_PORT || 8080; // Change from 5001 to 8080
 // Initialize Notion client
 let notion;
 try {
-    notion = new Client({
-        auth: process.env.NOTION_API_KEY
-    });
-    console.log('Notion client initialized successfully');
+    if (!process.env.NOTION_API_KEY) {
+        console.error('NOTION_API_KEY is not defined in environment variables');
+    } else {
+        notion = new Client({
+            auth: process.env.NOTION_API_KEY
+        });
+        console.log('Notion client initialized successfully');
+    }
 } catch (error) {
     console.error('Failed to initialize Notion client:', error);
 }
@@ -210,10 +214,25 @@ function formatDuration(duration) {
 // Route to log session details
 app.post('/api/log-session', async (req, res) => {
   const sessionDetails = req.body;
-
-  if (!sessionDetails || !sessionDetails.date || !sessionDetails.time || !sessionDetails.duration || !sessionDetails.text) {
-    return res.status(400).json({ error: 'Incomplete session details' });
+  
+  // Add debug logging
+  console.log('Received session details:', sessionDetails);
+  
+  // Check required fields, excluding 'text'
+  const requiredFields = ['date', 'time', 'duration'];
+  const missingFields = requiredFields.filter(field => !sessionDetails?.[field]);
+  
+  if (missingFields.length > 0) {
+    const errorMsg = `Incomplete session details. Missing fields: ${missingFields.join(', ')}`;
+    console.error(errorMsg);
+    return res.status(400).json({ 
+      error: errorMsg,
+      receivedData: sessionDetails 
+    });
   }
+
+  // Ensure text field is at least an empty string if not provided
+  sessionDetails.text = sessionDetails.text || '';
 
   // Format the duration before logging
   sessionDetails.duration = formatDuration(sessionDetails.duration);
@@ -241,7 +260,13 @@ app.post('/api/log-session', async (req, res) => {
 // Add this new endpoint
 app.post('/api/notion-log', async (req, res) => {
     if (!notion) {
+        console.error('Notion client not initialized - check your NOTION_API_KEY');
         return res.status(500).json({ error: 'Notion client not initialized' });
+    }
+
+    if (!process.env.NOTION_DATABASE_ID) {
+        console.error('NOTION_DATABASE_ID is not defined in environment variables');
+        return res.status(500).json({ error: 'Notion database ID not configured' });
     }
 
     try {
@@ -251,34 +276,34 @@ app.post('/api/notion-log', async (req, res) => {
             parent: {
                 database_id: process.env.NOTION_DATABASE_ID
             },
-            properties: {
-                Name: {
-                    title: [
-                        {
-                            text: {
-                                content: "Focus Session"
-                            }
-                        }
-                    ]
-                },
-                ...req.body.properties
-            }
+            properties: req.body.properties
         });
 
         console.log('Notion page created successfully');
         res.json({ success: true, notionResponse: response });
     } catch (error) {
         console.error('Detailed Notion error:', error);
+        // Send more detailed error information back to client
         res.status(500).json({ 
             error: 'Failed to send to Notion', 
             details: error.message,
-            code: error.code
+            code: error.code,
+            statusCode: error.status
         });
     }
 });
 
 // Add this test endpoint
 app.get('/api/notion-test', async (req, res) => {
+    // Check environment variables
+    if (!process.env.NOTION_API_KEY || !process.env.NOTION_DATABASE_ID) {
+        return res.status(500).json({ 
+            error: 'Missing configuration',
+            notionKey: !!process.env.NOTION_API_KEY,
+            databaseId: !!process.env.NOTION_DATABASE_ID
+        });
+    }
+
     if (!notion) {
         return res.status(500).json({ error: 'Notion client not initialized' });
     }
@@ -306,7 +331,19 @@ app.get('/api/notion-test', async (req, res) => {
     }
 });
 
-// Move the catch-all route to the end
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// CORS headers middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
+// Move the catch-all route to be the very last route
 app.get('*', (req, res) => {
   // In development, don't try to serve index.html
   if (process.env.NODE_ENV === 'development') {
@@ -314,15 +351,4 @@ app.get('*', (req, res) => {
     return;
   }
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
 });

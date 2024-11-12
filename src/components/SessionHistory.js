@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const API_BASE_URL = 'http://localhost:5001';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
     const [editingIndex, setEditingIndex] = useState(null);
@@ -22,7 +22,8 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
 
     const sendToServer = async (session) => {
         try {
-            console.log('Sending session to server:', session);
+            console.log('API_BASE_URL:', API_BASE_URL);
+            console.log('Session data being sent:', JSON.stringify(session, null, 2));
 
             // Send to your existing server
             const serverResponse = await fetch(`${API_BASE_URL}/api/log-session`, {
@@ -34,7 +35,9 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
             });
             
             if (!serverResponse.ok) {
-                throw new Error('Failed to log session to server');
+                const errorData = await serverResponse.json();
+                console.error('Server error response:', errorData);
+                throw new Error(`Failed to log session to server: ${JSON.stringify(errorData)}`);
             }
 
             // Send to Notion

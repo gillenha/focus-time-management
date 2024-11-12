@@ -29,9 +29,19 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     updateAudioVolume(volume);
   }, [volume, updateAudioVolume]);
 
-  // Modified playNextAudio to handle volume more safely
+  // Consolidated next track handling
+  const handleNextTrack = useCallback(() => {
+    console.log('Moving to next track');
+    setCurrentAudioIndex(prevIndex => {
+      const nextIndex = (prevIndex + 1) % audioFiles.length;
+      return nextIndex;
+    });
+  }, [audioFiles.length]);
+
+  // Modified playNextAudio to prevent infinite loops
   const playNextAudio = useCallback(() => {
-    if (currentAudioIndex >= audioFiles.length) return;
+    // Return early if no audio files or if there's an error
+    if (!audioFiles.length) return;
 
     // Cleanup previous audio
     if (audioRef.current) {
@@ -42,9 +52,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     const relativePath = audioFiles[currentAudioIndex];
     const audioUrl = AudioManager.getFullAudioUrl(relativePath);
     
-    const audio = new Audio(audioUrl);
+    console.log('Attempting to play:', audioUrl);
     
-    // Set up audio before playing
+    const audio = new Audio(audioUrl);
     audio.volume = volume;
 
     const listeners = {
@@ -58,6 +68,8 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
             console.error('Play error:', error);
             setIsPlaying(false);
             setTimerActive(false);
+            // Don't set hasPlaybackError here to prevent loops
+            handleNextTrack();
           });
       },
       error: (e) => {
@@ -65,10 +77,21 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           error: e,
           state: audio.readyState,
           volume: audio.volume,
-          url: audioUrl
+          url: audioUrl,
+          index: currentAudioIndex
         });
+        // Instead of setting error state, try next track directly
+        handleNextTrack();
       },
-      ended: () => setCurrentAudioIndex(prev => prev + 1)
+      ended: () => {
+        handleNextTrack();
+      }
+    };
+
+    // Helper function to handle track changes
+    const handleNextTrack = () => {
+      const nextIndex = (currentAudioIndex + 1) % audioFiles.length;
+      setCurrentAudioIndex(nextIndex);
     };
 
     // Attach listeners
@@ -171,10 +194,18 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }
   };
 
-  const handleNextTrackClick = () => {
+  // Modify the effect to be more selective about when it runs
+  useEffect(() => {
+    if (audioFiles.length > 0 && isPlaying) {
+      playNextAudio();
+    }
+  }, [currentAudioIndex, audioFiles, playNextAudio, isPlaying]);
+
+  // Handle next track button click
+  const handleNextTrackClick = useCallback(() => {
     console.log('Next track button clicked');
-    // Implement logic to play the next track
-  };
+    handleNextTrack();
+  }, [handleNextTrack]);
 
   return (
     <div className={`
@@ -296,9 +327,9 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           Begin Session
         </button>
         <ControlBar
-        isPlaying={isPlaying}
-        onPlayPauseClick={handlePlayPauseClick}
-        onNextTrackClick={handleNextTrackClick}
+          isPlaying={isPlaying}
+          onPlayPauseClick={handlePlayPauseClick}
+          onNextTrackClick={handleNextTrackClick}
           volume={volume}
           onVolumeChange={onVolumeChange}
         />

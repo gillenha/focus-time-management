@@ -259,6 +259,11 @@ app.post('/api/log-session', async (req, res) => {
 
 // Add this new endpoint
 app.post('/api/notion-log', async (req, res) => {
+    // Add environment logging
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Notion API Key exists:', !!process.env.NOTION_API_KEY);
+    console.log('Notion Database ID exists:', !!process.env.NOTION_DATABASE_ID);
+
     if (!notion) {
         console.error('Notion client not initialized - check your NOTION_API_KEY');
         return res.status(500).json({ error: 'Notion client not initialized' });

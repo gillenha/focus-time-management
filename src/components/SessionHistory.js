@@ -80,7 +80,9 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
             });
 
             if (!notionResponse.ok) {
-                throw new Error('Failed to log session to Notion');
+                const notionError = await notionResponse.json();
+                console.error('Notion error details:', notionError);
+                throw new Error(`Failed to log session to Notion: ${JSON.stringify(notionError)}`);
             }
 
             const result = await serverResponse.json();

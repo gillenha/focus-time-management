@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './MusicPlayer.css';
 import ControlBar from './ControlBar';
 import SessionInput from './SessionInput';
@@ -68,6 +68,11 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     }));
   };
 
+  const handleCleanup = useCallback((cleanup) => {
+    // Store cleanup function for later use
+    window.audioCleanup = cleanup;
+  }, []);
+
   return (
     <div className={`
       tw-relative tw-flex tw-flex-col tw-items-center tw-justify-center 
@@ -99,6 +104,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
             volume={volume}
             onVolumeChange={onVolumeChange}
             audioFiles={audioState.files}
+            onCleanup={handleCleanup}
           />
         )}
       </div>

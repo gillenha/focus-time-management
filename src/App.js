@@ -150,6 +150,12 @@ function App() {
     if (isFreeflow) {
       console.log("Freeflow ended");
 
+      // Clean up audio if cleanup function exists
+      if (window.audioCleanup) {
+        window.audioCleanup();
+        window.audioCleanup = null;
+      }
+
       const now = new Date();
       const newSession = {
         date: now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),

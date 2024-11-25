@@ -1,58 +1,57 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AudioManager from '../utils/audioManager';
 
-function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
-  // Add a ref to track initialization
+function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onCleanup }) {
   const hasInitialized = useRef(false);
+  const audioRef = useRef(null);
   
-  // Combined audio state
+  // Combined states
+  const [shuffleQueue, setShuffleQueue] = useState([]);
   const [audioState, setAudioState] = useState({
     isPlaying: false,
     currentIndex: null
   });
-  
-  const audioRef = useRef(null);
 
-  // Single volume effect
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
+  // 1. Define getRandomTrackIndex first (no dependencies on other functions)
   const getRandomTrackIndex = useCallback((currentIndex, totalTracks) => {
     if (totalTracks <= 1) return 0;
-    return Math.floor(Math.random() * totalTracks);
-  }, []);
-
-  const handleNextTrack = useCallback(() => {
-    if (!audioFiles?.length) return;
     
-    const nextIndex = getRandomTrackIndex(audioState.currentIndex, audioFiles.length);
-    setAudioState(prev => ({ ...prev, currentIndex: nextIndex }));
-    playAudio(audioFiles[nextIndex]);
-  }, [audioFiles, getRandomTrackIndex]);
+    if (shuffleQueue.length === 0) {
+      const newQueue = Array.from({ length: totalTracks }, (_, i) => i)
+        .filter(i => i !== currentIndex);
+      
+      // Fisher-Yates shuffle
+      for (let i = newQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+      }
+      
+      setShuffleQueue(newQueue);
+      return newQueue[0];
+    }
+    
+    const nextIndex = shuffleQueue[0];
+    setShuffleQueue(prev => prev.slice(1));
+    return nextIndex;
+  }, [shuffleQueue]);
 
-  // Consolidated audio setup
+  // 2. Define basic audio setup (without ended event)
   const setupAudioElement = useCallback((audio) => {
     audio.volume = volume;
     
-    const handleEnded = () => handleNextTrack();
     const handleVolumeChange = () => {
       if (onVolumeChange && audio.volume !== volume) {
         onVolumeChange(audio.volume);
       }
     };
 
-    audio.addEventListener('ended', handleEnded);
     audio.addEventListener('volumechange', handleVolumeChange);
-
     return () => {
-      audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('volumechange', handleVolumeChange);
     };
-  }, [volume, onVolumeChange, handleNextTrack]);
+  }, [volume, onVolumeChange]);
 
+  // 3. Define playAudio
   const playAudio = useCallback(async (audioPath) => {
     console.log('playAudio called with:', audioPath);
     if (audioRef.current) {
@@ -74,21 +73,37 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
     } catch (error) {
       console.error('Playback failed:', error);
       cleanup();
-      if (audioRef.current === audio) {
-        handleNextTrack();
-      }
+      return null;
     }
-  }, [setupAudioElement, setTimerActive, handleNextTrack]);
+  }, [setupAudioElement, setTimerActive]);
 
-  // Modify the initialization effect
-  useEffect(() => {
-    console.log('Initial effect triggered', { 
-      audioFiles, 
-      currentIndex: audioState.currentIndex,
-      hasInitialized: hasInitialized.current 
-    });
+  // 4. Define handleNextTrack
+  const handleNextTrack = useCallback(() => {
+    if (!audioFiles?.length) return;
     
-    // Only initialize once, even in strict mode
+    const nextIndex = getRandomTrackIndex(audioState.currentIndex, audioFiles.length);
+    setAudioState(prev => ({ ...prev, currentIndex: nextIndex }));
+    playAudio(audioFiles[nextIndex]);
+  }, [audioFiles, audioState.currentIndex, getRandomTrackIndex, playAudio]);
+
+  // 5. Handle ended event in a separate effect
+  useEffect(() => {
+    if (audioRef.current) {
+      const handleEnded = () => handleNextTrack();
+      audioRef.current.addEventListener('ended', handleEnded);
+      return () => audioRef.current?.removeEventListener('ended', handleEnded);
+    }
+  }, [handleNextTrack]);
+
+  // Handle volume changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Initialize playback
+  useEffect(() => {
     if (audioFiles?.length && !hasInitialized.current) {
       hasInitialized.current = true;
       const initialIndex = getRandomTrackIndex(-1, audioFiles.length);
@@ -98,19 +113,7 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
     }
   }, [audioFiles, getRandomTrackIndex, playAudio]);
 
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
-      }
-      hasInitialized.current = false; // Reset on unmount
-    };
-  }, []);
-
-  const handlePlayPauseClick = () => {
+  const handlePlayPauseClick = useCallback(() => {
     if (!audioRef.current) return;
 
     if (audioState.isPlaying) {
@@ -120,8 +123,25 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
       audioRef.current.play();
       setTimerActive(true);
     }
-    setAudioState(prev => ({ ...prev, isPlaying: !audioState.isPlaying }));
-  };
+    setAudioState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
+  }, [audioState.isPlaying, setTimerActive]);
+
+  // Add cleanup function
+  const cleanupAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+    setAudioState(prev => ({ ...prev, isPlaying: false }));
+  }, []);
+
+  // Expose cleanup through props
+  useEffect(() => {
+    if (onCleanup) {
+      onCleanup(cleanupAudio);
+    }
+  }, [onCleanup, cleanupAudio]);
 
   return (
     <div className="tw-absolute tw-bottom-8 tw-left-0 tw-right-0 tw-flex tw-justify-center tw-gap-4 tw-h-[10%]">

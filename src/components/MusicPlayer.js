@@ -39,6 +39,7 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
   const handleBeginSession = async () => {
     if (!audioState.isVerified) return;
 
+    // Only play the bell sound
     try {
       const bellUrl = AudioManager.getBellAudioUrl();
       const isValid = await AudioManager.verifyAudio(bellUrl);
@@ -47,26 +48,17 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
         const audio = new Audio(bellUrl);
         await audio.play();
       }
-      
-      // Single state update for session start
-      setTimeout(() => {
-        setSessionState(prev => ({
-          ...prev,
-          started: true,
-          slideIn: true
-        }));
-        onBeginClick(sessionState.inputValue);
-      }, 1000);
     } catch (error) {
-      console.error('Session initialization error:', error);
-      // Same state update for error path
-      setSessionState(prev => ({
-        ...prev,
-        started: true,
-        slideIn: true
-      }));
-      onBeginClick(sessionState.inputValue);
+      console.error('Bell sound failed:', error);
     }
+    
+    // Update session state
+    setSessionState(prev => ({
+      ...prev,
+      started: true,
+      slideIn: true
+    }));
+    onBeginClick(sessionState.inputValue);
   };
 
   const handleInputChange = (event) => {

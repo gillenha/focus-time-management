@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AudioManager from '../utils/audioManager';
 
 function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
+  // Add a ref to track initialization
+  const hasInitialized = useRef(false);
+  
   // Combined audio state
   const [audioState, setAudioState] = useState({
     isPlaying: false,
@@ -28,7 +31,7 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
     const nextIndex = getRandomTrackIndex(audioState.currentIndex, audioFiles.length);
     setAudioState(prev => ({ ...prev, currentIndex: nextIndex }));
     playAudio(audioFiles[nextIndex]);
-  }, [audioFiles, audioState.currentIndex, getRandomTrackIndex]);
+  }, [audioFiles, getRandomTrackIndex]);
 
   // Consolidated audio setup
   const setupAudioElement = useCallback((audio) => {
@@ -51,34 +54,49 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
   }, [volume, onVolumeChange, handleNextTrack]);
 
   const playAudio = useCallback(async (audioPath) => {
+    console.log('playAudio called with:', audioPath);
     if (audioRef.current) {
+      console.log('Existing audio found, cleaning up');
       audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
     }
 
     const audio = new Audio(AudioManager.getFullAudioUrl(audioPath));
     const cleanup = setupAudioElement(audio);
 
     try {
+      audioRef.current = audio;
       await audio.play();
       setAudioState(prev => ({ ...prev, isPlaying: true }));
       setTimerActive(true);
-      audioRef.current = audio;
       return cleanup;
     } catch (error) {
       console.error('Playback failed:', error);
       cleanup();
-      handleNextTrack();
+      if (audioRef.current === audio) {
+        handleNextTrack();
+      }
     }
   }, [setupAudioElement, setTimerActive, handleNextTrack]);
 
-  // Single initialization effect
+  // Modify the initialization effect
   useEffect(() => {
-    if (audioFiles?.length && audioState.currentIndex === null) {
+    console.log('Initial effect triggered', { 
+      audioFiles, 
+      currentIndex: audioState.currentIndex,
+      hasInitialized: hasInitialized.current 
+    });
+    
+    // Only initialize once, even in strict mode
+    if (audioFiles?.length && !hasInitialized.current) {
+      hasInitialized.current = true;
       const initialIndex = getRandomTrackIndex(-1, audioFiles.length);
+      console.log('Starting initial playback', { initialIndex });
       setAudioState(prev => ({ ...prev, currentIndex: initialIndex }));
       playAudio(audioFiles[initialIndex]);
     }
-  }, [audioFiles, audioState.currentIndex, getRandomTrackIndex, playAudio]);
+  }, [audioFiles, getRandomTrackIndex, playAudio]);
 
   // Cleanup effect
   useEffect(() => {
@@ -86,7 +104,9 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        audioRef.current = null;
       }
+      hasInitialized.current = false; // Reset on unmount
     };
   }, []);
 

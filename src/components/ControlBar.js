@@ -65,13 +65,27 @@ function ControlBar({ setTimerActive, volume, onVolumeChange }) {
     }
   }, [volume, setTimerActive, onVolumeChange]);
 
+  // Add a utility function to get random track
+  const getRandomTrackIndex = useCallback((currentIndex, totalTracks) => {
+    if (totalTracks <= 1) return 0;
+    
+    // Generate random index that's different from current
+    let randomIndex;
+    do {
+      randomIndex = Math.floor(Math.random() * totalTracks);
+    } while (randomIndex === currentIndex);
+    
+    return randomIndex;
+  }, []);
+
+  // Modified handleNextTrack to use random selection
   const handleNextTrack = useCallback(() => {
     if (audioFiles.length === 0) return;
     
-    const nextIndex = (currentAudioIndex + 1) % audioFiles.length;
+    const nextIndex = getRandomTrackIndex(currentAudioIndex, audioFiles.length);
     setCurrentAudioIndex(nextIndex);
     playAudio(audioFiles[nextIndex]);
-  }, [audioFiles, currentAudioIndex, playAudio]);
+  }, [audioFiles, currentAudioIndex, playAudio, getRandomTrackIndex]);
 
   const handlePlayPauseClick = () => {
     if (!audioRef.current) return;

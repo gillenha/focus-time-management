@@ -1,10 +1,91 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import AudioManager from '../utils/audioManager';
 
-function ControlBar({ onPlayPauseClick, isPlaying, onNextTrackClick }) {
+function ControlBar({ setTimerActive, volume, onVolumeChange }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioFiles, setAudioFiles] = useState([]);
+  const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
+  const audioRef = useRef(null);
+
+  // Load audio files on mount
+  useEffect(() => {
+    let mounted = true;
+
+    const loadAudioFiles = async () => {
+      try {
+        const files = await AudioManager.getManifest();
+        if (mounted) {
+          console.log('Audio files loaded:', files);
+          setAudioFiles(files);
+          // Auto-start first track
+          if (files.length > 0) {
+            playAudio(files[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load audio files:', error);
+      }
+    };
+
+    loadAudioFiles();
+    return () => { mounted = false; };
+  }, []);
+
+  const playAudio = useCallback(async (audioPath) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    const audioUrl = AudioManager.getFullAudioUrl(audioPath);
+    const audio = new Audio(audioUrl);
+    audio.volume = volume;
+
+    try {
+      await audio.play();
+      setIsPlaying(true);
+      setTimerActive(true);
+      audioRef.current = audio;
+    } catch (error) {
+      console.error('Audio playback error:', error);
+      handleNextTrack();
+    }
+  }, [volume, setTimerActive]);
+
+  const handleNextTrack = useCallback(() => {
+    if (audioFiles.length === 0) return;
+    
+    const nextIndex = (currentAudioIndex + 1) % audioFiles.length;
+    setCurrentAudioIndex(nextIndex);
+    playAudio(audioFiles[nextIndex]);
+  }, [audioFiles, currentAudioIndex, playAudio]);
+
+  const handlePlayPauseClick = () => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setTimerActive(false);
+    } else {
+      audioRef.current.play();
+      setTimerActive(true);
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
+
   return (
     <div className="tw-absolute tw-bottom-8 tw-left-0 tw-right-0 tw-flex tw-justify-center tw-gap-4 tw-h-[10%]">
       <button 
-        onClick={onPlayPauseClick}
+        onClick={handlePlayPauseClick}
         className="tw-w-12 tw-h-12 tw-flex tw-items-center tw-justify-center tw-bg-gray-600 tw-rounded-full tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0 tw-outline-none focus:tw-outline-none hover:tw-cursor-pointer tw-transition-all"
       >
         {isPlaying ? (
@@ -36,7 +117,7 @@ function ControlBar({ onPlayPauseClick, isPlaying, onNextTrackClick }) {
         )}
       </button>
       <button 
-        onClick={onNextTrackClick}
+        onClick={handleNextTrack}
         className="tw-w-12 tw-h-12 tw-flex tw-flex-row tw-items-center tw-gap-2 tw-justify-center tw-bg-gray-600 tw-rounded-full hover:tw-cursor-pointer tw-transition-all tw-border-0 tw-outline-none focus:tw-outline-none tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]"
       >
         <svg 

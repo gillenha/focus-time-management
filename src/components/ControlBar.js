@@ -1,106 +1,86 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AudioManager from '../utils/audioManager';
 
-function ControlBar({ setTimerActive, volume, onVolumeChange }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioFiles, setAudioFiles] = useState([]);
-  const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
+function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles }) {
+  // Combined audio state
+  const [audioState, setAudioState] = useState({
+    isPlaying: false,
+    currentIndex: null
+  });
+  
   const audioRef = useRef(null);
 
-  // Update audio volume when volume prop changes
+  // Single volume effect
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
   }, [volume]);
 
-  // Load audio files on mount
-  useEffect(() => {
-    let mounted = true;
+  const getRandomTrackIndex = useCallback((currentIndex, totalTracks) => {
+    if (totalTracks <= 1) return 0;
+    return Math.floor(Math.random() * totalTracks);
+  }, []);
 
-    const loadAudioFiles = async () => {
-      try {
-        const files = await AudioManager.getManifest();
-        if (mounted) {
-          console.log('Audio files loaded:', files);
-          setAudioFiles(files);
-          // Auto-start first track
-          if (files.length > 0) {
-            playAudio(files[0]);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load audio files:', error);
+  const handleNextTrack = useCallback(() => {
+    if (!audioFiles?.length) return;
+    
+    const nextIndex = getRandomTrackIndex(audioState.currentIndex, audioFiles.length);
+    setAudioState(prev => ({ ...prev, currentIndex: nextIndex }));
+    playAudio(audioFiles[nextIndex]);
+  }, [audioFiles, audioState.currentIndex, getRandomTrackIndex]);
+
+  // Consolidated audio setup
+  const setupAudioElement = useCallback((audio) => {
+    audio.volume = volume;
+    
+    const handleEnded = () => handleNextTrack();
+    const handleVolumeChange = () => {
+      if (onVolumeChange && audio.volume !== volume) {
+        onVolumeChange(audio.volume);
       }
     };
 
-    loadAudioFiles();
-    return () => { mounted = false; };
-  }, []);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('volumechange', handleVolumeChange);
+
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('volumechange', handleVolumeChange);
+    };
+  }, [volume, onVolumeChange, handleNextTrack]);
 
   const playAudio = useCallback(async (audioPath) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
 
-    const audioUrl = AudioManager.getFullAudioUrl(audioPath);
-    const audio = new Audio(audioUrl);
-    audio.volume = volume; // Set initial volume
+    const audio = new Audio(AudioManager.getFullAudioUrl(audioPath));
+    const cleanup = setupAudioElement(audio);
 
     try {
       await audio.play();
-      setIsPlaying(true);
+      setAudioState(prev => ({ ...prev, isPlaying: true }));
       setTimerActive(true);
       audioRef.current = audio;
-
-      // Add volume change listener
-      audio.addEventListener('volumechange', () => {
-        if (onVolumeChange && audio.volume !== volume) {
-          onVolumeChange(audio.volume);
-        }
-      });
+      return cleanup;
     } catch (error) {
-      console.error('Audio playback error:', error);
+      console.error('Playback failed:', error);
+      cleanup();
       handleNextTrack();
     }
-  }, [volume, setTimerActive, onVolumeChange]);
+  }, [setupAudioElement, setTimerActive, handleNextTrack]);
 
-  // Add a utility function to get random track
-  const getRandomTrackIndex = useCallback((currentIndex, totalTracks) => {
-    if (totalTracks <= 1) return 0;
-    
-    // Generate random index that's different from current
-    let randomIndex;
-    do {
-      randomIndex = Math.floor(Math.random() * totalTracks);
-    } while (randomIndex === currentIndex);
-    
-    return randomIndex;
-  }, []);
-
-  // Modified handleNextTrack to use random selection
-  const handleNextTrack = useCallback(() => {
-    if (audioFiles.length === 0) return;
-    
-    const nextIndex = getRandomTrackIndex(currentAudioIndex, audioFiles.length);
-    setCurrentAudioIndex(nextIndex);
-    playAudio(audioFiles[nextIndex]);
-  }, [audioFiles, currentAudioIndex, playAudio, getRandomTrackIndex]);
-
-  const handlePlayPauseClick = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setTimerActive(false);
-    } else {
-      audioRef.current.play();
-      setTimerActive(true);
+  // Single initialization effect
+  useEffect(() => {
+    if (audioFiles?.length && audioState.currentIndex === null) {
+      const initialIndex = getRandomTrackIndex(-1, audioFiles.length);
+      setAudioState(prev => ({ ...prev, currentIndex: initialIndex }));
+      playAudio(audioFiles[initialIndex]);
     }
-    setIsPlaying(!isPlaying);
-  };
+  }, [audioFiles, audioState.currentIndex, getRandomTrackIndex, playAudio]);
 
-  // Cleanup on unmount
+  // Cleanup effect
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -110,13 +90,26 @@ function ControlBar({ setTimerActive, volume, onVolumeChange }) {
     };
   }, []);
 
+  const handlePlayPauseClick = () => {
+    if (!audioRef.current) return;
+
+    if (audioState.isPlaying) {
+      audioRef.current.pause();
+      setTimerActive(false);
+    } else {
+      audioRef.current.play();
+      setTimerActive(true);
+    }
+    setAudioState(prev => ({ ...prev, isPlaying: !audioState.isPlaying }));
+  };
+
   return (
     <div className="tw-absolute tw-bottom-8 tw-left-0 tw-right-0 tw-flex tw-justify-center tw-gap-4 tw-h-[10%]">
       <button 
         onClick={handlePlayPauseClick}
         className="tw-w-12 tw-h-12 tw-flex tw-items-center tw-justify-center tw-bg-gray-600 tw-rounded-full tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0 tw-outline-none focus:tw-outline-none hover:tw-cursor-pointer tw-transition-all"
       >
-        {isPlaying ? (
+        {audioState.isPlaying ? (
           <svg 
             stroke="currentColor" 
             fill="currentColor" 

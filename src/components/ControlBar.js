@@ -7,6 +7,13 @@ function ControlBar({ setTimerActive, volume, onVolumeChange }) {
   const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
   const audioRef = useRef(null);
 
+  // Update audio volume when volume prop changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
   // Load audio files on mount
   useEffect(() => {
     let mounted = true;
@@ -38,18 +45,25 @@ function ControlBar({ setTimerActive, volume, onVolumeChange }) {
 
     const audioUrl = AudioManager.getFullAudioUrl(audioPath);
     const audio = new Audio(audioUrl);
-    audio.volume = volume;
+    audio.volume = volume; // Set initial volume
 
     try {
       await audio.play();
       setIsPlaying(true);
       setTimerActive(true);
       audioRef.current = audio;
+
+      // Add volume change listener
+      audio.addEventListener('volumechange', () => {
+        if (onVolumeChange && audio.volume !== volume) {
+          onVolumeChange(audio.volume);
+        }
+      });
     } catch (error) {
       console.error('Audio playback error:', error);
       handleNextTrack();
     }
-  }, [volume, setTimerActive]);
+  }, [volume, setTimerActive, onVolumeChange]);
 
   const handleNextTrack = useCallback(() => {
     if (audioFiles.length === 0) return;

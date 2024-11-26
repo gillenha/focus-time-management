@@ -1,4 +1,17 @@
 import React, { useState } from 'react';
+import { 
+    Tree,
+    Waves,
+    Snowflake,
+    Circle,
+    Island,
+    Lightning,
+    Building,
+    Binoculars,
+    Cactus,
+    Mountains,
+    Sailboat
+} from "@phosphor-icons/react"
 
 const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackgroundImage }) => {
     const [selectedTheme, setSelectedTheme] = useState(theme);
@@ -11,6 +24,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
         setTheme(selectedTheme);
         localStorage.setItem('unsplashTheme', selectedTheme);
         fetchBackgroundImage(selectedTheme, true);
+        onClose();
     };
 
     return (
@@ -60,32 +74,90 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             >
                                 {selectedTheme === theme ? 'Current Theme' : 'Apply Theme'}
                             </button>
-                            <select
-                                value={selectedTheme}
-                                onChange={handleThemeChange}
-                                className="tw-w-full tw-px-4 tw-py-2 tw-bg-white tw-border 
-                                         tw-border-gray-300 tw-rounded-md tw-shadow-sm 
-                                         tw-appearance-none tw-text-gray-700
-                                         focus:tw-outline-none focus:tw-ring-2 
-                                         focus:tw-ring-blue-500 focus:tw-border-blue-500 
-                                         tw-cursor-pointer"
-                            >
-                                <option value="scenic landscape nature">Nature</option>
-                                <option value="dramatic ocean waves">Ocean</option>
-                                <option value="snowy mountain landscape">Winter</option>
-                                <option value="traditional japanese temple">Japan</option>
-                                <option value="tropical paradise beach">Beach</option>
-                                <option value="northern lights aurora">Aurora</option>
-                                <option value="ancient forest sunrise">Forest</option>
-                                <option value="cityscape at night">City</option>
-                                <option value="volcanic landscape">Volcano</option>
-                                <option value="desert landscape">Desert</option>
-                                <option value="majestic mountain landscape">Mountains</option>
-                                <option value="snowy mountain landscape">Snowy Mountains</option>
-                                <option value="serene lake reflection">Lakes</option>
-                            </select>
+                            {/* Replace select with grid */}
+                            <div className="tw-grid tw-grid-cols-2 tw-gap-4 tw-cursor-pointer">
+                                {[
+                                    { 
+                                        value: "scenic landscape nature", 
+                                        label: "Nature",
+                                        icon: <Tree size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "dramatic ocean waves", 
+                                        label: "Ocean",
+                                        icon: <Waves size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "snowy mountain landscape", 
+                                        label: "Winter",
+                                        icon: <Snowflake size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "traditional japanese temple", 
+                                        label: "Japan",
+                                        icon: <Circle size={32} weight="thin" className="tw-mb-2" />    
+                                    },
+                                    { 
+                                        value: "tropical paradise beach", 
+                                        label: "Beach",
+                                        icon: <Island size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "northern lights aurora", 
+                                        label: "Aurora",
+                                        icon: <Lightning size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "ancient forest sunrise", 
+                                        label: "Forest",
+                                        icon: <Tree size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "cityscape at night", 
+                                        label: "City",
+                                        icon: <Building size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "volcanic landscape", 
+                                        label: "Volcano",
+                                        icon: <Binoculars size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "desert landscape", 
+                                        label: "Desert",
+                                        icon: <Cactus size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "majestic mountain landscape", 
+                                        label: "Mountains",
+                                        icon: <Mountains size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    { 
+                                        value: "serene lake reflection", 
+                                        label: "Lakes",
+                                        icon: <Sailboat size={32} weight="thin" className="tw-mb-2" />
+                                    }
+                                ].map((theme) => (
+                                    <button
+                                        key={theme.value}
+                                        onClick={() => handleThemeChange({ target: { value: theme.value }})}
+                                        className={`
+                                            tw-p-4 tw-rounded-lg tw-text-center tw-transition-all
+                                            tw-border tw-border-gray-200
+                                            hover:tw-border-gray-300 hover:tw-shadow-md
+                                            tw-flex tw-flex-col tw-items-center tw-justify-center
+                                            tw-cursor-pointer
+                                            ${selectedTheme === theme.value 
+                                                ? 'tw-bg-gray-800 tw-text-white' 
+                                                : 'tw-bg-white tw-text-gray-700 hover:tw-bg-gray-50'}
+                                        `}
+                                    >
+                                        {theme.icon}
+                                        {theme.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-
                     </div>
                 </div>
             </div>

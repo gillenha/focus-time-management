@@ -66,7 +66,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             <button
                                 onClick={handleApplyTheme}
                                 className={`tw-w-full tw-px-4 tw-py-2 tw-rounded-lg 
-                                      tw-font-medium tw-transition-colors
+                                      tw-font-medium tw-transition-colors tw-cursor-pointer
                                       ${selectedTheme !== theme
                                         ? 'tw-bg-gray-800 tw-text-white hover:tw-bg-gray-700'
                                         : 'tw-bg-gray-100 tw-text-gray-400 tw-cursor-not-allowed'}`}
@@ -103,7 +103,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         icon: <Island size={32} weight="thin" className="tw-mb-2" />
                                     },
                                     { 
-                                        value: "northern lights aurora", 
+                                        value: "northern lights", 
                                         label: "Aurora",
                                         icon: <Lightning size={32} weight="thin" className="tw-mb-2" />
                                     },
@@ -118,7 +118,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         icon: <Building size={32} weight="thin" className="tw-mb-2" />
                                     },
                                     { 
-                                        value: "volcanic landscape", 
+                                        value: "volcano eruption landscape", 
                                         label: "Volcano",
                                         icon: <Binoculars size={32} weight="thin" className="tw-mb-2" />
                                     },

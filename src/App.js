@@ -76,7 +76,7 @@ function App() {
       }
 
       const response = await fetch(
-        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant`,
+        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant&featured=true`,
         {
           headers: {
             Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
@@ -88,7 +88,7 @@ function App() {
       
       const data = await response.json();
       
-      setBackgroundImage(data.urls.regular);
+      setBackgroundImage(data.urls.raw);
       
       setPhotographer({
         name: data.user.name || '',

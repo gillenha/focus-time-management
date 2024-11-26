@@ -52,6 +52,16 @@ steps:
       - '--format=get(digest)'
       - '--sort-by=~timestamp'
 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+    - 'run'
+    - 'deploy'
+    - 'YOUR-SERVICE-NAME'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/your-image'
+    - '--update-secrets'
+    - 'NOTION_API_KEY=notion-api-key:latest,NOTION_DATABASE_ID=notion-database-id:latest'
+
 options:
   logging: CLOUD_LOGGING_ONLY
 

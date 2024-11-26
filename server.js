@@ -17,20 +17,27 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const PORT = process.env.SERVER_PORT || 8080; // Change from 5001 to 8080
 
-// Initialize Notion client
-let notion;
-try {
+// Add this near the top of your server.js
+const initializeNotion = () => {
     if (!process.env.NOTION_API_KEY) {
-        console.error('NOTION_API_KEY is not defined in environment variables');
-    } else {
-        notion = new Client({
+        console.error('NOTION_API_KEY missing. Current environment:', process.env.NODE_ENV);
+        return null;
+    }
+    
+    try {
+        const notion = new Client({
             auth: process.env.NOTION_API_KEY
         });
-        console.log('Notion client initialized successfully');
+        console.log('Notion client initialized successfully in', process.env.NODE_ENV);
+        return notion;
+    } catch (error) {
+        console.error('Failed to initialize Notion client:', error);
+        return null;
     }
-} catch (error) {
-    console.error('Failed to initialize Notion client:', error);
-}
+};
+
+// Use it when initializing your notion client
+const notion = initializeNotion();
 
 // Add security headers, but disable some that might interfere with audio playback
 app.use(helmet({

@@ -12,6 +12,8 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import SessionHistoryPage from './pages/SessionHistoryPage';
 import Menu from './components/Menu';
+import Profile from './pages/Profile';
+import ChangeBackground from './pages/ChangeBackground';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -26,8 +28,19 @@ function App() {
   const [totalFocusedTime, setTotalFocusedTime] = useState(0);
   const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState('');
-  const [photographer, setPhotographer] = useState({ name: '', username: '', link: '' });
+  const [photo, setPhoto] = useState({});
+  const [photographer, setPhotographer] = useState({
+    name: '',
+    username: '',
+    link: '',
+    photoLink: ''
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [unsplashTheme, setUnsplashTheme] = useState('nature');
+  const [showProfile, setShowProfile] = useState(false);
+  const [isProfileExiting, setIsProfileExiting] = useState(false);
+  const [showChangeBackgroundImage, setShowChangeBackgroundImage] = useState(false);
+  const [isChangeBackgroundImageExiting, setIsChangeBackgroundImageExiting] = useState(false);
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -46,105 +59,75 @@ function App() {
     return () => clearInterval(timer);
   }, [timerActive, time]);
 
-  useEffect(() => {
-    const fetchBackgroundImage = async () => {
-      console.log('Starting background image fetch process...');
-      console.log('Environment:', process.env.NODE_ENV);
-      console.log('All env variables:', {
-        REACT_APP_UNSPLASH_ACCESS_KEY: process.env.REACT_APP_UNSPLASH_ACCESS_KEY ? 'exists' : 'missing',
-        // Log other env variables if needed
-      });
-
-      // Check if we have a recent image (less than 30 minutes old)
-      const lastFetchTime = localStorage.getItem('lastImageFetch');
-      const savedImage = localStorage.getItem('backgroundImage');
-      const savedPhotographer = localStorage.getItem('photographer');
-      const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes in milliseconds
-
-      if (lastFetchTime && savedImage && savedPhotographer) {
-        const timeSinceLastFetch = Date.now() - parseInt(lastFetchTime);
-        if (timeSinceLastFetch < THIRTY_MINUTES) {
-          console.log('Using recently cached image (less than 30m old)');
-          setBackgroundImage(savedImage);
-          setPhotographer(JSON.parse(savedPhotographer));
+  const fetchBackgroundImage = async (theme, forceUpdate = false) => {
+    try {
+      const lastFetch = localStorage.getItem('lastImageFetch');
+      const timeSinceLastFetch = Date.now() - parseInt(lastFetch || '0');
+      
+      // If not forcing update and less than 1 hour since last fetch, use cached image
+      if (!forceUpdate && lastFetch && timeSinceLastFetch < 3600000) {
+        const cachedImage = localStorage.getItem('backgroundImage');
+        const cachedPhotographer = localStorage.getItem('photographer');
+        if (cachedImage && cachedPhotographer) {
+          setBackgroundImage(cachedImage);
+          setPhotographer(JSON.parse(cachedPhotographer));
           return;
         }
-        console.log('Cached image is older than 30m, fetching new image');
       }
 
-      // Retry logic for Unsplash API
-      const fetchUnsplashImage = async () => {
-        try {
-          if (!process.env.REACT_APP_UNSPLASH_ACCESS_KEY) {
-            console.log('No API key found, using fallback image');
-            setBackgroundImage('/images/test.jpg');
-            setPhotographer({ name: '', username: '', link: '' });
-            return;
-          }
-
-          console.log('Attempting to fetch image from Unsplash API...');
-          const response = await fetch(`https://api.unsplash.com/photos/random?query=nature&orientation=landscape`, {
-            headers: {
-              'Authorization': `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
-            }
-          });
-          
-          if (response.status === 401) {
-            console.log('Unauthorized: API key invalid');
-            setBackgroundImage('/images/test.jpg');
-            setPhotographer({ name: '', username: '', link: '' });
-            return;
-          }
-          
-          console.log('Unsplash API response status:', response.status);
-          
-          if (response.status === 403) {
-            console.log('Rate limit exceeded (403). Checking for cached image...');
-            throw new Error('Rate limited');
-          }
-          
-          console.log('Successfully fetched image from Unsplash API!');
-          const data = await response.json();
-          setBackgroundImage(data.urls.full);
-          setPhotographer({
-            name: data.user.name,
-            username: data.user.username,
-            link: data.user.links.html
-          });
-          
-          // Save to localStorage with timestamp
-          localStorage.setItem('backgroundImage', data.urls.regular);
-          localStorage.setItem('photographer', JSON.stringify({
-            name: data.user.name,
-            username: data.user.username,
-            link: data.user.links.html
-          }));
-          localStorage.setItem('lastImageFetch', Date.now().toString());
-        } catch (error) {
-          if (error.message === 'Rate limited') {
-            // Check for any cached image regardless of age
-            if (savedImage && savedPhotographer) {
-              console.log('Rate limited: Using cached image');
-              setBackgroundImage(savedImage);
-              setPhotographer(JSON.parse(savedPhotographer));
-            } else {
-              console.log('No cached image available, using fallback test.jpg');
-              setBackgroundImage('/images/test.jpg');
-              setPhotographer({ name: '', username: '', link: '' });
-            }
-          } else {
-            console.log('Other error occurred, retrying...', error);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            return fetchUnsplashImage();
+      const response = await fetch(
+        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape`,
+        {
+          headers: {
+            Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
           }
         }
+      );
+      
+      if (!response.ok) throw new Error('Failed to fetch image');
+      
+      const data = await response.json();
+      
+      setBackgroundImage(data.urls.regular);
+      
+      const photographerInfo = {
+        name: data.user.name || '',
+        username: data.user.username || '',
+        link: data.user.links.html || '',
+        photoLink: data.links.html || ''
       };
+      
+      setPhotographer(photographerInfo);
+      
+      localStorage.setItem('backgroundImage', data.urls.regular);
+      localStorage.setItem('photographer', JSON.stringify(photographerInfo));
+      localStorage.setItem('lastImageFetch', Date.now().toString());
+      
+    } catch (error) {
+      console.error('Error fetching image:', error);
+      // Use cached values
+      const cachedImage = localStorage.getItem('backgroundImage');
+      const cachedPhotographer = localStorage.getItem('photographer');
+      
+      if (cachedImage && cachedPhotographer) {
+        setBackgroundImage(cachedImage);
+        setPhotographer(JSON.parse(cachedPhotographer));
+      } else {
+        setBackgroundImage('/images/test.jpg');
+        setPhotographer({ 
+          name: '', 
+          username: '', 
+          link: '',
+          photoLink: '' 
+        });
+      }
+    }
+  };
 
-      await fetchUnsplashImage();
-    };
-
-    fetchBackgroundImage();
-  }, []);
+  useEffect(() => {
+    // This will respect the 30-minute cache
+    fetchBackgroundImage(unsplashTheme, false);
+  }, [unsplashTheme]);
 
   const handleFreeFlowClick = () => {
     if (isFreeflow) {
@@ -215,6 +198,14 @@ function App() {
     }
   };
 
+  const toggleChangeBackgroundImage = () => {
+    if (showChangeBackgroundImage) {
+      setIsChangeBackgroundImageExiting(true);
+    } else {
+      setShowChangeBackgroundImage(true);
+    }
+  };
+
   const fetchTotalFocusTime = async () => {
     try {
       const response = await fetch('http://localhost:5001/api/total-focus-time');
@@ -231,6 +222,25 @@ function App() {
     console.log('Public URL:', process.env.PUBLIC_URL);
   }, []);
 
+  window.fetchBackgroundImage = fetchBackgroundImage;
+
+  const toggleProfile = () => {
+    if (showProfile) {
+      setIsProfileExiting(true);
+      setTimeout(() => {
+        setShowProfile(false);
+        setIsProfileExiting(false);
+      }, 300); // Match your animation duration
+    } else {
+      setShowProfile(true);
+    }
+  };
+
+  const truncateText = (text, limit = 30) => {
+    if (!text) return '';
+    return text.length > limit ? `${text.slice(0, limit)}...` : text;
+  };
+
   return (
     <div className="grid-container">
       <div 
@@ -239,6 +249,19 @@ function App() {
       ></div>
       {photographer.name && (
         <div className="photo-attribution">
+          <a 
+            href={photographer.photoLink} 
+            target="_blank" 
+            rel="noopener noreferrer"
+          >
+            <p className="tw-text-right">
+              {truncateText(
+                photo.description || 
+                photo.alt_description || 
+                `${unsplashTheme.charAt(0).toUpperCase() + unsplashTheme.slice(1)} photo`
+              )}
+            </p>
+          </a>
           <p>
             Photo by{' '}
             <a 
@@ -275,7 +298,18 @@ function App() {
         <Menu 
           isOpen={isMenuOpen}
           onClose={() => setIsMenuOpen(false)}
-          onShowHistory={toggleSessionHistory}
+          onProfileClick={() => {
+            setIsMenuOpen(false);
+            toggleProfile();
+          }}
+          onShowHistory={() => {
+            setIsMenuOpen(false);
+            toggleSessionHistory();
+          }}
+          onBackgroundImage={() => {
+            setIsMenuOpen(false);
+            toggleChangeBackgroundImage();
+          }}
         />
         {showMusicPlayer && (
           <MusicPlayer
@@ -305,6 +339,29 @@ function App() {
           onClose={toggleSessionHistory}
           totalFocusedTime={totalFocusedTime}
           isExiting={isSessionHistoryExiting}
+        />
+      )}
+      {(showProfile || isProfileExiting) && (
+        <Profile
+          onClose={toggleProfile}
+          theme={unsplashTheme}
+          setTheme={setUnsplashTheme}
+          isExiting={isProfileExiting}
+        />
+      )}
+      {showChangeBackgroundImage && (
+        <ChangeBackground
+          onClose={() => {
+            setIsChangeBackgroundImageExiting(true);
+            setTimeout(() => {
+              setShowChangeBackgroundImage(false);
+              setIsChangeBackgroundImageExiting(false);
+            }, 300);
+          }}
+          theme={unsplashTheme}
+          setTheme={setUnsplashTheme}
+          isExiting={isChangeBackgroundImageExiting}
+          fetchBackgroundImage={fetchBackgroundImage}
         />
       )}
       <nav className="bottom-navbar">

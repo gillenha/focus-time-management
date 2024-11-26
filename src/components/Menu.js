@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-function Menu({ isOpen, onClose, onShowHistory }) {
+function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImage }) {
   return (
-    <>
+    <div className={`menu ${isOpen ? 'open' : ''}`}>
       {/* Overlay */}
       <div 
         className={`tw-fixed tw-inset-0 tw-bg-black tw-bg-opacity-50 tw-transition-opacity tw-z-50 ${
@@ -22,7 +22,16 @@ function Menu({ isOpen, onClose, onShowHistory }) {
             <p className="tw-text-xl tw-font-bold tw-text-gray-800">Focus App</p>
             <button 
               onClick={onClose}
-              className="tw-text-gray-500 hover:tw-text-gray-700"
+              className="tw-text-gray-500 
+              hover:tw-text-gray-700 
+              tw-cursor-pointer 
+              tw-bg-transparent 
+              tw-border-0 
+              tw-outline-none 
+              tw-appearance-none
+              tw-text-2xl
+              tw-font-bold
+              "
             >
               ✕
             </button>
@@ -40,7 +49,9 @@ function Menu({ isOpen, onClose, onShowHistory }) {
                     e.preventDefault();
                   }}
                 >
-                  <span>Profile</span>
+                  <span onClick={onProfileClick} className="tw-cursor-pointer">
+                    Profile
+                  </span>
                   <span className="tw-text-gray-400">👤</span>
                 </a>
               </li>
@@ -58,21 +69,33 @@ function Menu({ isOpen, onClose, onShowHistory }) {
                 <a 
                   href="#" 
                   className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
-                  onClick={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
                     onShowHistory();
                     onClose();
                   }}
                 >
                   <span>Session History</span>
-                  <span className="tw-text-gray-400">📊</span>
+                  <span className="tw-text-gray-400"></span>
+                </a>
+              </li>
+              <li>
+                <a 
+                  href="#" 
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  onClick={() => {
+                    onBackgroundImage();
+                    onClose();
+                  }}
+                >
+                  <span>Background Image</span>
+                  <span className="tw-text-gray-400"></span>
                 </a>
               </li>
             </ul>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -76,7 +76,7 @@ function App() {
       }
 
       const response = await fetch(
-        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape`,
+        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant`,
         {
           headers: {
             Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
@@ -90,17 +90,22 @@ function App() {
       
       setBackgroundImage(data.urls.regular);
       
-      const photographerInfo = {
+      setPhotographer({
         name: data.user.name || '',
         username: data.user.username || '',
         link: data.user.links.html || '',
-        photoLink: data.links.html || ''
-      };
-      
-      setPhotographer(photographerInfo);
+        photoLink: data.links.html || '',
+        description: data.description || data.alt_description || ''
+      });
       
       localStorage.setItem('backgroundImage', data.urls.regular);
-      localStorage.setItem('photographer', JSON.stringify(photographerInfo));
+      localStorage.setItem('photographer', JSON.stringify({
+        name: data.user.name || '',
+        username: data.user.username || '',
+        link: data.user.links.html || '',
+        photoLink: data.links.html || '',
+        description: data.description || data.alt_description || ''
+      }));
       localStorage.setItem('lastImageFetch', Date.now().toString());
       
     } catch (error) {
@@ -256,8 +261,7 @@ function App() {
           >
             <p className="tw-text-right">
               {truncateText(
-                photo.description || 
-                photo.alt_description || 
+                photographer.description || 
                 `${unsplashTheme.charAt(0).toUpperCase() + unsplashTheme.slice(1)} photo`
               )}
             </p>

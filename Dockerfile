@@ -1,5 +1,5 @@
 # Step 1: Build the React App
-FROM node:14 AS build
+FROM node:18 AS build
 WORKDIR /app
 
 # Copy package files first for better caching
@@ -17,7 +17,7 @@ ENV REACT_APP_API_URL=https://focus-music-app-368754647823.us-central1.run.app
 RUN npm run build
 
 # Step 2: Set up Node.js server with the React Build
-FROM node:14
+FROM node:18
 WORKDIR /app
 
 # Copy only necessary files for production

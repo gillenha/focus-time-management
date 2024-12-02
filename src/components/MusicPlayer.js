@@ -13,42 +13,37 @@ function MusicPlayer({
   onVolumeChange,
   playlistTracks
 }) {
-  // Combined session state
   const [sessionState, setSessionState] = useState({
     started: false,
     slideIn: false,
     inputValue: ''
   });
   
-  // Remove audioState and use playlistTracks directly
   const [isAudioVerified, setIsAudioVerified] = useState(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
 
-  // Replace audio initialization effect
-  useEffect(() => {
-    const verifyAudio = async () => {
-      if (playlistTracks.length === 0) {
-        setIsAudioVerified(false);
-        return;
-      }
+  const verifyAudio = async () => {
+    if (playlistTracks.length === 0) {
+      setIsAudioVerified(false);
+      return false;
+    }
 
-      try {
-        // Verify at least one track is playable
-        const firstTrack = `/mp3s/${playlistTracks[0].fileName}`;
-        const isValid = await AudioManager.verifyAudio(firstTrack);
-        setIsAudioVerified(isValid);
-      } catch (error) {
-        console.error('Audio verification failed:', error);
-        setIsAudioVerified(false);
-      }
-    };
-
-    verifyAudio();
-  }, [playlistTracks]);
+    try {
+      const firstTrack = `/mp3s/${playlistTracks[0].fileName}`;
+      const isValid = await AudioManager.verifyAudio(firstTrack);
+      setIsAudioVerified(isValid);
+      return isValid;
+    } catch (error) {
+      console.error('Audio verification failed:', error);
+      setIsAudioVerified(false);
+      return false;
+    }
+  };
 
   const handleBeginSession = async () => {
-    if (!isAudioVerified) return;
+    const audioVerified = await verifyAudio();
+    if (!audioVerified) return;
 
-    // Only play the bell sound
     try {
       const bellUrl = AudioManager.getBellAudioUrl();
       const isValid = await AudioManager.verifyAudio(bellUrl);
@@ -61,7 +56,6 @@ function MusicPlayer({
       console.error('Bell sound failed:', error);
     }
     
-    // Update session state
     setSessionState(prev => ({
       ...prev,
       started: true,
@@ -77,8 +71,13 @@ function MusicPlayer({
     }));
   };
 
+  const handleTrackEnd = useCallback(() => {
+    setCurrentTrackIndex(prevIndex => {
+      return prevIndex >= playlistTracks.length - 1 ? 0 : prevIndex + 1;
+    });
+  }, [playlistTracks.length]);
+
   const handleCleanup = useCallback((cleanup) => {
-    // Store cleanup function for later use
     window.audioCleanup = cleanup;
   }, []);
 
@@ -114,6 +113,9 @@ function MusicPlayer({
             onVolumeChange={onVolumeChange}
             audioFiles={playlistTracks.map(track => `/mp3s/${track.fileName}`)}
             onCleanup={handleCleanup}
+            currentTrackIndex={currentTrackIndex}
+            onTrackEnd={handleTrackEnd}
+            isSequential={true}
           />
         )}
       </div>

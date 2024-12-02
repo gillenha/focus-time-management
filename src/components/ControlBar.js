@@ -21,6 +21,13 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onClea
     };
   }, [volume, onVolumeChange]);
 
+  // Add real-time volume control
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
   const playAudio = useCallback(async (audioPath) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -33,6 +40,8 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onClea
 
     try {
       audioRef.current = audio;
+      // Set initial volume before playing
+      audio.volume = volume;
       await audio.play();
       setIsPlaying(true);
       setTimerActive(true);
@@ -42,7 +51,7 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onClea
       cleanup();
       return null;
     }
-  }, [setupAudioElement, setTimerActive]);
+  }, [setupAudioElement, setTimerActive, volume]);
 
   // Initialize first track only once when session starts
   useEffect(() => {

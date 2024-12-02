@@ -44,6 +44,10 @@ function App() {
   const [isChangeBackgroundImageExiting, setIsChangeBackgroundImageExiting] = useState(false);
   const [showTrackList, setShowTrackList] = useState(false);
   const [isTrackListExiting, setIsTrackListExiting] = useState(false);
+  const [playlistTracks, setPlaylistTracks] = useState(() => {
+    const saved = localStorage.getItem('focusPlaylist');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -266,6 +270,10 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    localStorage.setItem('focusPlaylist', JSON.stringify(playlistTracks));
+  }, [playlistTracks]);
+
   return (
     <div className="grid-container">
       <div 
@@ -347,6 +355,7 @@ function App() {
             setTimerActive={setTimerActive}
             volume={volume}
             onVolumeChange={handleVolumeChange}
+            playlistTracks={playlistTracks}
           />
         )}
         <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
@@ -396,6 +405,8 @@ function App() {
         <TrackListPage
           onClose={toggleTrackList}
           isExiting={isTrackListExiting}
+          playlistTracks={playlistTracks}
+          setPlaylistTracks={setPlaylistTracks}
         />
       )}
     </div>

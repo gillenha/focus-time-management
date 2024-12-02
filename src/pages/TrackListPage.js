@@ -1,18 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function TrackListPage({ onClose, isExiting }) {
-    const [uploadedTracks, setUploadedTracks] = useState([
-        { id: 'track-1', title: 'Peaceful Piano' },
-        { id: 'track-2', title: 'Ambient Sounds' },
-        { id: 'track-3', title: 'Rain Sounds' },
-        { id: 'track-4', title: 'Forest Ambience' },
-        { id: 'track-5', title: 'Ocean Waves' },
-    ]);
+function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }) {
+    const [uploadedTracks, setUploadedTracks] = useState([]);
 
-    const [playlistTracks, setPlaylistTracks] = useState([
-        { id: 'playlist-1', title: 'Meditation Music' },
-        { id: 'playlist-2', title: 'Study Focus' },
-    ]);
+    useEffect(() => {
+        const fetchTracks = async () => {
+            try {
+                const response = await fetch('http://localhost:8080/mp3s');
+                const data = await response.json();
+                
+                // Create unique IDs using filename hash
+                const tracks = data.mp3s.map((fileName) => ({
+                    id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`, // Create unique ID from filename
+                    title: fileName.replace('.mp3', ''),
+                    fileName: fileName
+                }));
+                
+                // Filter out tracks that are already in playlist
+                const filteredTracks = tracks.filter(track => 
+                    !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
+                );
+                
+                setUploadedTracks(filteredTracks);
+            } catch (error) {
+                console.error('Error fetching tracks:', error);
+            }
+        };
+
+        fetchTracks();
+    }, [playlistTracks]); // Re-fetch when playlist changes
 
     const handleDragStart = (track, sourceList) => (event) => {
         event.dataTransfer.setData('track', JSON.stringify(track));
@@ -28,22 +44,43 @@ function TrackListPage({ onClose, isExiting }) {
         const track = JSON.parse(event.dataTransfer.getData('track'));
         const sourceList = event.dataTransfer.getData('sourceList');
 
-        // Remove from source list
+        // Prevent duplicate drops
+        if (targetList === 'playlist' && 
+            playlistTracks.some(t => t.fileName === track.fileName)) {
+            return;
+        }
+
+        if (targetList === 'uploaded' && 
+            uploadedTracks.some(t => t.fileName === track.fileName)) {
+            return;
+        }
+
+        // Remove from source
         if (sourceList === 'uploaded') {
             setUploadedTracks(current => 
-                current.filter(t => t.id !== track.id)
+                current.filter(t => t.fileName !== track.fileName)
             );
         } else {
             setPlaylistTracks(current => 
-                current.filter(t => t.id !== track.id)
+                current.filter(t => t.fileName !== track.fileName)
             );
         }
         
-        // Add to target list
+        // Add to target
         if (targetList === 'playlist') {
-            setPlaylistTracks(current => [...current, track]);
+            // Ensure unique ID for playlist items
+            const playlistTrack = {
+                ...track,
+                id: `playlist-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+            };
+            setPlaylistTracks(current => [...current, playlistTrack]);
         } else {
-            setUploadedTracks(current => [...current, track]);
+            // Ensure unique ID for uploaded items
+            const uploadedTrack = {
+                ...track,
+                id: `upload-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+            };
+            setUploadedTracks(current => [...current, uploadedTrack]);
         }
     };
 

@@ -4,7 +4,15 @@ import ControlBar from './ControlBar';
 import SessionInput from './SessionInput';
 import AudioManager from '../utils/audioManager';
 
-function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volume, onVolumeChange }) {
+function MusicPlayer({ 
+  isFreeflow, 
+  onBeginClick, 
+  stopAudio, 
+  setTimerActive, 
+  volume, 
+  onVolumeChange,
+  playlistTracks
+}) {
   // Combined session state
   const [sessionState, setSessionState] = useState({
     started: false,
@@ -12,32 +20,33 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
     inputValue: ''
   });
   
-  // Audio state
-  const [audioState, setAudioState] = useState({
-    files: [],
-    isVerified: false
-  });
+  // Remove audioState and use playlistTracks directly
+  const [isAudioVerified, setIsAudioVerified] = useState(false);
 
-  // Single effect for audio initialization
+  // Replace audio initialization effect
   useEffect(() => {
-    const initializeAudio = async () => {
+    const verifyAudio = async () => {
+      if (playlistTracks.length === 0) {
+        setIsAudioVerified(false);
+        return;
+      }
+
       try {
-        const files = await AudioManager.getManifest();
-        setAudioState({
-          files: files || [],
-          isVerified: Boolean(files?.length)
-        });
+        // Verify at least one track is playable
+        const firstTrack = `/mp3s/${playlistTracks[0].fileName}`;
+        const isValid = await AudioManager.verifyAudio(firstTrack);
+        setIsAudioVerified(isValid);
       } catch (error) {
-        console.error('Audio initialization failed:', error);
-        setAudioState({ files: [], isVerified: false });
+        console.error('Audio verification failed:', error);
+        setIsAudioVerified(false);
       }
     };
 
-    initializeAudio();
-  }, []);
+    verifyAudio();
+  }, [playlistTracks]);
 
   const handleBeginSession = async () => {
-    if (!audioState.isVerified) return;
+    if (!isAudioVerified) return;
 
     // Only play the bell sound
     try {
@@ -98,12 +107,12 @@ function MusicPlayer({ isFreeflow, onBeginClick, stopAudio, setTimerActive, volu
           />
         )}
 
-        {sessionState.started && audioState.isVerified && (
+        {sessionState.started && isAudioVerified && (
           <ControlBar
             setTimerActive={setTimerActive}
             volume={volume}
             onVolumeChange={onVolumeChange}
-            audioFiles={audioState.files}
+            audioFiles={playlistTracks.map(track => `/mp3s/${track.fileName}`)}
             onCleanup={handleCleanup}
           />
         )}

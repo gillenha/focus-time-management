@@ -6,18 +6,30 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     useEffect(() => {
         const fetchTracks = async () => {
             try {
-                const response = await fetch('http://localhost:8080/mp3s');
-                const data = await response.json();
+                let tracks;
+                if (process.env.NODE_ENV === 'production') {
+                    // In production, fetch from Google Cloud Storage
+                    const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
+                    const data = await response.json();
+                    tracks = data.items
+                        .filter(item => item.name.endsWith('.mp3'))
+                        .map(item => item.name);
+                } else {
+                    // In development, use local endpoint
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
+                    const data = await response.json();
+                    tracks = data.mp3s;
+                }
                 
                 // Create unique IDs using filename hash
-                const tracks = data.mp3s.map((fileName) => ({
-                    id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`, // Create unique ID from filename
+                const formattedTracks = tracks.map((fileName) => ({
+                    id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
                     title: fileName.replace('.mp3', ''),
                     fileName: fileName
                 }));
                 
                 // Filter out tracks that are already in playlist
-                const filteredTracks = tracks.filter(track => 
+                const filteredTracks = formattedTracks.filter(track => 
                     !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
                 );
                 
@@ -28,7 +40,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         };
 
         fetchTracks();
-    }, [playlistTracks]); // Re-fetch when playlist changes
+    }, [playlistTracks]);
 
     const handleDragStart = (track, sourceList) => (event) => {
         event.dataTransfer.setData('track', JSON.stringify(track));

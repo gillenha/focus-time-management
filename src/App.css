@@ -21,7 +21,7 @@ body, html {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: 1fr;
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
   position: relative;
 }
@@ -31,8 +31,9 @@ body, html {
   grid-row: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: 20px 0;
   color: white;
   text-align: center;
 }
@@ -52,9 +53,12 @@ body, html {
 }
 
 .freeflow-button {
-  position: relative; /* Changed from absolute */
+  position: relative;
   z-index: 10;
-  margin-bottom: 10px; /* Add some space above the navbar */
+  width: auto;
+  min-width: 200px;
+  margin: 0 auto;
+  padding: 12px 24px;
 }
 
 .session-history-container {
@@ -172,22 +176,19 @@ body, html {
   padding: 10px;
 }
 
-.bottom-bar {
-  margin-top: auto;
-  text-align: center;
-  z-index: 10; /* Ensure this is above other elements */
-  cursor: pointer;
-}
-
 .bottom-navbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
-  background-color: rgba(200, 200, 200, 0.7); /* Light grey with 70% opacity */
-  backdrop-filter: blur(5px); /* Adds a blur effect to the background */
-  z-index: 5; /* Ensure it's below the freeflow button */
+  height: 1rem;
+  padding: 20px;
+  background-color: rgba(200, 200, 200, 0.7);
+  backdrop-filter: blur(5px);
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .photo-attribution {
@@ -223,4 +224,15 @@ body, html {
 
 .slide-in.scale-after-slide {
   transform: scale(1);
+}
+
+@media screen and (max-width: 768px) {
+  .bottom-navbar {
+    padding: 16px;
+  }
+  
+  .freeflow-button {
+    width: 80%;
+    max-width: 300px;
+  }
 }

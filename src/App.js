@@ -14,6 +14,7 @@ import SessionHistoryPage from './pages/SessionHistoryPage';
 import Menu from './components/Menu';
 import Profile from './pages/Profile';
 import ChangeBackground from './pages/ChangeBackground';
+import TrackListPage from './pages/TrackListPage';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -41,6 +42,8 @@ function App() {
   const [isProfileExiting, setIsProfileExiting] = useState(false);
   const [showChangeBackgroundImage, setShowChangeBackgroundImage] = useState(false);
   const [isChangeBackgroundImageExiting, setIsChangeBackgroundImageExiting] = useState(false);
+  const [showTrackList, setShowTrackList] = useState(false);
+  const [isTrackListExiting, setIsTrackListExiting] = useState(false);
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -246,6 +249,23 @@ function App() {
     return text.length > limit ? `${text.slice(0, limit)}...` : text;
   };
 
+  useEffect(() => {
+    console.log('Bottom bar rendered:', document.querySelector('.bottom-bar'));
+    console.log('Freeflow button rendered:', document.querySelector('.freeflow-button'));
+  }, []);
+
+  const toggleTrackList = () => {
+    if (showTrackList) {
+      setIsTrackListExiting(true);
+      setTimeout(() => {
+        setShowTrackList(false);
+        setIsTrackListExiting(false);
+      }, 300); // Match animation duration
+    } else {
+      setShowTrackList(true);
+    }
+  };
+
   return (
     <div className="grid-container">
       <div 
@@ -314,6 +334,10 @@ function App() {
             setIsMenuOpen(false);
             toggleChangeBackgroundImage();
           }}
+          onTrackList={() => {
+            setIsMenuOpen(false);
+            toggleTrackList();
+          }}
         />
         {showMusicPlayer && (
           <MusicPlayer
@@ -326,11 +350,11 @@ function App() {
           />
         )}
         <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
-        <div className="bottom-bar">
+        <nav className="bottom-navbar">
           <button className="freeflow-button" onClick={handleFreeFlowClick}>
             {isFreeflow ? "End Freeflow" : "Begin Freeflow"}
           </button>
-        </div>
+        </nav>
       </div>
       <VolumeBar 
         volume={volume} 
@@ -368,8 +392,12 @@ function App() {
           fetchBackgroundImage={fetchBackgroundImage}
         />
       )}
-      <nav className="bottom-navbar">
-      </nav>
+      {(showTrackList || isTrackListExiting) && (
+        <TrackListPage
+          onClose={toggleTrackList}
+          isExiting={isTrackListExiting}
+        />
+      )}
     </div>
   );
 }

@@ -49,8 +49,8 @@
   flex-direction: column; /* Added to arrange children vertically */
   justify-content: space-between; /* Added to space out children */
   padding: 20px; /* Added padding for better spacing */
-  width: 300px; /* Adjust as needed */
-  height: 300px; /* Adjust as needed */
+  width: 600px; /* Default width for desktop */
+  height: 400px;
   margin: 0 auto;
   background-color: rgba(0, 0, 0, 0.5); /* Changed to semi-transparent black */
   border: 1px solid #333333; /* Same as Session History */
@@ -61,6 +61,21 @@
   left: 50%; /* Center horizontally */
   transform: translate(-50%, -50%); /* Adjust for the element's own size */
   opacity: 0;
+}
+
+/* Add responsive breakpoints */
+@media screen and (max-width: 768px) {
+  .music-player {
+    width: 90%; /* Use percentage for mobile */
+    max-width: 400px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .music-player {
+    width: 95%; /* Even more width on smaller devices */
+    max-width: 350px;
+  }
 }
 
 .music-player.fade-in {

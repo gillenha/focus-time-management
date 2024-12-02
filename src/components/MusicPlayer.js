@@ -29,8 +29,11 @@ function MusicPlayer({
     }
 
     try {
-      const firstTrack = `/mp3s/${playlistTracks[0].fileName}`;
-      const isValid = await AudioManager.verifyAudio(firstTrack);
+      const audioPath = process.env.NODE_ENV === 'production'
+        ? playlistTracks[0].fileName
+        : `/mp3s/${playlistTracks[0].fileName}`;
+      
+      const isValid = await AudioManager.verifyAudio(AudioManager.getFullAudioUrl(audioPath));
       setIsAudioVerified(isValid);
       return isValid;
     } catch (error) {
@@ -81,6 +84,14 @@ function MusicPlayer({
     window.audioCleanup = cleanup;
   }, []);
 
+  const getAudioFiles = useCallback(() => {
+    return playlistTracks.map(track => 
+      process.env.NODE_ENV === 'production'
+        ? track.fileName
+        : `/mp3s/${track.fileName}`
+    );
+  }, [playlistTracks]);
+
   return (
     <div className={`
       tw-relative tw-flex tw-flex-col tw-items-center tw-justify-center 
@@ -111,7 +122,7 @@ function MusicPlayer({
             setTimerActive={setTimerActive}
             volume={volume}
             onVolumeChange={onVolumeChange}
-            audioFiles={playlistTracks.map(track => `/mp3s/${track.fileName}`)}
+            audioFiles={getAudioFiles()}
             onCleanup={handleCleanup}
             currentTrackIndex={currentTrackIndex}
             onTrackEnd={handleTrackEnd}

@@ -48,6 +48,28 @@ function App() {
     const saved = localStorage.getItem('focusPlaylist');
     return saved ? JSON.parse(saved) : [];
   });
+  const [sessionInputValue, setSessionInputValue] = useState('');
+  const [sessionStarted, setSessionStarted] = useState(false);
+
+  // Add ref to track session state without causing re-renders
+  const sessionRef = React.useRef({
+    timerActive: false,
+    isFreeflow: false,
+    time: 0,
+    sessionStarted: false,
+    sessionEnded: false
+  });
+
+  // Update ref when relevant state changes
+  useEffect(() => {
+    sessionRef.current = {
+      timerActive,
+      isFreeflow,
+      time,
+      sessionStarted,
+      sessionEnded
+    };
+  }, [timerActive, isFreeflow, time, sessionStarted, sessionEnded]);
 
   useEffect(() => {
     const savedHistory = JSON.parse(localStorage.getItem('sessionHistory')) || [];
@@ -161,18 +183,36 @@ function App() {
       const updatedHistory = [...sessionHistory, newSession];
       setSessionHistory(updatedHistory);
       localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
-
+      
+      // First set freeflow to false to trigger fade out animation
       setIsFreeflow(false);
-      setTimeout(() => setShowMusicPlayer(false), 1000);
       setTimerActive(false);
       setSessionEnded(true);
+
+      // Wait for fade out animation before unmounting music player
+      setTimeout(() => {
+        setShowMusicPlayer(false);
+        // Only reset session state, not the timer
+        localStorage.removeItem('currentSession');
+        setSessionStarted(false);
+        setSessionInputValue('');
+        setCurrentSessionText('');
+        // Note: we're not resetting the time here anymore
+      }, 1000);
     } else {
       console.log("Freeflow started");
+      // Clear any existing session state AND reset timer when starting new session
+      localStorage.removeItem('currentSession');
+      setSessionStarted(false);
+      setSessionInputValue('');
+      setCurrentSessionText('');
+      setTime(0); // Only reset timer when starting new session
+      setTimerActive(false);
+      setSessionEnded(false);
+      
+      // Start new session
       setShowMusicPlayer(true);
       setIsFreeflow(true);
-      setSessionEnded(false);
-      setTime(0);
-      setCurrentSessionText('');
     }
   };
 
@@ -184,6 +224,8 @@ function App() {
   const handleBeginClick = (inputText) => {
     setTimerActive(true);
     setCurrentSessionText(inputText);
+    setSessionInputValue(inputText);
+    setSessionStarted(true);
   };
 
   const formatDuration = (duration) => {
@@ -274,6 +316,59 @@ function App() {
     localStorage.setItem('focusPlaylist', JSON.stringify(playlistTracks));
   }, [playlistTracks]);
 
+  // Session persistence effect (existing)
+  useEffect(() => {
+    // Load saved session on mount
+    const savedSession = JSON.parse(localStorage.getItem('currentSession'));
+    if (savedSession) {
+      setTime(savedSession.time);
+      setTimerActive(savedSession.timerActive);
+      setCurrentSessionText(savedSession.text);
+      setIsFreeflow(savedSession.isFreeflow);
+      setShowMusicPlayer(savedSession.showMusicPlayer);
+      setSessionInputValue(savedSession.sessionInputValue);
+      setSessionStarted(savedSession.sessionStarted);
+      
+      // If session was active, automatically restart it
+      if (savedSession.sessionStarted && savedSession.timerActive) {
+        handleBeginClick(savedSession.text);
+      }
+    }
+  }, []);
+
+  // Separate beforeunload handler effect
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const session = sessionRef.current;
+      if (session.timerActive || (session.isFreeflow && session.time > 0) || (session.sessionStarted && !session.sessionEnded)) {
+        e.preventDefault();
+        e.returnValue = 'You have an active focus session. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []); // No dependencies needed as we use ref
+
+  // Auto-save current session
+  useEffect(() => {
+    if (timerActive || time > 0) {
+      const sessionData = {
+        time,
+        timerActive,
+        text: currentSessionText,
+        isFreeflow,
+        showMusicPlayer,
+        sessionInputValue,
+        sessionStarted
+      };
+      localStorage.setItem('currentSession', JSON.stringify(sessionData));
+    } else {
+      localStorage.removeItem('currentSession');
+    }
+  }, [time, timerActive, currentSessionText, isFreeflow, showMusicPlayer, sessionInputValue, sessionStarted]);
+
   return (
     <div className="grid-container">
       <div 
@@ -356,12 +451,16 @@ function App() {
             volume={volume}
             onVolumeChange={handleVolumeChange}
             playlistTracks={playlistTracks}
+            sessionInputValue={sessionInputValue}
+            setSessionInputValue={setSessionInputValue}
+            sessionStarted={sessionStarted}
+            setSessionStarted={setSessionStarted}
           />
         )}
         <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
         <nav className="bottom-navbar">
           <button className="freeflow-button" onClick={handleFreeFlowClick}>
-            {isFreeflow ? "End Freeflow" : "Begin Freeflow"}
+            {isFreeflow ? "Exit Flow State" : "Enter Flow State"}
           </button>
         </nav>
       </div>

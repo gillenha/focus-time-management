@@ -340,5 +340,17 @@
     "time": "12:55 pm",
     "duration": "00:57",
     "text": "test "
+  },
+  {
+    "date": "Dec 4, 2024",
+    "time": "11:34 am",
+    "duration": "00:29",
+    "text": "testing the lifecycle methods of all component on page refresh"
+  },
+  {
+    "date": "Dec 4, 2024",
+    "time": "11:35 am",
+    "duration": "00:40",
+    "text": "testing that all lifecycle methods restart from a blank slate after page refresh"
   }
 ]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './MusicPlayer.css';
 import ControlBar from './ControlBar';
 import SessionInput from './SessionInput';
@@ -11,16 +11,21 @@ function MusicPlayer({
   setTimerActive, 
   volume, 
   onVolumeChange,
-  playlistTracks
+  playlistTracks,
+  sessionInputValue,
+  setSessionInputValue,
+  sessionStarted,
+  setSessionStarted
 }) {
-  const [sessionState, setSessionState] = useState({
-    started: false,
-    slideIn: false,
-    inputValue: ''
-  });
-  
   const [isAudioVerified, setIsAudioVerified] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [slideIn, setSlideIn] = useState(sessionStarted);
+
+  useEffect(() => {
+    if (sessionStarted) {
+      verifyAudio();
+    }
+  }, [sessionStarted]);
 
   const verifyAudio = async () => {
     if (playlistTracks.length === 0) {
@@ -59,19 +64,13 @@ function MusicPlayer({
       console.error('Bell sound failed:', error);
     }
     
-    setSessionState(prev => ({
-      ...prev,
-      started: true,
-      slideIn: true
-    }));
-    onBeginClick(sessionState.inputValue);
+    setSlideIn(true);
+    setSessionStarted(true);
+    onBeginClick(sessionInputValue);
   };
 
   const handleInputChange = (event) => {
-    setSessionState(prev => ({
-      ...prev,
-      inputValue: event.target.value
-    }));
+    setSessionInputValue(event.target.value);
   };
 
   const handleTrackEnd = useCallback(() => {
@@ -103,21 +102,21 @@ function MusicPlayer({
           tw-text-white tw-font-medium tw-text-2xl tw-absolute
           tw-left-1/2 tw-transform tw-transition-all tw-duration-500
           tw-ease-out tw--translate-x-1/2
-          ${sessionState.slideIn ? 'tw-top-1/3 tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
+          ${slideIn ? 'tw-top-1/3 tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
         `}>
           Time to focus
         </p>
 
-        {!sessionState.started && (
+        {!sessionStarted && (
           <SessionInput
-            inputValue={sessionState.inputValue}
+            inputValue={sessionInputValue}
             onInputChange={handleInputChange}
             onBeginClick={handleBeginSession}
-            fadeOut={sessionState.slideIn}
+            fadeOut={slideIn}
           />
         )}
 
-        {sessionState.started && isAudioVerified && (
+        {sessionStarted && (
           <ControlBar
             setTimerActive={setTimerActive}
             volume={volume}

@@ -30,7 +30,7 @@
   "scripts": {
     "start": "react-scripts start",
     "start:dev": "NODE_ENV=development react-scripts start",
-    "start:server:dev": "NODE_ENV=development SERVER_PORT=3001 node server.js",
+    "start:server:dev": "NODE_ENV=development concurrently \"SERVER_PORT=8080 node server.js\" \"node fileServer.js\"",
     "build": "NODE_ENV=production react-scripts build",
     "dist": "electron-builder",
     "deploy": "gcloud app deploy"
@@ -60,6 +60,7 @@
   "license": "ISC",
   "devDependencies": {
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
     "electron": "^32.1.2",
     "electron-builder": "^25.1.7",
     "nodemon": "^3.0.2",

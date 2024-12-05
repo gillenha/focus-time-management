@@ -1,97 +1,214 @@
+require('dotenv').config();
 const express = require('express');
-const multer = require('multer');
+const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const { Client } = require('@notionhq/client');
+
+// Only import Storage when in production
+let Storage;
+if (process.env.NODE_ENV === 'production') {
+    const { Storage: GCPStorage } = require('@google-cloud/storage');
+    Storage = GCPStorage;
+}
 
 const app = express();
+const PORT = process.env.SERVER_PORT || 8080;
 
-// More specific CORS configuration
-app.use(cors({
-    origin: 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+// Add this near the top of your server.js
+const initializeNotion = () => {
+    if (!process.env.NOTION_API_KEY) {
+        console.error('NOTION_API_KEY missing. Current environment:', process.env.NODE_ENV);
+        return null;
+    }
+    
+    try {
+        const notion = new Client({
+            auth: process.env.NOTION_API_KEY
+        });
+        console.log('Notion client initialized successfully in', process.env.NODE_ENV);
+        return notion;
+    } catch (error) {
+        console.error('Failed to initialize Notion client:', error);
+        return null;
+    }
+};
+
+// Use it when initializing your notion client
+const notion = initializeNotion();
+
+// Add security headers, but disable some that might interfere with audio playback
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// File size limit (15MB)
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
+// Configure CORS
+app.use(cors({
+  origin: process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:3000' 
+    : '*',  // Allow all origins in production
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const mp3sDir = path.join(__dirname, 'mp3s');
-        // Create mp3s directory if it doesn't exist
-        if (!fs.existsSync(mp3sDir)) {
-            fs.mkdirSync(mp3sDir, { recursive: true });
-        }
-        cb(null, mp3sDir);
-    },
-    filename: (req, file, cb) => {
-        cb(null, file.originalname);
+// Limit JSON body size
+app.use(bodyParser.json({ limit: '10kb' }));
+
+// Route to handle PUT requests for Freeflow
+app.put('/api/freeflow', (req, res) => {
+  const { time } = req.body;
+
+  if (!time) {
+    return res.status(400).json({ error: 'Time is required' });
+  }
+
+  res.status(200).json({ message: 'Time received successfully', time });
+});
+
+// Helper function to format duration
+function formatDuration(duration) {
+  const [minutes, seconds] = duration.split(':').map(Number);
+  const totalMinutes = minutes + (seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = Math.floor(totalMinutes % 60);
+  const remainingSeconds = Math.round((totalMinutes % 1) * 60);
+
+  if (hours > 0) {
+    return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  } else {
+    return duration;
+  }
+}
+
+// Route to log session details
+app.post('/api/log-session', async (req, res) => {
+  const sessionDetails = req.body;
+  
+  // Add debug logging
+  console.log('Received session details:', sessionDetails);
+  
+  // Check required fields, excluding 'text'
+  const requiredFields = ['date', 'time', 'duration'];
+  const missingFields = requiredFields.filter(field => !sessionDetails?.[field]);
+  
+  if (missingFields.length > 0) {
+    const errorMsg = `Incomplete session details. Missing fields: ${missingFields.join(', ')}`;
+    console.error(errorMsg);
+    return res.status(400).json({ 
+      error: errorMsg,
+      receivedData: sessionDetails 
+    });
+  }
+
+  // Ensure text field is at least an empty string if not provided
+  sessionDetails.text = sessionDetails.text || '';
+
+  // Format the duration before logging
+  sessionDetails.duration = formatDuration(sessionDetails.duration);
+
+  const sessionsFilePath = path.join(__dirname, 'sessions.json');
+  let sessions = [];
+
+  try {
+    if (await fs.promises.access(sessionsFilePath).then(() => true).catch(() => false)) {
+      const fileContent = await fs.promises.readFile(sessionsFilePath, 'utf8');
+      sessions = JSON.parse(fileContent);
+    }
+
+    sessions.push(sessionDetails);
+
+    await fs.promises.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2));
+
+    console.log('Session logged:', sessionDetails);
+    res.status(200).json({ message: 'Session details logged successfully', sessionDetails });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to log session details' });
+  }
+});
+
+// Add this new endpoint
+app.post('/api/notion-log', async (req, res) => {
+    // Add environment logging
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Notion API Key exists:', !!process.env.NOTION_API_KEY);
+    console.log('Notion Database ID exists:', !!process.env.NOTION_DATABASE_ID);
+
+    if (!notion) {
+        console.error('Notion client not initialized - check your NOTION_API_KEY');
+        return res.status(500).json({ error: 'Notion client not initialized' });
+    }
+
+    if (!process.env.NOTION_DATABASE_ID) {
+        console.error('NOTION_DATABASE_ID is not defined in environment variables');
+        return res.status(500).json({ error: 'Notion database ID not configured' });
+    }
+
+    try {
+        console.log('Attempting to create Notion page with properties:', req.body.properties);
+        
+        const response = await notion.pages.create({
+            parent: {
+                database_id: process.env.NOTION_DATABASE_ID
+            },
+            properties: req.body.properties
+        });
+
+        console.log('Notion page created successfully');
+        res.json({ success: true, notionResponse: response });
+    } catch (error) {
+        console.error('Detailed Notion error:', error);
+        // Send more detailed error information back to client
+        res.status(500).json({ 
+            error: 'Failed to send to Notion', 
+            details: error.message,
+            code: error.code,
+            statusCode: error.status
+        });
     }
 });
 
-const upload = multer({ 
-    storage,
-    limits: {
-        fileSize: MAX_FILE_SIZE
-    },
-    fileFilter: (req, file, cb) => {
-        // Check file extension
-        if (path.extname(file.originalname).toLowerCase() === '.mp3') {
-            cb(null, true);
-        } else {
-            cb(new Error('Only .mp3 files are allowed'));
-        }
+// Add this test endpoint
+app.get('/api/notion-test', async (req, res) => {
+    // Check environment variables
+    if (!process.env.NOTION_API_KEY || !process.env.NOTION_DATABASE_ID) {
+        return res.status(500).json({ 
+            error: 'Missing configuration',
+            notionKey: !!process.env.NOTION_API_KEY,
+            databaseId: !!process.env.NOTION_DATABASE_ID
+        });
     }
-});
 
-// Serve static files from mp3s directory
-app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
+    if (!notion) {
+        return res.status(500).json({ error: 'Notion client not initialized' });
+    }
 
-// Serve static files from public/effects directory
-app.use('/effects', express.static(path.join(__dirname, 'public', 'effects')));
-
-// Handle file uploads
-app.post('/upload', (req, res) => {
-    upload.single('file')(req, res, (err) => {
-        if (err) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ 
-                    error: `File size too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB` 
-                });
-            }
-            return res.status(400).json({ error: err.message });
-        }
-
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
+    try {
+        // Try to query the database to verify connection
+        const response = await notion.databases.query({
+            database_id: process.env.NOTION_DATABASE_ID
+        });
+        
         res.json({ 
-            message: 'File uploaded successfully',
-            file: {
-                name: req.file.originalname,
-                size: req.file.size
+            success: true, 
+            message: 'Notion connection successful',
+            databaseInfo: {
+                results: response.results.length,
+                hasMore: response.has_more
             }
         });
-    });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Failed to connect to Notion', 
+            details: error.message,
+            code: error.code
+        });
+    }
 });
 
-// List MP3 files
-app.get('/mp3s', (req, res) => {
-    const mp3sDir = path.join(__dirname, 'mp3s');
-    fs.readdir(mp3sDir, (err, files) => {
-        if (err) {
-            return res.status(500).json({ error: 'Failed to read mp3s directory' });
-        }
-        const mp3s = files.filter(file => file.endsWith('.mp3'));
-        res.json({ mp3s });
-    });
-});
-
-const PORT = 3001;
 app.listen(PORT, () => {
-    console.log(`Development server running on port ${PORT}`);
-    console.log(`Maximum file size: ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
+  console.log(`API Server is running on port ${PORT}`);
 });

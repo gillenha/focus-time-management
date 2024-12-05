@@ -6,16 +6,35 @@ const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
+const multer = require('multer');
+const { format } = require('util');
 
-// Only import Storage when in production
-let Storage;
+// Initialize Google Cloud Storage in production
+let storage;
+let bucket;
 if (process.env.NODE_ENV === 'production') {
-    const { Storage: GCPStorage } = require('@google-cloud/storage');
-    Storage = GCPStorage;
+    const { Storage } = require('@google-cloud/storage');
+    storage = new Storage();
+    bucket = storage.bucket('react-app-assets');
 }
 
 const app = express();
-const PORT = process.env.SERVER_PORT || 8080;
+const PORT = process.env.PORT || 8080;
+
+// Configure multer for file handling
+const multerStorage = multer.memoryStorage();
+const upload = multer({
+    storage: multerStorage,
+    limits: {
+        fileSize: 15 * 1024 * 1024 // 15MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (!file.originalname.toLowerCase().endsWith('.mp3')) {
+            return cb(new Error('Only .mp3 files are allowed'));
+        }
+        cb(null, true);
+    }
+});
 
 // Add this near the top of your server.js
 const initializeNotion = () => {
@@ -218,6 +237,105 @@ app.get('/api/notion-test', async (req, res) => {
             details: error.message,
             code: error.code
         });
+    }
+});
+
+// File upload endpoint
+app.post('/upload', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        if (process.env.NODE_ENV === 'production') {
+            // Upload to Google Cloud Storage
+            const blob = bucket.file(req.file.originalname);
+            const blobStream = blob.createWriteStream({
+                resumable: false,
+                metadata: {
+                    contentType: 'audio/mpeg'
+                }
+            });
+
+            blobStream.on('error', (err) => {
+                console.error('Upload error:', err);
+                res.status(500).json({ error: 'Failed to upload file' });
+            });
+
+            blobStream.on('finish', () => {
+                res.status(200).json({
+                    message: 'File uploaded successfully',
+                    file: {
+                        name: req.file.originalname,
+                        size: req.file.size
+                    }
+                });
+            });
+
+            blobStream.end(req.file.buffer);
+        } else {
+            // Development: Save to local directory
+            const mp3sDir = path.join(__dirname, 'mp3s');
+            if (!fs.existsSync(mp3sDir)) {
+                fs.mkdirSync(mp3sDir, { recursive: true });
+            }
+            
+            fs.writeFileSync(path.join(mp3sDir, req.file.originalname), req.file.buffer);
+            res.json({
+                message: 'File uploaded successfully',
+                file: {
+                    name: req.file.originalname,
+                    size: req.file.size
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Failed to upload file' });
+    }
+});
+
+// List MP3 files
+app.get('/mp3s', async (req, res) => {
+    try {
+        if (process.env.NODE_ENV === 'production') {
+            const [files] = await bucket.getFiles();
+            const mp3s = files
+                .filter(file => file.name.endsWith('.mp3'))
+                .map(file => file.name);
+            res.json({ mp3s });
+        } else {
+            const mp3sDir = path.join(__dirname, 'mp3s');
+            if (!fs.existsSync(mp3sDir)) {
+                fs.mkdirSync(mp3sDir, { recursive: true });
+            }
+            const files = fs.readdirSync(mp3sDir);
+            const mp3s = files.filter(file => file.endsWith('.mp3'));
+            res.json({ mp3s });
+        }
+    } catch (error) {
+        console.error('Error listing files:', error);
+        res.status(500).json({ error: 'Failed to list files' });
+    }
+});
+
+// Delete MP3 file
+app.delete('/mp3s/:filename', async (req, res) => {
+    const filename = req.params.filename;
+
+    try {
+        if (process.env.NODE_ENV === 'production') {
+            await bucket.file(filename).delete();
+        } else {
+            const filePath = path.join(__dirname, 'mp3s', filename);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+        res.json({ message: 'File deleted successfully' });
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ error: 'Failed to delete file' });
     }
 });
 

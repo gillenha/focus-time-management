@@ -63,43 +63,24 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     return;
                 }
 
-                if (process.env.NODE_ENV === 'production') {
-                    // Production: Upload to Google Cloud Storage
-                    const formData = new FormData();
-                    formData.append('file', file);
+                const formData = new FormData();
+                formData.append('file', file);
 
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
-                        method: 'POST',
-                        body: formData,
-                    });
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
 
-                    if (!response.ok) {
-                        const data = await response.json();
-                        throw new Error(data.error || `Upload failed for ${file.name}`);
-                    }
-                } else {
-                    // Development: Copy file to mp3s folder
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    const response = await fetch('http://localhost:3001/upload', {
-                        method: 'POST',
-                        body: formData,
-                    });
-
-                    if (!response.ok) {
-                        const data = await response.json();
-                        throw new Error(data.error || `Failed to copy ${file.name} to mp3s folder`);
-                    }
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || `Upload failed for ${file.name}`);
                 }
             }
             
             await fetchTracks();
         } catch (error) {
             console.error('Upload error:', error);
-            setUploadError(error.message || (process.env.NODE_ENV === 'production' 
-                ? 'Failed to upload file(s)' 
-                : 'Failed to copy file(s) to mp3s folder'));
+            setUploadError(error.message || 'Failed to upload file(s)');
         } finally {
             setIsUploading(false);
             // Reset the file input
@@ -223,7 +204,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         
         for (const track of selectedTrackObjects) {
             try {
-                const response = await fetch(`http://localhost:3001/mp3s/${track.fileName}`, {
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s/${track.fileName}`, {
                     method: 'DELETE'
                 });
 

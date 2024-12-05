@@ -64,28 +64,16 @@ app.get('/mp3s/manifest.json', async (req, res) => {
         const env = process.env.NODE_ENV || 'development';
         console.log(`Serving audio files in ${env} environment`);
         
-        if (env === 'development') {
-            // Directly read from mp3s directory for development
-            const mp3Dir = path.join(__dirname, 'mp3s');
-            const files = await fs.promises.readdir(mp3Dir);
-            const audioFiles = files
-                .filter(file => file.endsWith('.mp3'))
-                .map(file => `/mp3s/${file}`);
-            
-            console.log('Development: Serving local files:', audioFiles);
-            return res.json(audioFiles);
-        } else {
-            // Production: Use Google Cloud Storage
-            const storage = new Storage();
-            const bucket = storage.bucket('react-app-assets');
-            const [files] = await bucket.getFiles({ prefix: 'audio/' });
-            const audioFiles = files
-                .filter(file => file.name.endsWith('.mp3'))
-                .map(file => `https://storage.googleapis.com/react-app-assets/${file.name}`);
-            
-            console.log('Production: Serving GCS files:', audioFiles);
-            return res.json(audioFiles);
+        // Get the appropriate configuration based on environment
+        const envConfig = config[env];
+        if (!envConfig) {
+            throw new Error(`Invalid environment: ${env}`);
         }
+        
+        const audioFiles = await envConfig.getAudioFiles();
+        console.log(`${env}: Sending manifest response:`, audioFiles);
+        
+        res.json(audioFiles);
     } catch (error) {
         console.error(`Error fetching audio files in ${process.env.NODE_ENV}:`, error);
         res.status(500).json({ error: 'Failed to fetch audio files' });
@@ -94,7 +82,7 @@ app.get('/mp3s/manifest.json', async (req, res) => {
 
 // AFTER the manifest route, set up static file serving
 app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
-app.use('/effects', express.static(path.join(__dirname, 'effects')));
+app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
 app.use(express.static(path.join(__dirname, 'build')));
 
 // Add this configuration at the top of server.js
@@ -140,29 +128,6 @@ const config = {
         }
     }
 };
-
-// Update the manifest route to be environment-aware
-app.get('/mp3s/manifest.json', async (req, res) => {
-    try {
-        // Force development environment when running locally
-        const env = process.env.NODE_ENV || 'development';
-        console.log(`Serving audio files in ${env} environment`);
-        
-        // Get the appropriate configuration based on environment
-        const envConfig = config[env];
-        if (!envConfig) {
-            throw new Error(`Invalid environment: ${env}`);
-        }
-        
-        const audioFiles = await envConfig.getAudioFiles();
-        console.log(`${env}: Sending manifest response:`, audioFiles);
-        
-        res.json(audioFiles);
-    } catch (error) {
-        console.error(`Error fetching audio files in ${process.env.NODE_ENV}:`, error);
-        res.status(500).json({ error: 'Failed to fetch audio files' });
-    }
-});
 
 // Add a debug route to check MP3 files
 app.get('/debug/mp3s', async (req, res) => {

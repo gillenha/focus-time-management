@@ -29,6 +29,7 @@ function MusicPlayer({
 
   const verifyAudio = async () => {
     if (playlistTracks.length === 0) {
+      console.error('No tracks available to play');
       setIsAudioVerified(false);
       return false;
     }
@@ -38,7 +39,17 @@ function MusicPlayer({
         ? playlistTracks[0].fileName
         : `/mp3s/${playlistTracks[0].fileName}`;
       
-      const isValid = await AudioManager.verifyAudio(AudioManager.getFullAudioUrl(audioPath));
+      console.log('Verifying first track:', audioPath);
+      const fullUrl = AudioManager.getFullAudioUrl(audioPath);
+      const isValid = await AudioManager.verifyAudio(fullUrl);
+      
+      if (!isValid) {
+        console.error('Audio verification failed. Please check if the audio files are available in the correct location.');
+        if (process.env.NODE_ENV === 'development') {
+          console.info('Development mode: Make sure your audio files are in the /mp3s directory and your development server is configured correctly.');
+        }
+      }
+      
       setIsAudioVerified(isValid);
       return isValid;
     } catch (error) {
@@ -49,16 +60,24 @@ function MusicPlayer({
   };
 
   const handleBeginSession = async () => {
+    console.log('Beginning session...');
     const audioVerified = await verifyAudio();
-    if (!audioVerified) return;
+    
+    if (!audioVerified) {
+      console.error('Cannot start session: Audio verification failed');
+      return;
+    }
 
     try {
       const bellUrl = AudioManager.getBellAudioUrl();
+      console.log('Verifying bell sound:', bellUrl);
       const isValid = await AudioManager.verifyAudio(bellUrl);
       
       if (isValid) {
         const audio = new Audio(bellUrl);
         await audio.play();
+      } else {
+        console.warn('Bell sound verification failed, continuing without bell sound');
       }
     } catch (error) {
       console.error('Bell sound failed:', error);

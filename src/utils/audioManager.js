@@ -76,6 +76,7 @@ class AudioManager {
 
     static getFullAudioUrl(relativePath) {
         const apiUrl = process.env.REACT_APP_API_URL;
+        console.log('Getting full audio URL for:', relativePath);
         
         // Development environment
         if (process.env.NODE_ENV === 'development') {
@@ -84,11 +85,14 @@ class AudioManager {
                 relativePath = `/mp3s/${filename}`;
             }
             
+            // Ensure the path starts with /mp3s
             const localPath = relativePath.startsWith('/mp3s') 
                 ? relativePath 
                 : `/mp3s/${relativePath}`;
                 
-            return `${apiUrl}${localPath}`;
+            const fullUrl = `${apiUrl}${localPath}`;
+            console.log('Development URL:', fullUrl);
+            return fullUrl;
         }
         
         // Production environment
@@ -107,15 +111,31 @@ class AudioManager {
     }
 
     static getBellAudioUrl() {
-        return '/effects/bell.mp3';
+        console.log('Getting bell sound URL in environment:', process.env.NODE_ENV);
+        if (process.env.NODE_ENV === 'development') {
+            const apiUrl = process.env.REACT_APP_API_URL;
+            const url = `${apiUrl}/effects/bell.mp3`;
+            console.log('Development bell URL:', url);
+            return url;
+        }
+        // In production, the file will be served from the static build
+        const url = '/effects/bell.mp3';
+        console.log('Production bell URL:', url);
+        return url;
     }
 
     static async verifyAudio(url) {
+        console.log('Verifying audio URL:', url);
         try {
-            const response = await fetch(url);
-            return response.ok;
+            const response = await fetch(url, { method: 'HEAD' });
+            const isValid = response.ok;
+            console.log('Audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
+            if (!isValid) {
+                console.error('Audio file not found at:', url);
+            }
+            return isValid;
         } catch (error) {
-            console.error('Audio verification failed:', error);
+            console.error('Audio verification failed:', error.message);
             return false;
         }
     }

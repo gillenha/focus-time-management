@@ -51,6 +51,37 @@ function App() {
   const [sessionInputValue, setSessionInputValue] = useState('');
   const [sessionStarted, setSessionStarted] = useState(false);
 
+  // Add effect to load tracks from server if none in localStorage
+  useEffect(() => {
+    const loadTracksFromServer = async () => {
+      if (playlistTracks.length === 0) {
+        try {
+          console.log('Loading tracks from server...');
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
+          const data = await response.json();
+          
+          if (data.mp3s && data.mp3s.length > 0) {
+            console.log('Tracks loaded from server:', data.mp3s);
+            const formattedTracks = data.mp3s.map(fileName => ({
+              id: `playlist-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
+              title: fileName.replace('.mp3', ''),
+              fileName: fileName
+            }));
+            
+            setPlaylistTracks(formattedTracks);
+            localStorage.setItem('focusPlaylist', JSON.stringify(formattedTracks));
+          } else {
+            console.error('No tracks found on server');
+          }
+        } catch (error) {
+          console.error('Error loading tracks from server:', error);
+        }
+      }
+    };
+
+    loadTracksFromServer();
+  }, [playlistTracks.length]);
+
   // Add ref to track session state without causing re-renders
   const sessionRef = React.useRef({
     timerActive: false,

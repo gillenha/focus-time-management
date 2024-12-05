@@ -4,6 +4,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const [uploadedTracks, setUploadedTracks] = useState([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
+    const [selectedTracks, setSelectedTracks] = useState(new Set());
 
     const fetchTracks = async () => {
         try {
@@ -205,15 +206,64 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
+    const handleTrackSelect = (trackId) => {
+        setSelectedTracks(prev => {
+            const newSelected = new Set(prev);
+            if (newSelected.has(trackId)) {
+                newSelected.delete(trackId);
+            } else {
+                newSelected.add(trackId);
+            }
+            return newSelected;
+        });
+    };
+
+    const handleDeleteSelected = async () => {
+        const selectedTrackObjects = uploadedTracks.filter(track => selectedTracks.has(track.id));
+        
+        for (const track of selectedTrackObjects) {
+            try {
+                const response = await fetch(`http://localhost:3001/mp3s/${track.fileName}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to delete ${track.fileName}`);
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                continue;
+            }
+        }
+
+        // Refresh the track list
+        await fetchTracks();
+        // Clear selection
+        setSelectedTracks(new Set());
+    };
+
     const TrackItem = ({ track, sourceList }) => (
         <div
-            draggable
-            onDragStart={handleDragStart(track, sourceList)}
-            onClick={() => handleTrackClick(track, sourceList)}
-            className="tw-p-3 tw-mb-2 tw-rounded-lg tw-bg-white tw-border tw-border-gray-200 
-                       hover:tw-bg-gray-50 tw-cursor-pointer"
+            className="tw-flex tw-items-center tw-gap-2 tw-p-3 tw-mb-2 tw-rounded-lg tw-bg-white tw-border tw-border-gray-200 
+                     hover:tw-bg-gray-50"
         >
-            {track.title}
+            {sourceList === 'uploaded' && (
+                <input
+                    type="checkbox"
+                    checked={selectedTracks.has(track.id)}
+                    onChange={() => handleTrackSelect(track.id)}
+                    className="tw-w-4 tw-h-4 tw-rounded tw-border-gray-300 tw-text-blue-600 focus:tw-ring-blue-500"
+                    onClick={e => e.stopPropagation()}
+                />
+            )}
+            <div
+                draggable
+                onDragStart={handleDragStart(track, sourceList)}
+                onClick={() => handleTrackClick(track, sourceList)}
+                className="tw-flex-1 tw-cursor-pointer"
+            >
+                {track.title}
+            </div>
         </div>
     );
 
@@ -253,49 +303,61 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                         <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
                             <div className="tw-flex tw-items-center tw-justify-between tw-mb-4">
                                 <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
-                                <div className="tw-relative">
-                                    <input
-                                        type="file"
-                                        accept=".mp3"
-                                        multiple
-                                        onChange={handleFileUpload}
-                                        className="tw-hidden"
-                                        id="file-upload"
-                                    />
-                                    <label
-                                        htmlFor="file-upload"
-                                        className={`tw-inline-flex tw-items-center tw-px-3 tw-py-2 tw-rounded-lg 
-                                                  tw-bg-blue-600 tw-text-white tw-text-sm tw-font-medium
-                                                  hover:tw-bg-blue-700 tw-cursor-pointer tw-transition-colors
-                                                  ${isUploading ? 'tw-opacity-75 tw-cursor-not-allowed' : ''}`}
-                                    >
-                                        {isUploading ? (
-                                            <span>Uploading...</span>
-                                        ) : (
-                                            <>
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    className="tw-h-4 tw-w-4 tw-mr-2"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                    stroke="currentColor"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth={2}
-                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                                    />
-                                                </svg>
-                                                Upload MP3
-                                            </>
-                                        )}
-                                    </label>
-                                    {uploadError && (
-                                        <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
-                                            {uploadError}
-                                        </div>
+                                <div className="tw-flex tw-items-center tw-gap-2">
+                                    {selectedTracks.size > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelected}
+                                            className="tw-px-3 tw-py-2 tw-rounded-lg tw-bg-red-600 tw-text-white 
+                                                     tw-text-sm tw-font-medium hover:tw-bg-red-700 
+                                                     tw-transition-colors"
+                                        >
+                                            Delete Selected
+                                        </button>
                                     )}
+                                    <div className="tw-relative">
+                                        <input
+                                            type="file"
+                                            accept=".mp3"
+                                            multiple
+                                            onChange={handleFileUpload}
+                                            className="tw-hidden"
+                                            id="file-upload"
+                                        />
+                                        <label
+                                            htmlFor="file-upload"
+                                            className={`tw-inline-flex tw-items-center tw-px-3 tw-py-2 tw-rounded-lg 
+                                                      tw-bg-blue-600 tw-text-white tw-text-sm tw-font-medium
+                                                      hover:tw-bg-blue-700 tw-cursor-pointer tw-transition-colors
+                                                      ${isUploading ? 'tw-opacity-75 tw-cursor-not-allowed' : ''}`}
+                                        >
+                                            {isUploading ? (
+                                                <span>Uploading...</span>
+                                            ) : (
+                                                <>
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        className="tw-h-4 tw-w-4 tw-mr-2"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                                                        />
+                                                    </svg>
+                                                    Upload MP3
+                                                </>
+                                            )}
+                                        </label>
+                                        {uploadError && (
+                                            <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
+                                                {uploadError}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div 

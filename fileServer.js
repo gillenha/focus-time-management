@@ -9,8 +9,9 @@ const app = express();
 // CORS configuration for development
 app.use(cors({
     origin: 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    methods: ['GET', 'POST', 'DELETE'],
+    allowedHeaders: ['Content-Type'],
+    optionsSuccessStatus: 204
 }));
 
 // File size limit (15MB)
@@ -88,6 +89,25 @@ app.get('/mp3s', (req, res) => {
         const mp3s = files.filter(file => file.endsWith('.mp3'));
         res.json({ mp3s });
     });
+});
+
+// Delete MP3 file
+app.delete('/mp3s/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, 'mp3s', filename);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    try {
+        fs.unlinkSync(filePath);
+        res.json({ message: 'File deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        res.status(500).json({ error: 'Failed to delete file' });
+    }
 });
 
 const PORT = 3001;

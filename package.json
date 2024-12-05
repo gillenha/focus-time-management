@@ -18,6 +18,7 @@
     "express": "^4.21.0",
     "helmet": "^8.0.0",
     "lodash": "^4.17.21",
+    "multer": "^1.4.5-lts.1",
     "prop-types": "^15.8.1",
     "react": "^18.3.1",
     "react-beautiful-dnd": "^13.1.1",
@@ -29,7 +30,7 @@
   "scripts": {
     "start": "react-scripts start",
     "start:dev": "NODE_ENV=development react-scripts start",
-    "start:server:dev": "NODE_ENV=development SERVER_PORT=8080 node server.js",
+    "start:server:dev": "NODE_ENV=development SERVER_PORT=3001 node server.js",
     "build": "NODE_ENV=production react-scripts build",
     "dist": "electron-builder",
     "deploy": "gcloud app deploy"
@@ -61,6 +62,7 @@
     "autoprefixer": "^10.4.20",
     "electron": "^32.1.2",
     "electron-builder": "^25.1.7",
+    "nodemon": "^3.0.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14"
   },

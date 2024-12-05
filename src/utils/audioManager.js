@@ -75,7 +75,6 @@ class AudioManager {
     }
 
     static getFullAudioUrl(relativePath) {
-        const apiUrl = process.env.REACT_APP_API_URL;
         console.log('Getting full audio URL for:', relativePath);
         
         // Development environment
@@ -90,7 +89,7 @@ class AudioManager {
                 ? relativePath 
                 : `/mp3s/${relativePath}`;
                 
-            const fullUrl = `${apiUrl}${localPath}`;
+            const fullUrl = `http://localhost:3001${localPath}`;
             console.log('Development URL:', fullUrl);
             return fullUrl;
         }
@@ -107,16 +106,13 @@ class AudioManager {
         
         // Fallback
         const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-        return `${apiUrl}/${cleanPath}`;
+        return `${process.env.REACT_APP_API_URL}/${cleanPath}`;
     }
 
     static getBellAudioUrl() {
         console.log('Getting bell sound URL in environment:', process.env.NODE_ENV);
         if (process.env.NODE_ENV === 'development') {
-            const apiUrl = process.env.REACT_APP_API_URL;
-            const url = `${apiUrl}/effects/bell.mp3`;
-            console.log('Development bell URL:', url);
-            return url;
+            return 'http://localhost:3001/effects/bell.mp3';
         }
         // In production, the file will be served from the static build
         const url = '/effects/bell.mp3';

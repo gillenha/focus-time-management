@@ -17,7 +17,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     .map(item => item.name);
             } else {
                 // In development, use local endpoint
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
+                const response = await fetch('http://localhost:3001/mp3s');
                 const data = await response.json();
                 tracks = data.mp3s;
             }
@@ -55,25 +55,54 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     return;
                 }
 
-                const formData = new FormData();
-                formData.append('file', file);
+                // Check file size (15MB)
+                const MAX_SIZE = 15 * 1024 * 1024;
+                if (file.size > MAX_SIZE) {
+                    setUploadError(`File ${file.name} is too large. Maximum size is 15MB`);
+                    return;
+                }
 
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
-                    method: 'POST',
-                    body: formData,
-                });
+                if (process.env.NODE_ENV === 'production') {
+                    // Production: Upload to Google Cloud Storage
+                    const formData = new FormData();
+                    formData.append('file', file);
 
-                if (!response.ok) {
-                    throw new Error(`Upload failed for ${file.name}`);
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.error || `Upload failed for ${file.name}`);
+                    }
+                } else {
+                    // Development: Copy file to mp3s folder
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('http://localhost:3001/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.error || `Failed to copy ${file.name} to mp3s folder`);
+                    }
                 }
             }
             
             await fetchTracks();
         } catch (error) {
             console.error('Upload error:', error);
-            setUploadError('Failed to upload file(s)');
+            setUploadError(error.message || (process.env.NODE_ENV === 'production' 
+                ? 'Failed to upload file(s)' 
+                : 'Failed to copy file(s) to mp3s folder'));
         } finally {
             setIsUploading(false);
+            // Reset the file input
+            event.target.value = '';
         }
     };
 

@@ -96,12 +96,54 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
+    const handleTrackClick = (track, sourceList) => {
+        const targetList = sourceList === 'uploaded' ? 'playlist' : 'uploaded';
+        
+        // Use the same logic as handleDrop
+        if (targetList === 'playlist' && 
+            playlistTracks.some(t => t.fileName === track.fileName)) {
+            return;
+        }
+
+        if (targetList === 'uploaded' && 
+            uploadedTracks.some(t => t.fileName === track.fileName)) {
+            return;
+        }
+
+        // Remove from source
+        if (sourceList === 'uploaded') {
+            setUploadedTracks(current => 
+                current.filter(t => t.fileName !== track.fileName)
+            );
+        } else {
+            setPlaylistTracks(current => 
+                current.filter(t => t.fileName !== track.fileName)
+            );
+        }
+        
+        // Add to target
+        if (targetList === 'playlist') {
+            const playlistTrack = {
+                ...track,
+                id: `playlist-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+            };
+            setPlaylistTracks(current => [...current, playlistTrack]);
+        } else {
+            const uploadedTrack = {
+                ...track,
+                id: `upload-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+            };
+            setUploadedTracks(current => [...current, uploadedTrack]);
+        }
+    };
+
     const TrackItem = ({ track, sourceList }) => (
         <div
             draggable
             onDragStart={handleDragStart(track, sourceList)}
+            onClick={() => handleTrackClick(track, sourceList)}
             className="tw-p-3 tw-mb-2 tw-rounded-lg tw-bg-white tw-border tw-border-gray-200 
-                       hover:tw-bg-gray-50 tw-cursor-grab"
+                       hover:tw-bg-gray-50 tw-cursor-pointer"
         >
             {track.title}
         </div>

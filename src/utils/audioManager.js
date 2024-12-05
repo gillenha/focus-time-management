@@ -114,8 +114,8 @@ class AudioManager {
         if (process.env.NODE_ENV === 'development') {
             return 'http://localhost:3001/effects/bell.mp3';
         }
-        // In production, serve from Google Cloud Storage
-        return 'https://storage.googleapis.com/react-app-assets/effects/bell.mp3';
+        // In production, serve from static build files
+        return '/effects/bell.mp3';
     }
 
     static async verifyAudio(url) {

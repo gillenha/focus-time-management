@@ -2,43 +2,82 @@ import React, { useState, useEffect } from 'react';
 
 function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }) {
     const [uploadedTracks, setUploadedTracks] = useState([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+
+    const fetchTracks = async () => {
+        try {
+            let tracks;
+            if (process.env.NODE_ENV === 'production') {
+                // In production, fetch from Google Cloud Storage
+                const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
+                const data = await response.json();
+                tracks = data.items
+                    .filter(item => item.name.endsWith('.mp3'))
+                    .map(item => item.name);
+            } else {
+                // In development, use local endpoint
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
+                const data = await response.json();
+                tracks = data.mp3s;
+            }
+            
+            // Create unique IDs using filename hash
+            const formattedTracks = tracks.map((fileName) => ({
+                id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
+                title: fileName.replace('.mp3', ''),
+                fileName: fileName
+            }));
+            
+            // Filter out tracks that are already in playlist
+            const filteredTracks = formattedTracks.filter(track => 
+                !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
+            );
+            
+            setUploadedTracks(filteredTracks);
+        } catch (error) {
+            console.error('Error fetching tracks:', error);
+        }
+    };
+
+    const handleFileUpload = async (event) => {
+        const files = event.target.files;
+        if (!files.length) return;
+
+        setIsUploading(true);
+        setUploadError('');
+        
+        try {
+            for (const file of files) {
+                // Strict .mp3 file check
+                if (!file.name.toLowerCase().endsWith('.mp3')) {
+                    setUploadError('Only .mp3 files are allowed');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed for ${file.name}`);
+                }
+            }
+            
+            await fetchTracks();
+        } catch (error) {
+            console.error('Upload error:', error);
+            setUploadError('Failed to upload file(s)');
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchTracks = async () => {
-            try {
-                let tracks;
-                if (process.env.NODE_ENV === 'production') {
-                    // In production, fetch from Google Cloud Storage
-                    const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
-                    const data = await response.json();
-                    tracks = data.items
-                        .filter(item => item.name.endsWith('.mp3'))
-                        .map(item => item.name);
-                } else {
-                    // In development, use local endpoint
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
-                    const data = await response.json();
-                    tracks = data.mp3s;
-                }
-                
-                // Create unique IDs using filename hash
-                const formattedTracks = tracks.map((fileName) => ({
-                    id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
-                    title: fileName.replace('.mp3', ''),
-                    fileName: fileName
-                }));
-                
-                // Filter out tracks that are already in playlist
-                const filteredTracks = formattedTracks.filter(track => 
-                    !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
-                );
-                
-                setUploadedTracks(filteredTracks);
-            } catch (error) {
-                console.error('Error fetching tracks:', error);
-            }
-        };
-
         fetchTracks();
     }, [playlistTracks]);
 
@@ -183,7 +222,53 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     <div className="tw-grid tw-grid-cols-2 tw-gap-6">
                         {/* Uploaded Tracks Column */}
                         <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
-                            <h3 className="tw-text-lg tw-font-bold tw-text-gray-800 tw-mb-4">Uploaded Tracks</h3>
+                            <div className="tw-flex tw-items-center tw-justify-between tw-mb-4">
+                                <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
+                                <div className="tw-relative">
+                                    <input
+                                        type="file"
+                                        accept=".mp3"
+                                        multiple
+                                        onChange={handleFileUpload}
+                                        className="tw-hidden"
+                                        id="file-upload"
+                                    />
+                                    <label
+                                        htmlFor="file-upload"
+                                        className={`tw-inline-flex tw-items-center tw-px-3 tw-py-2 tw-rounded-lg 
+                                                  tw-bg-blue-600 tw-text-white tw-text-sm tw-font-medium
+                                                  hover:tw-bg-blue-700 tw-cursor-pointer tw-transition-colors
+                                                  ${isUploading ? 'tw-opacity-75 tw-cursor-not-allowed' : ''}`}
+                                    >
+                                        {isUploading ? (
+                                            <span>Uploading...</span>
+                                        ) : (
+                                            <>
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="tw-h-4 tw-w-4 tw-mr-2"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                                                    />
+                                                </svg>
+                                                Upload MP3
+                                            </>
+                                        )}
+                                    </label>
+                                    {uploadError && (
+                                        <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
+                                            {uploadError}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             <div 
                                 className="tw-min-h-[200px]"
                                 onDragOver={handleDragOver}

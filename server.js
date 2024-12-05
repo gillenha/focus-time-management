@@ -58,7 +58,19 @@ app.use(cors({
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Route to handle PUT requests for Freeflow
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+    // Serve static files from the React build
+    app.use(express.static(path.join(__dirname, 'build')));
+    
+    // Serve MP3 files from the mp3s directory
+    app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
+    
+    // Serve effects from the public directory
+    app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
+}
+
+// API Routes
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;
 
@@ -209,6 +221,13 @@ app.get('/api/notion-test', async (req, res) => {
     }
 });
 
+// Catch-all route to serve React app in production
+if (process.env.NODE_ENV === 'production') {
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, 'build', 'index.html'));
+    });
+}
+
 app.listen(PORT, () => {
-  console.log(`API Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 });

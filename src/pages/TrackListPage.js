@@ -106,7 +106,11 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         const track = JSON.parse(event.dataTransfer.getData('track'));
         const sourceList = event.dataTransfer.getData('sourceList');
 
-        // Prevent duplicate drops
+        // Prevent moving if it's the last track in playlist
+        if (sourceList === 'playlist' && playlistTracks.length <= 1) {
+            return; // Early return if trying to remove last track
+        }
+
         if (targetList === 'playlist' && 
             playlistTracks.some(t => t.fileName === track.fileName)) {
             return;
@@ -117,7 +121,6 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             return;
         }
 
-        // Remove from source
         if (sourceList === 'uploaded') {
             setUploadedTracks(current => 
                 current.filter(t => t.fileName !== track.fileName)
@@ -128,16 +131,13 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             );
         }
         
-        // Add to target
         if (targetList === 'playlist') {
-            // Ensure unique ID for playlist items
             const playlistTrack = {
                 ...track,
                 id: `playlist-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
             };
             setPlaylistTracks(current => [...current, playlistTrack]);
         } else {
-            // Ensure unique ID for uploaded items
             const uploadedTrack = {
                 ...track,
                 id: `upload-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
@@ -149,7 +149,11 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const handleTrackClick = (track, sourceList) => {
         const targetList = sourceList === 'uploaded' ? 'playlist' : 'uploaded';
         
-        // Use the same logic as handleDrop
+        // Prevent moving if it's the last track in playlist
+        if (sourceList === 'playlist' && playlistTracks.length <= 1) {
+            return; // Early return if trying to remove last track
+        }
+
         if (targetList === 'playlist' && 
             playlistTracks.some(t => t.fileName === track.fileName)) {
             return;
@@ -160,7 +164,6 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             return;
         }
 
-        // Remove from source
         if (sourceList === 'uploaded') {
             setUploadedTracks(current => 
                 current.filter(t => t.fileName !== track.fileName)
@@ -171,7 +174,6 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             );
         }
         
-        // Add to target
         if (targetList === 'playlist') {
             const playlistTrack = {
                 ...track,

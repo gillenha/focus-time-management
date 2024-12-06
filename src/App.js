@@ -46,7 +46,8 @@ function App() {
   const [isTrackListExiting, setIsTrackListExiting] = useState(false);
   const [playlistTracks, setPlaylistTracks] = useState(() => {
     const saved = localStorage.getItem('focusPlaylist');
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    return parsed.length > 0 ? parsed : [/* default track */];
   });
   const [sessionInputValue, setSessionInputValue] = useState('');
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -148,7 +149,7 @@ function App() {
       
       const data = await response.json();
       
-      setBackgroundImage(data.urls.raw);
+      setBackgroundImage(data.urls.full);
       
       setPhotographer({
         name: data.user.name || '',
@@ -158,7 +159,7 @@ function App() {
         description: data.description || data.alt_description || ''
       });
       
-      localStorage.setItem('backgroundImage', data.urls.regular);
+      localStorage.setItem('backgroundImage', data.urls.full);
       localStorage.setItem('photographer', JSON.stringify({
         name: data.user.name || '',
         username: data.user.username || '',
@@ -400,6 +401,40 @@ function App() {
     }
   }, [time, timerActive, currentSessionText, isFreeflow, showMusicPlayer, sessionInputValue, sessionStarted]);
 
+  // Add this new helper function near your other formatting functions
+  const formatTitleTime = (time) => {
+    const hours = Math.floor(time / 3600);
+    const minutes = Math.floor((time % 3600) / 60);
+    const seconds = time % 60;
+
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+  };
+
+  // Add this new effect to update the document title
+  useEffect(() => {
+    if (timerActive || time > 0) {
+      document.title = `${formatTitleTime(time)} - Flow State`;
+    } else {
+      document.title = 'Flow State';
+    }
+  }, [time, timerActive]);
+
+  // Add this function to handle track removal
+  const handleRemoveTrack = (trackId) => {
+    setPlaylistTracks(currentTracks => {
+      // Only allow removal if more than one track remains
+      if (currentTracks.length <= 1) {
+        // You could show a toast notification here if you want
+        return currentTracks;
+      }
+      return currentTracks.filter(track => track.id !== trackId);
+    });
+  };
+
   return (
     <div className="grid-container">
       <div 
@@ -537,6 +572,7 @@ function App() {
           isExiting={isTrackListExiting}
           playlistTracks={playlistTracks}
           setPlaylistTracks={setPlaylistTracks}
+          onRemoveTrack={handleRemoveTrack}
         />
       )}
     </div>

@@ -100,6 +100,7 @@ class AudioManager {
                 return relativePath;
             }
             
+            // Remove any leading slashes and 'mp3s/'
             const filename = relativePath.split('/').pop();
             return `https://storage.googleapis.com/react-app-assets/${filename}`;
         }
@@ -121,13 +122,33 @@ class AudioManager {
     static async verifyAudio(url) {
         console.log('Verifying audio URL:', url);
         try {
-            const response = await fetch(url, { method: 'HEAD' });
-            const isValid = response.ok;
-            console.log('Audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
-            if (!isValid) {
-                console.error('Audio file not found at:', url);
+            if (process.env.NODE_ENV === 'development') {
+                // In development, verify directly from local server
+                const response = await fetch(url, { method: 'HEAD' });
+                const isValid = response.ok;
+                console.log('Development audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
+                if (!isValid) {
+                    console.error('Audio file not found at:', url);
+                }
+                return isValid;
+            } else {
+                // In production, for Google Cloud Storage URLs
+                if (url.includes('storage.googleapis.com')) {
+                    const response = await fetch(url, { 
+                        method: 'HEAD',
+                        headers: {
+                            'Origin': window.location.origin
+                        }
+                    });
+                    const isValid = response.ok;
+                    console.log('Production audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
+                    return isValid;
+                } else {
+                    // For static files (like bell.mp3)
+                    const response = await fetch(url, { method: 'HEAD' });
+                    return response.ok;
+                }
             }
-            return isValid;
         } catch (error) {
             console.error('Audio verification failed:', error.message);
             return false;

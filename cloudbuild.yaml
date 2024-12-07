@@ -18,7 +18,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA']
 
-  # Deploy container image to Cloud Run with error handling
+  # Deploy container image to Cloud Run with preserved environment variables
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
@@ -30,7 +30,7 @@ steps:
           --region=us-central1 \
           --platform=managed \
           --allow-unauthenticated \
-          --set-env-vars=NODE_ENV=production \
+          --update-env-vars=NODE_ENV=production \
           --service-account=harry-gillen-builder@appspot.gserviceaccount.com; then
           echo "Deployment successful!"
         else

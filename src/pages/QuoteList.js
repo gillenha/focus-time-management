@@ -7,6 +7,7 @@ const QuoteList = ({ onClose, isExiting }) => {
     const [attribution, setAttribution] = useState('');
     const [quotes, setQuotes] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showQuotes, setShowQuotes] = useState(false);
 
     useEffect(() => {
         loadQuotes();
@@ -55,7 +56,7 @@ const QuoteList = ({ onClose, isExiting }) => {
 
     return (
         <div className={`tw-fixed tw-inset-0 tw-bg-white tw-z-50 ${isExiting ? 'slide-out' : 'slide-in'}`}>
-            <div className="tw-h-full tw-overflow-y-auto">
+            <div className="tw-h-full tw-overflow-y-scroll">
                 <div className="tw-p-6">
                     {/* Header with close button */}
                     <div className="tw-flex tw-items-center tw-justify-between tw-mb-6">
@@ -89,17 +90,16 @@ const QuoteList = ({ onClose, isExiting }) => {
                             <h3 className="tw-text-lg tw-font-semibold tw-mb-4">Focus Quotes</h3>
                             
                             {/* Add New Quote Form */}
-                            <div className="tw-max-w-2xl tw-mx-auto">
+                            <div className="tw-max-w-sm tw-mx-auto">
                                 <form onSubmit={handleAddQuote} className="tw-mb-8">
                                     <div className="tw-flex tw-flex-col tw-space-y-4">
                                         <div className="tw-flex tw-flex-col tw-space-y-1">
                                             <label className="tw-text-sm tw-font-medium tw-text-gray-700">Quote Text</label>
-                                            <input
-                                                type="text"
+                                            <textarea
                                                 value={quoteText}
                                                 onChange={(e) => setQuoteText(e.target.value)}
                                                 placeholder="Enter an inspiring focus quote..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-6 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500"
+                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-3 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 tw-resize-none tw-overflow-y-auto tw-h-32"
                                             />
                                         </div>
                                         <div className="tw-flex tw-flex-col tw-space-y-1">
@@ -123,8 +123,27 @@ const QuoteList = ({ onClose, isExiting }) => {
                                     </div>
                                 </form>
 
-                                {/* Quote List with improved styling */}
-                                <div className="tw-space-y-3">
+                                {/* Collapsible Quote List */}
+                                <div className="tw-mb-4 tw-flex tw-justify-center">
+                                    <button
+                                        onClick={() => setShowQuotes(!showQuotes)}
+                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-gray-800 hover:tw-text-gray-900 tw-cursor-pointer tw-transition-colors"
+                                    >
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            className={`tw-h-5 tw-w-5 tw-mr-2 tw-transition-transform tw-duration-200 ${showQuotes ? 'tw-rotate-90' : ''}`}
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                        {showQuotes ? 'Hide Quotes' : 'See Quotes'}
+                                    </button>
+                                </div>
+
+                                {/* Quote List with fade animation */}
+                                <div className={`tw-space-y-3 tw-transition-opacity tw-duration-300 ${showQuotes ? 'tw-opacity-100' : 'tw-opacity-0 tw-h-0 tw-overflow-hidden'}`}>
                                     {isLoading ? (
                                         <div className="tw-flex tw-justify-center tw-py-8">
                                             <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-blue-500 tw-border-t-transparent"></div>
@@ -135,9 +154,9 @@ const QuoteList = ({ onClose, isExiting }) => {
                                         quotes.map((quote, index) => (
                                             <div 
                                                 key={index} 
-                                                className="tw-group tw-relative tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-p-4 tw-shadow-sm hover:tw-shadow-md tw-transition-all"
+                                                className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto"
                                             >
-                                                <p className="tw-text-gray-700 tw-text-sm tw-leading-relaxed">{quote}</p>
+                                                <p className="tw-text-gray-700 tw-text-base tw-leading-relaxed tw-break-words">{quote}</p>
                                                 <button
                                                     onClick={() => handleRemoveQuote(index)}
                                                     className="tw-absolute tw-top-3 tw-right-3 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-rounded-full hover:tw-bg-red-50 tw-p-1.5 tw-cursor-pointer"

@@ -88,10 +88,24 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
-                    method: 'POST',
-                    body: formData,
-                });
+                let response;
+                if (process.env.NODE_ENV === 'production') {
+                    // Upload directly to Google Cloud Storage
+                    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=media&name=${encodeURIComponent(file.name)}`;
+                    response = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'audio/mpeg',
+                        },
+                        body: file,
+                    });
+                } else {
+                    // Development environment
+                    response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                }
 
                 if (!response.ok) {
                     const data = await response.json();

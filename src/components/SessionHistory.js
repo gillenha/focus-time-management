@@ -172,7 +172,7 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
                                                     e.stopPropagation();
                                                     sendToServer(session);
                                                 }}
-                                                className="tw-px-3 tw-py-1 tw-text-sm tw-text-gray-600 tw-bg-gray-100 tw-rounded hover:tw-bg-gray-200 tw-transition-colors"
+                                                className="btn-secondary"
                                             >
                                                 Log to Server
                                             </button>
@@ -188,13 +188,13 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
                         <div className="tw-flex tw-justify-end tw-space-x-3">
                             <button
                                 onClick={onClearHistory}
-                                className="tw-px-4 tw-py-2 tw-text-sm tw-text-red-600 tw-bg-red-50 tw-rounded hover:tw-bg-red-100 tw-transition-colors"
+                                className="btn-danger"
                             >
                                 Clear History
                             </button>
                             <button
                                 onClick={() => console.log("Data sent to Notion")}
-                                className="tw-px-4 tw-py-2 tw-text-sm tw-text-gray-600 tw-bg-gray-100 tw-rounded hover:tw-bg-gray-200 tw-transition-colors"
+                                className="btn-secondary"
                             >
                                 Send to Notion
                             </button>

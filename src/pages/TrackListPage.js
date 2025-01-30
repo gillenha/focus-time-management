@@ -334,65 +334,62 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     <div className="tw-grid tw-grid-cols-2 tw-gap-6">
                         {/* Uploaded Tracks Column */}
                         <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
-                            <div className="tw-flex tw-items-center tw-justify-between tw-mb-4">
-                                <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
-                                <StorageUsage />
-                                <div className="tw-flex tw-items-center tw-gap-2">
-                                    {selectedTracks.size > 0 && (
-                                        <button
-                                            onClick={handleDeleteSelected}
-                                            className="tw-px-3 tw-py-2 tw-rounded-lg tw-bg-red-600 tw-text-white 
-                                                     tw-text-sm tw-font-medium hover:tw-bg-red-700 
-                                                     tw-transition-colors"
-                                        >
-                                            Delete Selected
-                                        </button>
-                                    )}
-                                    <div className="tw-relative">
-                                        <input
-                                            type="file"
-                                            accept=".mp3"
-                                            multiple
-                                            onChange={handleFileUpload}
-                                            className="tw-hidden"
-                                            id="file-upload"
-                                        />
-                                        <label
-                                            htmlFor="file-upload"
-                                            className={`tw-inline-flex tw-items-center tw-px-3 tw-py-2 tw-rounded-lg 
-                                                      tw-bg-blue-600 tw-text-white tw-text-sm tw-font-medium
-                                                      hover:tw-bg-blue-700 tw-cursor-pointer tw-transition-colors
-                                                      ${isUploading ? 'tw-opacity-75 tw-cursor-not-allowed' : ''}`}
-                                        >
-                                            {isUploading ? (
-                                                <span>Uploading...</span>
-                                            ) : (
-                                                <>
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="tw-h-4 tw-w-4 tw-mr-2"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                                        />
-                                                    </svg>
-                                                    Upload MP3
-                                                </>
-                                            )}
-                                        </label>
-                                        {uploadError && (
-                                            <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
-                                                {uploadError}
-                                            </div>
+                            <div className="tw-flex tw-flex-col tw-gap-4 tw-mb-4">
+                                <div className="tw-flex tw-items-center tw-justify-between">
+                                    <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
+                                    <div className="tw-flex tw-items-center tw-gap-2">
+                                        {selectedTracks.size > 0 && (
+                                            <button
+                                                onClick={handleDeleteSelected}
+                                                className="btn-danger"
+                                            >
+                                                Delete Selected
+                                            </button>
                                         )}
+                                        <div className="tw-relative">
+                                            <input
+                                                type="file"
+                                                onChange={handleFileUpload}
+                                                accept=".mp3"
+                                                multiple
+                                                className="tw-hidden"
+                                                id="file-upload"
+                                            />
+                                            <label 
+                                                htmlFor="file-upload" 
+                                                className={`btn-primary tw-inline-flex tw-items-center ${isUploading ? 'disabled' : ''}`}
+                                            >
+                                                {isUploading ? (
+                                                    <span>Uploading...</span>
+                                                ) : (
+                                                    <>
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            className="tw-h-4 tw-w-4 tw-mr-2"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            stroke="currentColor"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                                                            />
+                                                        </svg>
+                                                        Upload MP3
+                                                    </>
+                                                )}
+                                            </label>
+                                            {uploadError && (
+                                                <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
+                                                    {uploadError}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
+                                <StorageUsage />
                             </div>
                             <div 
                                 className="tw-min-h-[200px]"

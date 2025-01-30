@@ -65,11 +65,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             {/* Apply Button */}
                             <button
                                 onClick={handleApplyTheme}
-                                className={`tw-w-full tw-px-4 tw-py-2 tw-rounded-lg 
-                                      tw-font-medium tw-transition-colors tw-cursor-pointer
-                                      ${selectedTheme !== theme
-                                        ? 'tw-bg-gray-800 tw-text-white hover:tw-bg-gray-700'
-                                        : 'tw-bg-gray-100 tw-text-gray-400 tw-cursor-not-allowed'}`}
+                                className={`btn-primary ${selectedTheme === theme ? 'disabled' : ''}`}
                                 disabled={selectedTheme === theme}
                             >
                                 {selectedTheme === theme ? 'Current Theme' : 'Apply Theme'}

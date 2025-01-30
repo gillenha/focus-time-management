@@ -127,7 +127,7 @@ const QuoteList = ({ onClose, isExiting }) => {
                                 <div className="tw-mb-4 tw-flex tw-justify-center">
                                     <button
                                         onClick={() => setShowQuotes(!showQuotes)}
-                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-gray-800 hover:tw-text-gray-900 tw-cursor-pointer tw-transition-colors"
+                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-gray-800 hover:tw-text-gray-900 tw-cursor-pointer tw-transition-colors tw-bg-transparent tw-border-0 tw-appearance-none"
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"

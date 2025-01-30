@@ -105,14 +105,28 @@ export const deleteQuote = async (index) => {
             const existingQuotes = await fetchQuotes();
             const updatedQuotes = existingQuotes.filter((_, i) => i !== index);
             
-            // Upload directly to Google Cloud Storage
-            const content = JSON.stringify({ quotes: updatedQuotes });
-            const response = await fetch(`${BUCKET_URL}/data/quotes.json`, {
+            // Get a signed URL for writing
+            const signedUrlResponse = await fetch(`${process.env.REACT_APP_API_URL}/get-quote-url`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ operation: 'write' }),
+            });
+
+            if (!signedUrlResponse.ok) {
+                throw new Error('Failed to get signed URL');
+            }
+
+            const { signedUrl } = await signedUrlResponse.json();
+            
+            // Upload using the signed URL
+            const response = await fetch(signedUrl, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: content
+                body: JSON.stringify({ quotes: updatedQuotes }),
             });
             
             if (!response.ok) {

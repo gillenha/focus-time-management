@@ -14,8 +14,23 @@ const { Storage } = require('@google-cloud/storage');
 let storage;
 let bucket;
 if (process.env.NODE_ENV === 'production') {
-    storage = new Storage();
-    bucket = storage.bucket('react-app-assets');
+    try {
+        console.log('Initializing Google Cloud Storage...');
+        storage = new Storage({
+            projectId: 'harry-gillen-builder',
+            // Use Application Default Credentials
+            keyFilename: undefined
+        });
+        bucket = storage.bucket('react-app-assets');
+        console.log('Successfully initialized Google Cloud Storage');
+    } catch (error) {
+        console.error('Failed to initialize Google Cloud Storage:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            errors: error.errors
+        });
+    }
 }
 
 const app = express();
@@ -521,14 +536,30 @@ app.post('/get-quote-url', async (req, res) => {
     }
 });
 
-// Update the existing get-upload-url endpoint to include proper error handling
+// Update the get-upload-url endpoint with more logging
 app.post('/get-upload-url', async (req, res) => {
     try {
         const { fileName, contentType, fileSize } = req.body;
         
         if (!bucket) {
+            console.error('Bucket not initialized. Storage instance:', !!storage);
             throw new Error('Storage bucket not initialized');
         }
+
+        console.log('Generating signed URL with params:', {
+            fileName,
+            contentType,
+            fileSize,
+            bucketName: bucket.name
+        });
+
+        // Check authentication status
+        const auth = await storage.auth.getCredentials();
+        console.log('Current credentials:', {
+            hasCredentials: !!auth,
+            type: auth?.type,
+            clientEmail: auth?.client_email
+        });
         
         // Generate signed URL that expires in 15 minutes
         const [signedUrl] = await bucket.file(fileName).getSignedUrl({
@@ -536,14 +567,26 @@ app.post('/get-upload-url', async (req, res) => {
             action: 'write',
             expires: Date.now() + 15 * 60 * 1000, // 15 minutes
             contentType,
+            extensionHeaders: {
+                'x-goog-content-length-range': `0,${fileSize}`
+            }
         });
 
+        console.log('Successfully generated signed URL');
         res.json({ signedUrl });
     } catch (error) {
-        console.error('Error generating signed URL:', error, error.stack);
+        console.error('Detailed error generating signed URL:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            errors: error.errors,
+            name: error.name,
+            statusCode: error.statusCode
+        });
         res.status(500).json({ 
             error: 'Failed to generate upload URL',
-            details: error.message 
+            details: error.message,
+            code: error.code
         });
     }
 });

@@ -303,94 +303,91 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     return (
         <div className={`tw-fixed tw-inset-0 tw-bg-white tw-z-50 ${isExiting ? 'slide-out' : 'slide-in'}`}>
             <div className="tw-h-full tw-overflow-y-auto">
-                <div className="tw-p-6">
+                <div className="tw-p-4 md:tw-p-6">
                     {/* Header */}
-                    <div className="tw-flex tw-items-center tw-justify-between tw-mb-8">
-                        <div className="tw-flex tw-items-center">
-                            <button
-                                onClick={onClose}
-                                className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-gray-500 tw-cursor-pointer"
+                    <div className="tw-flex tw-items-center tw-mb-6">
+                        <button
+                            onClick={onClose}
+                            className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-gray-500 tw-cursor-pointer"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="tw-w-6 tw-h-6"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="tw-w-6 tw-h-6"
-                                >
-                                    <path d="M19 12H5M12 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-                            <h2 className="tw-text-xl tw-font-bold tw-text-gray-800">Track List</h2>
-                        </div>
+                                <path d="M19 12H5M12 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <h2 className="tw-text-xl tw-font-bold tw-text-gray-800">Track List</h2>
                     </div>
 
-                    {/* Two-Column Layout */}
-                    <div className="tw-grid tw-grid-cols-2 tw-gap-6">
-                        {/* Uploaded Tracks Column */}
-                        <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
-                            <div className="tw-flex tw-flex-col tw-gap-4 tw-mb-4">
-                                <div className="tw-flex tw-items-center tw-justify-between">
-                                    <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
-                                    <div className="tw-flex tw-items-center tw-gap-2">
-                                        {selectedTracks.size > 0 && (
-                                            <button
-                                                onClick={handleDeleteSelected}
-                                                className="btn-danger"
-                                            >
-                                                Delete Selected
-                                            </button>
-                                        )}
-                                        <div className="tw-relative">
-                                            <input
-                                                type="file"
-                                                onChange={handleFileUpload}
-                                                accept=".mp3"
-                                                multiple
-                                                className="tw-hidden"
-                                                id="file-upload"
-                                            />
-                                            <label 
-                                                htmlFor="file-upload" 
-                                                className={`btn-primary tw-inline-flex tw-items-center ${isUploading ? 'disabled' : ''}`}
-                                            >
-                                                {isUploading ? (
-                                                    <span>Uploading...</span>
-                                                ) : (
-                                                    <>
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            className="tw-h-4 tw-w-4 tw-mr-2"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                                            />
-                                                        </svg>
-                                                        Upload MP3
-                                                    </>
-                                                )}
-                                            </label>
-                                            {uploadError && (
-                                                <div className="tw-absolute tw-top-full tw-left-0 tw-mt-1 tw-text-sm tw-text-red-600">
-                                                    {uploadError}
-                                                </div>
+                    {/* Main Content */}
+                    <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+                        {/* Uploaded Tracks Section */}
+                        <div className="tw-bg-gray-50 tw-rounded-xl tw-p-4">
+                            {/* Section Header */}
+                            <div className="tw-mb-4">
+                                <h3 className="tw-text-lg tw-font-bold tw-text-gray-800 tw-mb-2">Uploaded Tracks</h3>
+                                
+                                {/* Storage Usage */}
+                                <StorageUsage />
+                                
+                                {/* Action Buttons - Simplified */}
+                                <div className="tw-flex tw-justify-start tw-items-center tw-gap-4 tw-mt-4">
+                                    <div>
+                                        <input
+                                            type="file"
+                                            onChange={handleFileUpload}
+                                            accept=".mp3"
+                                            multiple
+                                            className="tw-hidden"
+                                            id="file-upload"
+                                        />
+                                        <label 
+                                            htmlFor="file-upload" 
+                                            className={`btn-primary tw-w-48 ${isUploading ? 'disabled' : ''}`}
+                                        >
+                                            {isUploading ? (
+                                                <span>Uploading...</span>
+                                            ) : (
+                                                <>
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        className="tw-h-4 tw-w-4 tw-mr-2"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                    </svg>
+                                                    Upload MP3
+                                                </>
                                             )}
-                                        </div>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <button
+                                            onClick={handleDeleteSelected}
+                                            disabled={selectedTracks.size === 0}
+                                            className={`btn-danger tw-w-48 ${selectedTracks.size === 0 ? 'disabled' : ''}`}
+                                        >
+                                            Delete Selected
+                                        </button>
                                     </div>
                                 </div>
-                                <StorageUsage />
+                                {uploadError && (
+                                    <div className="tw-mt-2 tw-text-sm tw-text-red-600">
+                                        {uploadError}
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Tracks List */}
                             <div 
                                 className="tw-min-h-[200px]"
                                 onDragOver={handleDragOver}
@@ -406,8 +403,8 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                             </div>
                         </div>
 
-                        {/* Focus Playlist Column */}
-                        <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
+                        {/* Focus Playlist Section */}
+                        <div className="tw-bg-gray-50 tw-rounded-xl tw-p-4">
                             <h3 className="tw-text-lg tw-font-bold tw-text-gray-800 tw-mb-4">My Focus Playlist</h3>
                             <div 
                                 className="tw-min-h-[200px]"

@@ -27,6 +27,7 @@ RUN npm install --production
 # Copy built files and server
 COPY --from=build /app/build ./build
 COPY server.js .
+COPY utils ./utils
 COPY public ./public
 
 # Set production environment variables

@@ -99,7 +99,7 @@ const Profile = ({ onClose, isExiting }) => {
                                                 value={quoteText}
                                                 onChange={(e) => setQuoteText(e.target.value)}
                                                 placeholder="Enter an inspiring focus quote..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-3 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500"
+                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-6 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500"
                                             />
                                         </div>
                                         <div className="tw-flex tw-flex-col tw-space-y-1">
@@ -115,7 +115,7 @@ const Profile = ({ onClose, isExiting }) => {
                                         <div>
                                             <button
                                                 type="submit"
-                                                className="tw-w-full tw-inline-flex tw-items-center tw-justify-center tw-rounded-lg tw-bg-blue-500 tw-px-4 tw-py-2.5 tw-text-sm tw-font-semibold tw-text-white hover:tw-bg-blue-600 focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-blue-500 focus:tw-ring-offset-2"
+                                                className="tw-w-full tw-inline-flex tw-items-center tw-justify-center tw-rounded-lg tw-bg-blue-500 tw-px-4 tw-py-2.5 tw-text-sm tw-font-semibold tw-text-white hover:tw-bg-blue-600 focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-blue-500 focus:tw-ring-offset-2 tw-cursor-pointer"
                                             >
                                                 Add Quote
                                             </button>
@@ -140,9 +140,9 @@ const Profile = ({ onClose, isExiting }) => {
                                                 <p className="tw-text-gray-700 tw-text-sm tw-leading-relaxed">{quote}</p>
                                                 <button
                                                     onClick={() => handleRemoveQuote(index)}
-                                                    className="tw-absolute tw-top-2 tw-right-2 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-p-1 tw-rounded-full hover:tw-bg-gray-100"
+                                                    className="tw-absolute tw-top-3 tw-right-3 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-rounded-full hover:tw-bg-red-50 tw-p-1.5 tw-cursor-pointer"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-gray-500 hover:tw-text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-3.5 tw-w-3.5 tw-text-gray-400 hover:tw-text-red-500 tw-transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>

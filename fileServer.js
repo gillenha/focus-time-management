@@ -14,9 +14,6 @@ app.use(cors({
     optionsSuccessStatus: 204
 }));
 
-// File size limit (15MB)
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
-
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -34,9 +31,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage,
-    limits: {
-        fileSize: MAX_FILE_SIZE
-    },
     fileFilter: (req, file, cb) => {
         // Check file extension
         if (path.extname(file.originalname).toLowerCase() === '.mp3') {
@@ -57,11 +51,6 @@ app.use('/effects', express.static(path.join(__dirname, 'public', 'effects')));
 app.post('/upload', (req, res) => {
     upload.single('file')(req, res, (err) => {
         if (err) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ 
-                    error: `File size too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB` 
-                });
-            }
             return res.status(400).json({ error: err.message });
         }
 
@@ -91,6 +80,28 @@ app.get('/mp3s', (req, res) => {
     });
 });
 
+// Get file sizes
+app.get('/mp3s/sizes', (req, res) => {
+    const mp3sDir = path.join(__dirname, 'mp3s');
+    try {
+        if (!fs.existsSync(mp3sDir)) {
+            fs.mkdirSync(mp3sDir, { recursive: true });
+        }
+        const files = fs.readdirSync(mp3sDir);
+        const sizes = {};
+        for (const file of files) {
+            if (file.endsWith('.mp3')) {
+                const stats = fs.statSync(path.join(mp3sDir, file));
+                sizes[file] = stats.size;
+            }
+        }
+        res.json(sizes);
+    } catch (error) {
+        console.error('Error getting file sizes:', error);
+        res.status(500).json({ error: 'Failed to get file sizes' });
+    }
+});
+
 // Delete MP3 file
 app.delete('/mp3s/:filename', (req, res) => {
     const filename = req.params.filename;
@@ -113,5 +124,4 @@ app.delete('/mp3s/:filename', (req, res) => {
 const PORT = 3001;
 app.listen(PORT, () => {
     console.log(`File server running on port ${PORT}`);
-    console.log(`Maximum file size: ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
 }); 

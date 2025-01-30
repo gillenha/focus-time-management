@@ -5,29 +5,52 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState('');
     const [selectedTracks, setSelectedTracks] = useState(new Set());
+    const [totalStorageSize, setTotalStorageSize] = useState(0);
+    const MAX_STORAGE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB in bytes
 
     const fetchTracks = async () => {
         try {
             let tracks;
+            let totalSize = 0;
+            
             if (process.env.NODE_ENV === 'production') {
                 // In production, fetch from Google Cloud Storage
                 const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
                 const data = await response.json();
                 tracks = data.items
                     .filter(item => item.name.endsWith('.mp3'))
-                    .map(item => item.name);
+                    .map(item => ({
+                        name: item.name,
+                        size: parseInt(item.size)
+                    }));
+                totalSize = tracks.reduce((acc, track) => acc + track.size, 0);
             } else {
                 // In development, use local endpoint
                 const response = await fetch('http://localhost:3001/mp3s');
                 const data = await response.json();
-                tracks = data.mp3s;
+                
+                // Get file sizes for local files
+                const sizeResponse = await fetch('http://localhost:3001/mp3s/sizes');
+                const sizeData = await sizeResponse.json();
+                
+                // Map the local files to match the expected structure
+                tracks = data.mp3s.map(fileName => ({
+                    name: fileName,
+                    size: sizeData[fileName] || 0
+                }));
+                
+                totalSize = Object.values(sizeData).reduce((acc, size) => acc + size, 0);
             }
             
+            // Update total storage size
+            setTotalStorageSize(totalSize);
+            
             // Create unique IDs using filename hash
-            const formattedTracks = tracks.map((fileName) => ({
-                id: `upload-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
-                title: fileName.replace('.mp3', ''),
-                fileName: fileName
+            const formattedTracks = tracks.map((track) => ({
+                id: `upload-${track.name.replace(/[^a-zA-Z0-9]/g, '')}`,
+                title: track.name.replace('.mp3', ''),
+                fileName: track.name,
+                size: track.size
             }));
             
             // Filter out tracks that are already in playlist
@@ -50,16 +73,15 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         
         try {
             for (const file of files) {
-                // Strict .mp3 file check
+                // Only check file type
                 if (!file.name.toLowerCase().endsWith('.mp3')) {
                     setUploadError('Only .mp3 files are allowed');
                     return;
                 }
 
-                // Check file size (15MB)
-                const MAX_SIZE = 15 * 1024 * 1024;
-                if (file.size > MAX_SIZE) {
-                    setUploadError(`File ${file.name} is too large. Maximum size is 15MB`);
+                // Check if adding this file would exceed storage limit
+                if (totalStorageSize + file.size > MAX_STORAGE_SIZE) {
+                    setUploadError('Storage limit of 5GB exceeded. Please delete some files before uploading more.');
                     return;
                 }
 
@@ -75,6 +97,9 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     const data = await response.json();
                     throw new Error(data.error || `Upload failed for ${file.name}`);
                 }
+
+                // Update total storage size
+                setTotalStorageSize(prev => prev + file.size);
             }
             
             await fetchTracks();
@@ -225,6 +250,31 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         setSelectedTracks(new Set());
     };
 
+    // Add storage usage indicator
+    const StorageUsage = () => {
+        const usagePercentage = (totalStorageSize / MAX_STORAGE_SIZE) * 100;
+        const usageGB = (totalStorageSize / (1024 * 1024 * 1024)).toFixed(2);
+        
+        return (
+            <div className="tw-mb-4">
+                <div className="tw-flex tw-justify-between tw-text-sm tw-text-gray-600 tw-mb-1">
+                    <span>Storage Used: {usageGB}GB / 5GB</span>
+                    <span>{usagePercentage.toFixed(1)}%</span>
+                </div>
+                <div className="tw-w-full tw-bg-gray-200 tw-rounded-full tw-h-2">
+                    <div 
+                        className={`tw-h-2 tw-rounded-full ${
+                            usagePercentage > 90 ? 'tw-bg-red-500' : 
+                            usagePercentage > 70 ? 'tw-bg-yellow-500' : 
+                            'tw-bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                    ></div>
+                </div>
+            </div>
+        );
+    };
+
     const TrackItem = ({ track, sourceList }) => (
         <div
             className="tw-flex tw-items-center tw-gap-2 tw-p-3 tw-mb-2 tw-rounded-lg tw-bg-white tw-border tw-border-gray-200 
@@ -286,6 +336,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                         <div className="tw-bg-gray-50 tw-p-4 tw-rounded-xl">
                             <div className="tw-flex tw-items-center tw-justify-between tw-mb-4">
                                 <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
+                                <StorageUsage />
                                 <div className="tw-flex tw-items-center tw-gap-2">
                                     {selectedTracks.size > 0 && (
                                         <button

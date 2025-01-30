@@ -25,9 +25,6 @@ const PORT = process.env.PORT || 8080;
 const multerStorage = multer.memoryStorage();
 const upload = multer({
     storage: multerStorage,
-    limits: {
-        fileSize: 15 * 1024 * 1024 // 15MB limit
-    },
     fileFilter: (req, file, cb) => {
         if (!file.originalname.toLowerCase().endsWith('.mp3')) {
             return cb(new Error('Only .mp3 files are allowed'));
@@ -467,6 +464,40 @@ app.delete('/api/quotes/:index', async (req, res) => {
     } catch (error) {
         console.error('Error deleting quote:', error);
         res.status(500).json({ error: 'Failed to delete quote' });
+    }
+});
+
+// Add endpoint to get file sizes
+app.get('/mp3s/sizes', async (req, res) => {
+    try {
+        if (process.env.NODE_ENV === 'production') {
+            const [files] = await bucket.getFiles();
+            const sizes = {};
+            for (const file of files) {
+                if (file.name.endsWith('.mp3')) {
+                    const [metadata] = await file.getMetadata();
+                    sizes[file.name] = parseInt(metadata.size);
+                }
+            }
+            res.json(sizes);
+        } else {
+            const mp3sDir = path.join(__dirname, 'mp3s');
+            if (!fs.existsSync(mp3sDir)) {
+                fs.mkdirSync(mp3sDir, { recursive: true });
+            }
+            const files = fs.readdirSync(mp3sDir);
+            const sizes = {};
+            for (const file of files) {
+                if (file.endsWith('.mp3')) {
+                    const stats = fs.statSync(path.join(mp3sDir, file));
+                    sizes[file] = stats.size;
+                }
+            }
+            res.json(sizes);
+        }
+    } catch (error) {
+        console.error('Error getting file sizes:', error);
+        res.status(500).json({ error: 'Failed to get file sizes' });
     }
 });
 

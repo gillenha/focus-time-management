@@ -15,6 +15,7 @@ import Menu from './components/Menu';
 import Profile from './pages/Profile';
 import ChangeBackground from './pages/ChangeBackground';
 import TrackListPage from './pages/TrackListPage';
+import QuoteList from './pages/QuoteList';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -51,6 +52,8 @@ function App() {
   });
   const [sessionInputValue, setSessionInputValue] = useState('');
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [showQuoteList, setShowQuoteList] = useState(false);
+  const [isQuoteListExiting, setIsQuoteListExiting] = useState(false);
 
   // Add effect to load tracks from server if none in localStorage
   useEffect(() => {
@@ -435,6 +438,18 @@ function App() {
     });
   };
 
+  const toggleQuoteList = () => {
+    if (showQuoteList) {
+      setIsQuoteListExiting(true);
+      setTimeout(() => {
+        setShowQuoteList(false);
+        setIsQuoteListExiting(false);
+      }, 300); // Match animation duration
+    } else {
+      setShowQuoteList(true);
+    }
+  };
+
   return (
     <div className="grid-container">
       <div 
@@ -507,6 +522,10 @@ function App() {
             setIsMenuOpen(false);
             toggleTrackList();
           }}
+          onQuoteList={() => {
+            setIsMenuOpen(false);
+            toggleQuoteList();
+          }}
         />
         {showMusicPlayer && (
           <MusicPlayer
@@ -573,6 +592,12 @@ function App() {
           playlistTracks={playlistTracks}
           setPlaylistTracks={setPlaylistTracks}
           onRemoveTrack={handleRemoveTrack}
+        />
+      )}
+      {(showQuoteList || isQuoteListExiting) && (
+        <QuoteList
+          onClose={toggleQuoteList}
+          isExiting={isQuoteListExiting}
         />
       )}
     </div>

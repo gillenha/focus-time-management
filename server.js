@@ -501,10 +501,34 @@ app.get('/mp3s/sizes', async (req, res) => {
     }
 });
 
-// Generate signed URL for upload
+// Add endpoint to get signed URL for quotes operations
+app.post('/get-quote-url', async (req, res) => {
+    try {
+        const { operation } = req.body; // 'read' or 'write'
+        const file = bucket.file('data/quotes.json');
+        
+        const [signedUrl] = await file.getSignedUrl({
+            version: 'v4',
+            action: operation === 'write' ? 'write' : 'read',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+            contentType: 'application/json',
+        });
+
+        res.json({ signedUrl });
+    } catch (error) {
+        console.error('Error generating quote signed URL:', error);
+        res.status(500).json({ error: 'Failed to generate quote URL' });
+    }
+});
+
+// Update the existing get-upload-url endpoint to include proper error handling
 app.post('/get-upload-url', async (req, res) => {
     try {
         const { fileName, contentType, fileSize } = req.body;
+        
+        if (!bucket) {
+            throw new Error('Storage bucket not initialized');
+        }
         
         // Generate signed URL that expires in 15 minutes
         const [signedUrl] = await bucket.file(fileName).getSignedUrl({
@@ -516,8 +540,11 @@ app.post('/get-upload-url', async (req, res) => {
 
         res.json({ signedUrl });
     } catch (error) {
-        console.error('Error generating signed URL:', error);
-        res.status(500).json({ error: 'Failed to generate upload URL' });
+        console.error('Error generating signed URL:', error, error.stack);
+        res.status(500).json({ 
+            error: 'Failed to generate upload URL',
+            details: error.message 
+        });
     }
 });
 

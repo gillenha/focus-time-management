@@ -7,7 +7,7 @@ module.exports = [
   '"You should have, at most, two primary goals or tasks per day." - Tim Ferriss',
   '"Earn with your mind, not your time." - Naval',
   '"You can do anything, but you can\'t do everything. This is a hard lesson to learn in life. But the beauty of this is you don\'t have to do everything." - Shaan Puri',
-  '"When you think about focusing, you think focusing is saying "yes." No — focusing is about saying "No." And you\'ve got to say no, no, no. - Steve Jobs',
+  '"When you think about focusing, you think focusing is saying "yes." No — focusing is about saying "No." And you\'ve got to say no, no, no." - Steve Jobs',
   '"If you know something\'s going to work, it\'s not worth working on. It requires no courage. It requires no faith. It requires no skin in the game." - Eliot Peper',
   '"Instead of trying to be someone that you are not, be the best at what you are." - Thomas Sowell',
   '"On the highest or peaceful level, based upon the feelings of courage, acceptance, and love, our ability to concentrate is at its highest." - David Hawkins',
@@ -21,6 +21,6 @@ module.exports = [
   '"With easy access to "answers," we spend less time hanging out with uncertainty and ambiguity. We have become wary of wonder and its partner, curiosity." - Britta Bushnell',
   '"Habit is necessary; but it is the habit of having careless habits, of turning a trail into a rut, that must be incessantly fought against if one is to remain alive." - Edith Wharton',
   '"Are You Hunting Antelope or Field Mice?" - James Carville',
-  '"The first step to getting all you want in the world is allowing yourself to want it — and facing the fears necessary to be able to get what you want." -Noah Kagan',
+  '"The first step to getting all you want in the world is allowing yourself to want it — and facing the fears necessary to be able to get what you want." - Noah Kagan',
   '"I leave this life with no regrets. It was a wonderful life — full and complete with the great loves and great endeavors that make it worth living. I am sad to leave, but I leave with the knowledge that I lived the life that I intended." - Charles Krauthammer'
 ]; 

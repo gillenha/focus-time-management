@@ -7,6 +7,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const [selectedTracks, setSelectedTracks] = useState(new Set());
     const [totalStorageSize, setTotalStorageSize] = useState(0);
     const MAX_STORAGE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB in bytes
+    const MAX_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
     const fetchTracks = async () => {
         try {
@@ -64,55 +65,191 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
+    const uploadFileInChunks = async (file) => {
+        const totalChunks = Math.ceil(file.size / MAX_CHUNK_SIZE);
+        let uploadedChunks = 0;
+
+        // Generate a unique upload ID for this file
+        const uploadId = `${Date.now()}-${file.name}`;
+
+        for (let start = 0; start < file.size; start += MAX_CHUNK_SIZE) {
+            const chunk = file.slice(start, start + MAX_CHUNK_SIZE);
+            const end = Math.min(start + MAX_CHUNK_SIZE, file.size);
+            
+            // Calculate chunk number and total chunks
+            const chunkNumber = Math.floor(start / MAX_CHUNK_SIZE);
+            
+            try {
+                if (process.env.NODE_ENV === 'production') {
+                    // For production: Use resumable upload protocol
+                    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=resumable&name=${encodeURIComponent(file.name)}`;
+                    
+                    // If this is the first chunk, initiate the resumable upload
+                    if (chunkNumber === 0) {
+                        const initResponse = await fetch(uploadUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Upload-Content-Type': 'audio/mpeg',
+                                'X-Upload-Content-Length': file.size.toString(),
+                            },
+                            body: JSON.stringify({ name: file.name }),
+                        });
+                        
+                        if (!initResponse.ok) throw new Error('Failed to initiate upload');
+                        
+                        // Get the resumable upload URL from the response
+                        const resumableUrl = initResponse.headers.get('Location');
+                        if (!resumableUrl) throw new Error('No resumable upload URL received');
+                        
+                        // Store the URL for subsequent chunks
+                        sessionStorage.setItem(`upload-${uploadId}`, resumableUrl);
+                    }
+                    
+                    // Get the stored resumable URL
+                    const resumableUrl = sessionStorage.getItem(`upload-${uploadId}`);
+                    if (!resumableUrl) throw new Error('Resumable upload URL not found');
+                    
+                    // Upload the chunk
+                    const response = await fetch(resumableUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Range': `bytes ${start}-${end-1}/${file.size}`,
+                            'Content-Type': 'audio/mpeg',
+                        },
+                        body: chunk,
+                    });
+                    
+                    if (!response.ok && response.status !== 308) {
+                        throw new Error(`Chunk upload failed: ${response.status}`);
+                    }
+                    
+                    // If this was the last chunk, clean up
+                    if (end === file.size) {
+                        sessionStorage.removeItem(`upload-${uploadId}`);
+                    }
+                } else {
+                    // For development: Use chunked upload endpoint
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('chunkNumber', chunkNumber.toString());
+                    formData.append('totalChunks', totalChunks.toString());
+                    formData.append('fileName', file.name);
+                    formData.append('uploadId', uploadId);
+                    
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload-chunk`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    if (!response.ok) throw new Error('Chunk upload failed');
+                }
+                
+                uploadedChunks++;
+                const progress = (uploadedChunks / totalChunks) * 100;
+                setUploadProgress(Math.round(progress));
+                
+            } catch (error) {
+                console.error(`Error uploading chunk ${chunkNumber}:`, error);
+                throw error;
+            }
+        }
+    };
+
+    const uploadFileWithProgress = (file, uploadUrl) => {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                    const progress = (event.loaded / event.total) * 100;
+                    setUploadProgress(Math.round(progress));
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(xhr.response);
+                } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Upload failed'));
+            });
+
+            xhr.open('PUT', uploadUrl);
+            xhr.setRequestHeader('Content-Type', 'audio/mpeg');
+            xhr.send(file);
+        });
+    };
+
     const handleFileUpload = async (event) => {
         const files = event.target.files;
         if (!files.length) return;
 
         setIsUploading(true);
         setUploadError('');
+        setUploadProgress(0);
         
         try {
             for (const file of files) {
-                // Only check file type
                 if (!file.name.toLowerCase().endsWith('.mp3')) {
                     setUploadError('Only .mp3 files are allowed');
                     return;
                 }
 
-                // Check if adding this file would exceed storage limit
                 if (totalStorageSize + file.size > MAX_STORAGE_SIZE) {
                     setUploadError('Storage limit of 5GB exceeded. Please delete some files before uploading more.');
                     return;
                 }
 
-                const formData = new FormData();
-                formData.append('file', file);
-
-                let response;
                 if (process.env.NODE_ENV === 'production') {
-                    // Upload directly to Google Cloud Storage
-                    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=media&name=${encodeURIComponent(file.name)}`;
-                    response = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'audio/mpeg',
-                        },
-                        body: file,
-                    });
+                    // Initialize resumable upload session
+                    const initResponse = await fetch(
+                        `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=resumable`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Upload-Content-Type': 'audio/mpeg',
+                                'X-Upload-Content-Length': file.size.toString(),
+                            },
+                            body: JSON.stringify({
+                                name: file.name,
+                                contentType: 'audio/mpeg',
+                            })
+                        }
+                    );
+
+                    if (!initResponse.ok) {
+                        throw new Error('Failed to initialize upload');
+                    }
+
+                    // Get the resumable upload URL
+                    const uploadUrl = initResponse.headers.get('Location');
+                    if (!uploadUrl) {
+                        throw new Error('No upload URL received');
+                    }
+
+                    // Upload the file with progress tracking
+                    await uploadFileWithProgress(file, uploadUrl);
                 } else {
                     // Development environment
-                    response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
                         method: 'POST',
                         body: formData,
                     });
+
+                    if (!response.ok) {
+                        throw new Error('Upload failed');
+                    }
                 }
 
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || `Upload failed for ${file.name}`);
-                }
-
-                // Update total storage size
                 setTotalStorageSize(prev => prev + file.size);
             }
             
@@ -122,7 +259,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             setUploadError(error.message || 'Failed to upload file(s)');
         } finally {
             setIsUploading(false);
-            // Reset the file input
+            setUploadProgress(0);
             event.target.value = '';
         }
     };
@@ -289,6 +426,9 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         );
     };
 
+    // Add upload progress state
+    const [uploadProgress, setUploadProgress] = useState(0);
+
     const TrackItem = ({ track, sourceList }) => (
         <div
             className="tw-flex tw-items-center tw-gap-2 tw-p-3 tw-mb-2 tw-rounded-lg tw-bg-white tw-border tw-border-gray-200 
@@ -367,7 +507,15 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                                             className={`btn-primary tw-w-48 ${isUploading ? 'disabled' : ''}`}
                                         >
                                             {isUploading ? (
-                                                <span>Uploading...</span>
+                                                <div className="tw-flex tw-flex-col tw-items-center">
+                                                    <span>Uploading... {uploadProgress}%</span>
+                                                    <div className="tw-w-full tw-bg-blue-200 tw-rounded-full tw-h-1 tw-mt-1">
+                                                        <div 
+                                                            className="tw-bg-blue-600 tw-h-1 tw-rounded-full" 
+                                                            style={{ width: `${uploadProgress}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <>
                                                     <svg

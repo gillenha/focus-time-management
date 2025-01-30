@@ -8,12 +8,12 @@ const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 const multer = require('multer');
 const { format } = require('util');
+const { Storage } = require('@google-cloud/storage');
 
 // Initialize Google Cloud Storage in production
 let storage;
 let bucket;
 if (process.env.NODE_ENV === 'production') {
-    const { Storage } = require('@google-cloud/storage');
     storage = new Storage();
     bucket = storage.bucket('react-app-assets');
 }
@@ -498,6 +498,26 @@ app.get('/mp3s/sizes', async (req, res) => {
     } catch (error) {
         console.error('Error getting file sizes:', error);
         res.status(500).json({ error: 'Failed to get file sizes' });
+    }
+});
+
+// Generate signed URL for upload
+app.post('/get-upload-url', async (req, res) => {
+    try {
+        const { fileName, contentType, fileSize } = req.body;
+        
+        // Generate signed URL that expires in 15 minutes
+        const [signedUrl] = await bucket.file(fileName).getSignedUrl({
+            version: 'v4',
+            action: 'write',
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+            contentType,
+        });
+
+        res.json({ signedUrl });
+    } catch (error) {
+        console.error('Error generating signed URL:', error);
+        res.status(500).json({ error: 'Failed to generate upload URL' });
     }
 });
 

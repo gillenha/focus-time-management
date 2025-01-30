@@ -206,35 +206,52 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 }
 
                 if (process.env.NODE_ENV === 'production') {
-                    // Initialize resumable upload session
-                    const initResponse = await fetch(
-                        `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=resumable`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Upload-Content-Type': 'audio/mpeg',
-                                'X-Upload-Content-Length': file.size.toString(),
-                            },
-                            body: JSON.stringify({
-                                name: file.name,
-                                contentType: 'audio/mpeg',
-                            })
-                        }
-                    );
+                    // Get a signed URL from your server
+                    const signedUrlResponse = await fetch(`${process.env.REACT_APP_API_URL}/get-upload-url`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            fileName: file.name,
+                            contentType: 'audio/mpeg',
+                            fileSize: file.size,
+                        }),
+                    });
 
-                    if (!initResponse.ok) {
-                        throw new Error('Failed to initialize upload');
+                    if (!signedUrlResponse.ok) {
+                        throw new Error('Failed to get upload URL');
                     }
 
-                    // Get the resumable upload URL
-                    const uploadUrl = initResponse.headers.get('Location');
-                    if (!uploadUrl) {
-                        throw new Error('No upload URL received');
-                    }
+                    const { signedUrl } = await signedUrlResponse.json();
 
-                    // Upload the file with progress tracking
-                    await uploadFileWithProgress(file, uploadUrl);
+                    // Upload using XMLHttpRequest for progress tracking
+                    await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        
+                        xhr.upload.addEventListener('progress', (event) => {
+                            if (event.lengthComputable) {
+                                const progress = (event.loaded / event.total) * 100;
+                                setUploadProgress(Math.round(progress));
+                            }
+                        });
+
+                        xhr.addEventListener('load', () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(xhr.response);
+                            } else {
+                                reject(new Error(`Upload failed with status ${xhr.status}`));
+                            }
+                        });
+
+                        xhr.addEventListener('error', () => {
+                            reject(new Error('Upload failed'));
+                        });
+
+                        xhr.open('PUT', signedUrl);
+                        xhr.setRequestHeader('Content-Type', 'audio/mpeg');
+                        xhr.send(file);
+                    });
                 } else {
                     // Development environment
                     const formData = new FormData();

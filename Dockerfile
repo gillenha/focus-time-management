@@ -30,7 +30,6 @@ COPY server.js .
 COPY server ./server
 COPY utils ./utils
 COPY public ./public
-COPY mp3s ./mp3s
 
 # Set production environment variables
 ENV NODE_ENV=production

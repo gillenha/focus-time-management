@@ -26,11 +26,12 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 totalSize = tracks.reduce((acc, track) => acc + track.size, 0);
             } else {
                 // In development, use local endpoint
-                const response = await fetch('http://localhost:3001/mp3s');
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+                const response = await fetch(`${apiUrl}/mp3s`);
                 const data = await response.json();
                 
                 // Get file sizes for local files
-                const sizeResponse = await fetch('http://localhost:3001/mp3s/sizes');
+                const sizeResponse = await fetch(`${apiUrl}/mp3s/sizes`);
                 const sizeData = await sizeResponse.json();
                 
                 // Map the local files to match the expected structure

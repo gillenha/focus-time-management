@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export const fetchQuotes = async () => {
     try {
@@ -14,14 +14,14 @@ export const fetchQuotes = async () => {
     }
 };
 
-export const addQuote = async (quote) => {
+export const addQuote = async ({ text, author }) => {
     try {
         const response = await fetch(`${API_URL}/api/quotes`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ quote }),
+            body: JSON.stringify({ text, author }),
         });
         if (!response.ok) {
             throw new Error('Failed to add quote');
@@ -34,9 +34,9 @@ export const addQuote = async (quote) => {
     }
 };
 
-export const deleteQuote = async (index) => {
+export const deleteQuote = async (id) => {
     try {
-        const response = await fetch(`${API_URL}/api/quotes/${index}`, {
+        const response = await fetch(`${API_URL}/api/quotes/${id}`, {
             method: 'DELETE',
         });
         if (!response.ok) {

@@ -15,7 +15,7 @@ class AudioManager {
             return this.manifestPromise;
         }
 
-        const apiUrl = process.env.REACT_APP_API_URL;
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
         console.log('Environment:', process.env.NODE_ENV);
         
         // Create new promise for manifest fetch
@@ -41,22 +41,16 @@ class AudioManager {
                     
                 } else {
                     // In development, use local manifest
-                    const response = await fetch(`${apiUrl}/mp3s/manifest.json`);
+                    const response = await fetch(`${apiUrl}/mp3s`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch audio manifest');
                     }
                     const audioFiles = await response.json();
                     
-                    // Validate development paths
-                    const isLocalPath = audioFiles.every(path => path.startsWith('/mp3s/'));
-                    if (!isLocalPath) {
-                        throw new Error('Invalid paths for development environment');
-                    }
-                    
                     // Cache the result
-                    this.manifestCache = audioFiles;
-                    console.log('Development: Using local files:', audioFiles);
-                    return audioFiles;
+                    this.manifestCache = audioFiles.mp3s;
+                    console.log('Development: Using local files:', audioFiles.mp3s);
+                    return audioFiles.mp3s;
                 }
                 
             } catch (error) {
@@ -76,6 +70,7 @@ class AudioManager {
 
     static getFullAudioUrl(relativePath) {
         console.log('Getting full audio URL for:', relativePath);
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
         
         // Development environment
         if (process.env.NODE_ENV === 'development') {
@@ -89,7 +84,7 @@ class AudioManager {
                 ? relativePath 
                 : `/mp3s/${relativePath}`;
                 
-            const fullUrl = `http://localhost:3001${localPath}`;
+            const fullUrl = `${apiUrl}${localPath}`;
             console.log('Development URL:', fullUrl);
             return fullUrl;
         }
@@ -107,13 +102,14 @@ class AudioManager {
         
         // Fallback
         const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-        return `${process.env.REACT_APP_API_URL}/${cleanPath}`;
+        return `${apiUrl}/${cleanPath}`;
     }
 
     static getBellAudioUrl() {
         console.log('Getting bell sound URL in environment:', process.env.NODE_ENV);
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
         if (process.env.NODE_ENV === 'development') {
-            return 'http://localhost:3001/effects/bell.mp3';
+            return `${apiUrl}/effects/bell.mp3`;
         }
         // In production, serve from static build files
         return '/effects/bell.mp3';

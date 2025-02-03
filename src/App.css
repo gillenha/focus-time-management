@@ -237,27 +237,28 @@ body, html {
   }
 }
 
-/* Global Button Styles */
-.btn-primary, .btn-secondary, .btn-danger {
-  @apply tw-h-11 tw-px-6 tw-rounded-lg tw-font-medium tw-transition-colors tw-cursor-pointer tw-flex tw-items-center tw-justify-center;
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
-.btn-primary {
-  @apply tw-bg-gray-800 tw-text-white hover:tw-bg-gray-700;
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 
-.btn-primary:disabled, .btn-primary.disabled {
-  @apply tw-bg-gray-100 tw-text-gray-400 tw-cursor-not-allowed hover:tw-bg-gray-100;
+.tw-animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
 }
 
-.btn-secondary {
-  @apply tw-bg-gray-100 tw-text-gray-600 hover:tw-bg-gray-200;
-}
-
-.btn-danger {
-  @apply tw-bg-red-50 tw-text-red-600 hover:tw-bg-red-100;
-}
-
-.btn-danger:disabled, .btn-danger.disabled {
-  @apply tw-bg-gray-100 tw-text-gray-400 tw-cursor-not-allowed hover:tw-bg-gray-100;
+.tw-animate-slideOut {
+  animation: slideOut 0.3s ease-out forwards;
 }

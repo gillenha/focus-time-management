@@ -31,7 +31,7 @@
   "scripts": {
     "start": "react-scripts start",
     "start:dev": "NODE_ENV=development react-scripts start",
-    "start:server:dev": "NODE_ENV=development concurrently \"SERVER_PORT=8080 node server.js\" \"node fileServer.js\"",
+    "start:server:dev": "NODE_ENV=development nodemon server.js",
     "build": "NODE_ENV=production react-scripts build",
     "dist": "electron-builder",
     "deploy": "gcloud app deploy"

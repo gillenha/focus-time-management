@@ -204,7 +204,10 @@ function MusicPlayer({
               tw-duration-1000
               ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
             `}>
-              {currentQuote}
+              "{currentQuote.text}"
+              {currentQuote.author && currentQuote.author !== 'Unknown' && (
+                <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
+              )}
             </p>
             <div className={`
               tw-transition-opacity 

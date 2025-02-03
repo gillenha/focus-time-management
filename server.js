@@ -10,6 +10,7 @@ const multer = require('multer');
 const { format } = require('util');
 const connectDB = require('./server/config/db');
 const quoteController = require('./server/controllers/quoteController');
+const quotesRouter = require('./server/routes/quotes');
 
 // Initialize Google Cloud Storage in production
 let storage;
@@ -79,19 +80,9 @@ app.use(cors({
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-    // Serve static files from the React build
-    app.use(express.static(path.join(__dirname, 'build')));
-    
-    // Serve MP3 files from the mp3s directory
-    app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
-    
-    // Serve effects from the public directory
-    app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
-}
-
 // API Routes
+app.use('/api/quotes', quotesRouter);
+
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;
 
@@ -380,13 +371,30 @@ app.get('/mp3s/sizes', async (req, res) => {
     }
 });
 
-// Catch-all route to serve React app in production
+// Import routers
+const sessionsRouter = require('./server/routes/sessions');
+const notionRouter = require('./server/routes/notion');
+const filesRouter = require('./server/routes/files');
+
+// Mount API routers first
+app.use('/api/sessions', sessionsRouter);
+app.use('/api/notion', notionRouter);
+app.use('/api/files', filesRouter);
+
+// Serve static files in both development and production
+app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
+app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
+
+// Additional static files in production
 if (process.env.NODE_ENV === 'production') {
-    app.get('*', (req, res) => {
+    app.use(express.static(path.join(__dirname, 'build')));
+    
+    // Catch-all route for React app routes only (not API routes)
+    app.get(/^(?!\/(api|mp3s|effects)).*/, (req, res) => {
         res.sendFile(path.join(__dirname, 'build', 'index.html'));
     });
 }
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+    console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 });

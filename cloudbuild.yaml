@@ -10,6 +10,8 @@ steps:
       - 'gcr.io/$PROJECT_ID/react-app:$SHORT_SHA'
       - '--build-arg'
       - 'REACT_APP_API_URL=https://focus-music-app-368754647823.us-central1.run.app'
+      - '--build-arg'
+      - 'CACHE_BUST=$BUILD_ID'
       - '.'
 
   # Push both tags
@@ -33,6 +35,11 @@ steps:
           --update-env-vars=NODE_ENV=production \
           --service-account=harry-gillen-builder@appspot.gserviceaccount.com; then
           echo "Deployment successful!"
+          
+          # Verify the deployment
+          echo "Verifying deployment..."
+          sleep 30  # Wait for the new version to be ready
+          curl -s https://focus-music-app-368754647823.us-central1.run.app/api/health || echo "Health check failed"
         else
           echo "Deployment failed. Checking service account and permissions..."
           gcloud projects get-iam-policy $PROJECT_ID \
@@ -41,7 +48,7 @@ steps:
           exit 1
         fi
 
-  # Cleanup old images (simplified)
+  # Cleanup old images
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:

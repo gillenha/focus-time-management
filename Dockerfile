@@ -2,6 +2,10 @@
 FROM node:18 AS build
 WORKDIR /app
 
+# Add cache busting
+ARG CACHE_BUST=1
+ARG REACT_APP_API_URL
+
 # Copy package files first for better caching
 COPY package*.json ./
 RUN npm install
@@ -9,12 +13,8 @@ RUN npm install
 # Copy source files
 COPY . .
 
-# Set production environment
-ENV NODE_ENV=production
-ENV REACT_APP_API_URL=https://focus-music-app-368754647823.us-central1.run.app
-
 # Build the app
-RUN npm run build
+RUN REACT_APP_API_URL=$REACT_APP_API_URL npm run build
 
 # Step 2: Set up Node.js server with the React Build
 FROM node:18
@@ -27,8 +27,10 @@ RUN npm install --production
 # Copy built files and server
 COPY --from=build /app/build ./build
 COPY server.js .
+COPY server ./server
 COPY utils ./utils
 COPY public ./public
+COPY mp3s ./mp3s
 
 # Set production environment variables
 ENV NODE_ENV=production

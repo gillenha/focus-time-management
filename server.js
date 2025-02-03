@@ -8,6 +8,8 @@ const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 const multer = require('multer');
 const { format } = require('util');
+const connectDB = require('./server/config/db');
+const quoteController = require('./server/controllers/quoteController');
 
 // Initialize Google Cloud Storage in production
 let storage;
@@ -20,6 +22,9 @@ if (process.env.NODE_ENV === 'production') {
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Connect to MongoDB
+connectDB();
 
 // Configure multer for file handling
 const multerStorage = multer.memoryStorage();
@@ -337,135 +342,9 @@ app.delete('/mp3s/:filename', async (req, res) => {
 });
 
 // Quotes endpoints
-app.get('/api/quotes', async (req, res) => {
-    try {
-        if (process.env.NODE_ENV === 'production') {
-            // In production, read from Google Cloud Storage
-            const file = bucket.file('data/quotes.json');
-            const exists = await file.exists();
-            
-            if (!exists[0]) {
-                // If file doesn't exist, create it with default quotes
-                const defaultQuotes = require(path.join(__dirname, 'utils', 'defaultQuotes'));
-                await file.save(JSON.stringify({ quotes: defaultQuotes }), {
-                    contentType: 'application/json',
-                });
-                return res.json({ quotes: defaultQuotes });
-            }
-
-            const [content] = await file.download();
-            const data = JSON.parse(content.toString());
-            res.json(data);
-        } else {
-            // In development, read from local file
-            const quotesPath = path.join(__dirname, 'quotes.json');
-            if (!fs.existsSync(quotesPath)) {
-                const defaultQuotes = require(path.join(__dirname, 'utils', 'defaultQuotes'));
-                fs.writeFileSync(quotesPath, JSON.stringify({ quotes: defaultQuotes }));
-                return res.json({ quotes: defaultQuotes });
-            }
-            const data = JSON.parse(fs.readFileSync(quotesPath, 'utf8'));
-            res.json(data);
-        }
-    } catch (error) {
-        console.error('Error fetching quotes:', error);
-        res.status(500).json({ error: 'Failed to fetch quotes' });
-    }
-});
-
-app.post('/api/quotes', async (req, res) => {
-    const { quote } = req.body;
-    if (!quote) {
-        return res.status(400).json({ error: 'Quote is required' });
-    }
-
-    try {
-        if (process.env.NODE_ENV === 'production') {
-            // In production, update Google Cloud Storage
-            const file = bucket.file('data/quotes.json');
-            const [exists] = await file.exists();
-            let quotes = [];
-            
-            if (exists) {
-                const [content] = await file.download();
-                const data = JSON.parse(content.toString());
-                quotes = data.quotes || [];
-            }
-
-            quotes.push(quote);
-            await file.save(JSON.stringify({ quotes }), {
-                contentType: 'application/json',
-            });
-            res.json({ quotes });
-        } else {
-            // In development, update local file
-            const quotesPath = path.join(__dirname, 'quotes.json');
-            let quotes = [];
-            
-            if (fs.existsSync(quotesPath)) {
-                const data = JSON.parse(fs.readFileSync(quotesPath, 'utf8'));
-                quotes = data.quotes || [];
-            }
-
-            quotes.push(quote);
-            fs.writeFileSync(quotesPath, JSON.stringify({ quotes }));
-            res.json({ quotes });
-        }
-    } catch (error) {
-        console.error('Error adding quote:', error);
-        res.status(500).json({ error: 'Failed to add quote' });
-    }
-});
-
-app.delete('/api/quotes/:index', async (req, res) => {
-    const index = parseInt(req.params.index);
-    
-    try {
-        if (process.env.NODE_ENV === 'production') {
-            // In production, update Google Cloud Storage
-            const file = bucket.file('data/quotes.json');
-            const [exists] = await file.exists();
-            
-            if (!exists) {
-                return res.status(404).json({ error: 'Quotes file not found' });
-            }
-
-            const [content] = await file.download();
-            const data = JSON.parse(content.toString());
-            const quotes = data.quotes || [];
-
-            if (index < 0 || index >= quotes.length) {
-                return res.status(400).json({ error: 'Invalid quote index' });
-            }
-
-            quotes.splice(index, 1);
-            await file.save(JSON.stringify({ quotes }), {
-                contentType: 'application/json',
-            });
-            res.json({ quotes });
-        } else {
-            // In development, update local file
-            const quotesPath = path.join(__dirname, 'quotes.json');
-            if (!fs.existsSync(quotesPath)) {
-                return res.status(404).json({ error: 'Quotes file not found' });
-            }
-
-            const data = JSON.parse(fs.readFileSync(quotesPath, 'utf8'));
-            const quotes = data.quotes || [];
-
-            if (index < 0 || index >= quotes.length) {
-                return res.status(400).json({ error: 'Invalid quote index' });
-            }
-
-            quotes.splice(index, 1);
-            fs.writeFileSync(quotesPath, JSON.stringify({ quotes }));
-            res.json({ quotes });
-        }
-    } catch (error) {
-        console.error('Error deleting quote:', error);
-        res.status(500).json({ error: 'Failed to delete quote' });
-    }
-});
+app.get('/api/quotes', quoteController.getQuotes);
+app.post('/api/quotes', quoteController.addQuote);
+app.delete('/api/quotes/:id', quoteController.deleteQuote);
 
 // Add endpoint to get file sizes
 app.get('/mp3s/sizes', async (req, res) => {

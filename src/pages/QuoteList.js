@@ -31,7 +31,10 @@ const QuoteList = ({ onClose, isExiting }) => {
         if (!quoteText.trim()) return;
         
         try {
-            const formattedQuote = `"${quoteText.trim()}"${attribution.trim() ? ` - ${attribution.trim()}` : ''}`;
+            const formattedQuote = {
+                text: quoteText.trim(),
+                author: attribution.trim() || 'Unknown'
+            };
             const updatedQuotes = await addQuote(formattedQuote);
             setQuotes(updatedQuotes);
             setQuoteText('');
@@ -55,15 +58,15 @@ const QuoteList = ({ onClose, isExiting }) => {
     };
 
     return (
-        <div className={`tw-fixed tw-inset-0 tw-bg-white tw-z-50 ${isExiting ? 'slide-out' : 'slide-in'}`}>
-            <div className="tw-h-full tw-overflow-y-scroll">
+        <div className={`tw-fixed tw-inset-0 tw-bg-black/90 tw-backdrop-blur-lg tw-z-50 ${isExiting ? 'tw-animate-slideOut' : 'tw-animate-slideIn'}`}>
+            <div className="tw-h-full tw-overflow-y-scroll tw-text-white">
                 <div className="tw-p-6">
                     {/* Header with close button */}
                     <div className="tw-flex tw-items-center tw-justify-between tw-mb-6">
                         <div className="tw-flex tw-items-center">
                             <button 
                                 onClick={onClose}
-                                className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-gray-500 tw-cursor-pointer"
+                                className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-white/70 hover:tw-text-white tw-cursor-pointer tw-transition-colors"
                             >
                                 <svg 
                                     xmlns="http://www.w3.org/2000/svg" 
@@ -80,42 +83,42 @@ const QuoteList = ({ onClose, isExiting }) => {
                                     <path d="M19 12H5M12 19l-7-7 7-7"/>
                                 </svg>
                             </button>
-                            <h2 className="tw-text-xl tw-font-bold tw-text-gray-800">Quote List</h2>
+                            <h2 className="tw-text-xl tw-font-bold tw-text-white">Quote List</h2>
                         </div>
                     </div>
 
                     {/* Quote Management Section */}
                     <div className="tw-space-y-6">
                         <div>
-                            <h3 className="tw-text-lg tw-font-semibold tw-mb-4">Focus Quotes</h3>
+                            <h3 className="tw-text-lg tw-font-semibold tw-mb-4 tw-text-white/90">Focus Quotes</h3>
                             
                             {/* Add New Quote Form */}
                             <div className="tw-max-w-sm tw-mx-auto">
                                 <form onSubmit={handleAddQuote} className="tw-mb-8">
                                     <div className="tw-flex tw-flex-col tw-space-y-4">
                                         <div className="tw-flex tw-flex-col tw-space-y-1">
-                                            <label className="tw-text-sm tw-font-medium tw-text-gray-700">Quote Text</label>
+                                            <label className="tw-text-sm tw-font-medium tw-text-white/80">Quote Text</label>
                                             <textarea
                                                 value={quoteText}
                                                 onChange={(e) => setQuoteText(e.target.value)}
                                                 placeholder="Enter an inspiring focus quote..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-3 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 tw-resize-none tw-overflow-y-auto tw-h-32"
+                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-white/10 tw-bg-white/5 tw-px-4 tw-py-3 tw-text-white tw-shadow-sm tw-transition-all hover:tw-border-white/20 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 tw-resize-none tw-overflow-y-auto tw-h-32 placeholder:tw-text-white/30"
                                             />
                                         </div>
                                         <div className="tw-flex tw-flex-col tw-space-y-1">
-                                            <label className="tw-text-sm tw-font-medium tw-text-gray-700">Attribution (Optional)</label>
+                                            <label className="tw-text-sm tw-font-medium tw-text-white/80">Attribution (Optional)</label>
                                             <input
                                                 type="text"
                                                 value={attribution}
                                                 onChange={(e) => setAttribution(e.target.value)}
                                                 placeholder="Enter the quote's author..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-200 tw-bg-white tw-px-4 tw-py-3 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-300 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500"
+                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-white/10 tw-bg-white/5 tw-px-4 tw-py-3 tw-text-white tw-shadow-sm tw-transition-all hover:tw-border-white/20 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 placeholder:tw-text-white/30"
                                             />
                                         </div>
                                         <div>
                                             <button
                                                 type="submit"
-                                                className="btn-primary"
+                                                className="tw-w-full tw-px-4 tw-py-2 tw-bg-blue-500 tw-text-white tw-rounded-lg hover:tw-bg-blue-600 tw-transition-colors tw-duration-200"
                                             >
                                                 Add Quote
                                             </button>
@@ -127,7 +130,7 @@ const QuoteList = ({ onClose, isExiting }) => {
                                 <div className="tw-mb-4 tw-flex tw-justify-center">
                                     <button
                                         onClick={() => setShowQuotes(!showQuotes)}
-                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-gray-800 hover:tw-text-gray-900 tw-cursor-pointer tw-transition-colors tw-bg-transparent tw-border-0 tw-appearance-none"
+                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-white/90 hover:tw-text-white tw-cursor-pointer tw-transition-colors tw-bg-transparent tw-border-0 tw-appearance-none"
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -149,19 +152,24 @@ const QuoteList = ({ onClose, isExiting }) => {
                                             <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-blue-500 tw-border-t-transparent"></div>
                                         </div>
                                     ) : quotes.length === 0 ? (
-                                        <p className="tw-text-center tw-text-gray-500 tw-italic tw-py-8">No quotes available.</p>
+                                        <p className="tw-text-center tw-text-white/50 tw-italic tw-py-8">No quotes available.</p>
                                     ) : (
                                         quotes.map((quote, index) => (
                                             <div 
                                                 key={index} 
-                                                className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto"
+                                                className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto tw-bg-white/5 tw-rounded-lg hover:tw-bg-white/10"
                                             >
-                                                <p className="tw-text-gray-700 tw-text-base tw-leading-relaxed tw-break-words">{quote}</p>
+                                                <p className="tw-text-white/90 tw-text-base tw-leading-relaxed tw-break-words">
+                                                    "{quote.text}"
+                                                    {quote.author && quote.author !== 'Unknown' && (
+                                                        <span className="tw-text-white/70 tw-ml-1">- {quote.author}</span>
+                                                    )}
+                                                </p>
                                                 <button
-                                                    onClick={() => handleRemoveQuote(index)}
-                                                    className="tw-absolute tw-top-3 tw-right-3 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-rounded-full hover:tw-bg-red-50 tw-p-1.5 tw-cursor-pointer"
+                                                    onClick={() => handleRemoveQuote(quote._id)}
+                                                    className="tw-absolute tw-top-3 tw-right-3 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-rounded-full hover:tw-bg-red-500/20 tw-p-1.5 tw-cursor-pointer"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-3.5 tw-w-3.5 tw-text-gray-400 hover:tw-text-red-500 tw-transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-3.5 tw-w-3.5 tw-text-white/70 hover:tw-text-red-500 tw-transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                                     </svg>
                                                 </button>

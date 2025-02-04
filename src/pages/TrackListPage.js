@@ -120,7 +120,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 setUploadStatus(`Uploading chunk ${chunkIndex + 1} of ${totalChunks}`);
 
                 const formData = new FormData();
-                formData.append('chunk', chunk, 'chunk');
+                formData.append('chunk', chunk, `chunk-${chunkIndex}.mp3`);
                 formData.append('uploadId', uploadId);
                 formData.append('chunkIndex', chunkIndex.toString());
                 formData.append('totalChunks', totalChunks.toString());

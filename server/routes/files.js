@@ -25,6 +25,11 @@ const multerStorage = multer.diskStorage({
 const upload = multer({
     storage: multerStorage,
     fileFilter: (req, file, cb) => {
+        // For chunk uploads, accept any file
+        if (req.path === '/upload-chunk') {
+            return cb(null, true);
+        }
+        // For regular uploads, check for .mp3 extension
         if (!file.originalname.toLowerCase().endsWith('.mp3')) {
             return cb(new Error('Only .mp3 files are allowed'));
         }
@@ -193,27 +198,53 @@ router.post('/get-signed-url', ensureStorageInitialized, async (req, res) => {
     }
 });
 
-// Finalize upload (just update metadata)
+// Finalize upload
 router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
     try {
-        const { fileName, size } = req.body;
+        const { uploadId, fileName, totalChunks } = req.body;
+        const metadata = uploads.get(uploadId);
+        
+        if (!metadata) {
+            throw new Error('Upload session not found');
+        }
+
+        if (metadata.receivedChunks !== totalChunks) {
+            throw new Error(`Missing chunks. Received ${metadata.receivedChunks} of ${totalChunks}`);
+        }
+
         const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
         const blobPath = `${targetFolder}/${fileName}`;
-        
-        // Update metadata
-        await bucket.file(blobPath).setMetadata({
-            contentType: 'audio/mpeg',
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
             metadata: {
-                uploadedAt: new Date().toISOString(),
-                size: size.toString()
+                contentType: 'audio/mpeg'
             }
         });
-        
+
+        // Combine chunks and stream to GCS
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkPath = path.join(metadata.tempDir, `chunk-${i}`);
+            const chunkData = fs.readFileSync(chunkPath);
+            blobStream.write(chunkData);
+        }
+
+        // End the stream and wait for upload to complete
+        await new Promise((resolve, reject) => {
+            blobStream.end();
+            blobStream.on('finish', resolve);
+            blobStream.on('error', reject);
+        });
+
+        // Clean up temp directory
+        fs.rmSync(metadata.tempDir, { recursive: true, force: true });
+        uploads.delete(uploadId);
+
         res.json({
             message: 'Upload finalized successfully',
             file: {
                 name: blobPath,
-                size: size
+                size: metadata.fileSize
             }
         });
     } catch (error) {
@@ -346,6 +377,79 @@ router.post('/init-upload', ensureStorageInitialized, async (req, res) => {
     } catch (error) {
         console.error('Upload initialization error:', error);
         res.status(500).json({ error: 'Failed to initialize upload' });
+    }
+});
+
+// Upload chunk
+router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
+    try {
+        console.log('Received chunk upload request:', {
+            body: req.body,
+            file: req.file ? {
+                originalname: req.file.originalname,
+                size: req.file.size,
+                path: req.file.path
+            } : 'No file'
+        });
+
+        const { uploadId, chunkIndex } = req.body;
+        if (!uploadId || chunkIndex === undefined) {
+            throw new Error(`Missing required fields. Got uploadId: ${uploadId}, chunkIndex: ${chunkIndex}`);
+        }
+
+        const metadata = uploads.get(uploadId);
+        console.log('Found upload metadata:', metadata);
+        
+        if (!metadata) {
+            throw new Error(`Upload session not found for ID: ${uploadId}`);
+        }
+
+        if (!req.file) {
+            throw new Error('No chunk file received');
+        }
+
+        // Ensure temp directory exists
+        if (!fs.existsSync(metadata.tempDir)) {
+            console.log('Creating temp directory:', metadata.tempDir);
+            fs.mkdirSync(metadata.tempDir, { recursive: true });
+        }
+
+        // Save chunk to temp directory
+        const chunkPath = path.join(metadata.tempDir, `chunk-${chunkIndex}`);
+        console.log('Moving chunk to:', chunkPath);
+        fs.renameSync(req.file.path, chunkPath);
+        
+        // Update received chunks count
+        metadata.receivedChunks++;
+        uploads.set(uploadId, metadata);
+        
+        console.log('Chunk processed successfully:', {
+            uploadId,
+            chunkIndex,
+            receivedChunks: metadata.receivedChunks,
+            totalChunks: metadata.totalChunks
+        });
+
+        res.json({ 
+            message: 'Chunk received',
+            progress: (metadata.receivedChunks / metadata.totalChunks) * 100
+        });
+    } catch (error) {
+        // Clean up temp file on error
+        if (req.file) {
+            console.error('Cleaning up temp file:', req.file.path);
+            fs.unlink(req.file.path, () => {});
+        }
+        console.error('Chunk upload error:', {
+            error: error.message,
+            stack: error.stack,
+            body: req.body,
+            file: req.file
+        });
+        res.status(500).json({ 
+            error: 'Failed to upload chunk',
+            details: error.message
+        });
     }
 });
 

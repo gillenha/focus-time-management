@@ -165,169 +165,59 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
     }
 });
 
-// Get signed URL for chunked upload
-router.post('/get-upload-url', ensureStorageInitialized, async (req, res) => {
+// Get signed URL for direct upload
+router.post('/get-signed-url', ensureStorageInitialized, async (req, res) => {
     try {
-        const { fileName } = req.body;
+        const { fileName, contentType } = req.body;
         const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const fullPath = `${targetFolder}/${fileName}`;
+        const blobPath = `${targetFolder}/${fileName}`;
+        
+        const file = bucket.file(blobPath);
+        
+        // Generate signed URL for direct upload
+        const [response] = await file.generateSignedPostPolicyV4({
+            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+            conditions: [
+                ['content-length-range', 0, 500 * 1024 * 1024], // up to 500MB
+                ['eq', '$Content-Type', contentType],
+            ],
+            fields: {
+                'Content-Type': contentType,
+            },
+        });
 
-        if (process.env.NODE_ENV === 'production') {
-            const file = bucket.file(fullPath);
-            
-            // Generate signed URL with resumable upload support
-            const [signedUrl] = await file.getSignedUrl({
-                version: 'v4',
-                action: 'write',
-                expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-                contentType: 'audio/mpeg',
-                queryParameters: { uploadType: 'resumable' }
-            });
-
-            res.json({ signedUrl });
-        } else {
-            // For development, create temporary file path
-            const mp3sDir = path.join(process.cwd(), 'mp3s');
-            if (!fs.existsSync(mp3sDir)) {
-                fs.mkdirSync(mp3sDir, { recursive: true });
-            }
-            
-            const baseUrl = 'http://localhost:8080/api/files';
-            res.json({ 
-                signedUrl: `${baseUrl}/upload-chunk/${fileName}`
-            });
-        }
+        res.json(response);
     } catch (error) {
         console.error('Error generating signed URL:', error);
         res.status(500).json({ error: 'Failed to generate signed URL' });
     }
 });
 
-// Handle chunk upload
-router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
-    try {
-        console.log('Received chunk upload request:', {
-            body: req.body,
-            file: req.file ? {
-                originalname: req.file.originalname,
-                size: req.file.size,
-                path: req.file.path
-            } : null
-        });
-
-        const uploadId = req.body.uploadId;
-        const chunkIndex = parseInt(req.body.chunkIndex);
-
-        if (!uploadId || isNaN(chunkIndex)) {
-            throw new Error(`Invalid parameters: uploadId=${uploadId}, chunkIndex=${chunkIndex}`);
-        }
-
-        const uploadData = uploads.get(uploadId);
-        console.log('Found upload data:', uploadData);
-        
-        if (!uploadData) {
-            throw new Error(`Upload not found for ID: ${uploadId}`);
-        }
-        
-        if (!req.file) {
-            throw new Error('No chunk file received');
-        }
-        
-        // Create chunk directory if it doesn't exist
-        if (!fs.existsSync(uploadData.tempDir)) {
-            fs.mkdirSync(uploadData.tempDir, { recursive: true });
-        }
-        
-        // Move chunk to temp directory
-        const chunkPath = path.join(uploadData.tempDir, `chunk-${chunkIndex}`);
-        console.log('Moving chunk to:', chunkPath);
-        
-        fs.renameSync(req.file.path, chunkPath);
-        
-        // Update received chunks count
-        uploadData.receivedChunks++;
-        uploads.set(uploadId, uploadData);
-        
-        console.log('Successfully processed chunk:', {
-            uploadId,
-            chunkIndex,
-            receivedChunks: uploadData.receivedChunks,
-            totalChunks: uploadData.totalChunks
-        });
-        
-        res.json({ 
-            message: 'Chunk received',
-            progress: {
-                received: uploadData.receivedChunks,
-                total: uploadData.totalChunks
-            }
-        });
-    } catch (error) {
-        console.error('Chunk upload error:', error);
-        // Clean up temp file if it exists
-        if (req.file && req.file.path) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (cleanupError) {
-                console.error('Failed to clean up temp file:', cleanupError);
-            }
-        }
-        res.status(500).json({ 
-            error: 'Failed to process chunk',
-            details: error.message
-        });
-    }
-});
-
-// Finalize upload
+// Finalize upload (just update metadata)
 router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
     try {
-        const { uploadId, fileName } = req.body;
-        const uploadData = uploads.get(uploadId);
-        
-        if (!uploadData) {
-            throw new Error('Upload not found');
-        }
-        
-        if (uploadData.receivedChunks !== uploadData.totalChunks) {
-            throw new Error('Not all chunks received');
-        }
-        
-        // Combine chunks
+        const { fileName, size } = req.body;
         const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
         const blobPath = `${targetFolder}/${fileName}`;
-        const blob = bucket.file(blobPath);
-        const blobStream = blob.createWriteStream({
-            resumable: false,
+        
+        // Update metadata
+        await bucket.file(blobPath).setMetadata({
+            contentType: 'audio/mpeg',
             metadata: {
-                contentType: 'audio/mpeg'
+                uploadedAt: new Date().toISOString(),
+                size: size.toString()
             }
         });
         
-        // Process chunks in order
-        for (let i = 0; i < uploadData.totalChunks; i++) {
-            const chunkPath = path.join(uploadData.tempDir, `chunk-${i}`);
-            await new Promise((resolve, reject) => {
-                fs.createReadStream(chunkPath)
-                    .pipe(blobStream)
-                    .on('error', reject)
-                    .on('finish', resolve);
-            });
-        }
-        
-        // Clean up
-        fs.rmSync(uploadData.tempDir, { recursive: true, force: true });
-        uploads.delete(uploadId);
-        
         res.json({
-            message: 'Upload completed successfully',
+            message: 'Upload finalized successfully',
             file: {
                 name: blobPath,
-                size: uploadData.fileSize
+                size: size
             }
         });
     } catch (error) {
-        console.error('Finalize upload error:', error);
+        console.error('Finalize error:', error);
         res.status(500).json({ error: 'Failed to finalize upload' });
     }
 });

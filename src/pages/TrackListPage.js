@@ -85,64 +85,50 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     continue;
                 }
 
-                // Get the total number of chunks
-                const CHUNK_SIZE = 30 * 1024 * 1024; // 30MB chunks
-                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-                let uploadedChunks = 0;
-
-                // Initialize the upload
-                const initResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/init-upload`, {
+                // Get signed URL for direct upload
+                const signedUrlResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/get-signed-url`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         fileName: file.name,
-                        fileSize: file.size,
-                        totalChunks
+                        contentType: file.type
                     })
                 });
 
-                if (!initResponse.ok) {
-                    throw new Error('Failed to initialize upload');
+                if (!signedUrlResponse.ok) {
+                    throw new Error('Failed to get upload URL');
                 }
 
-                const { uploadId } = await initResponse.json();
+                const { url, fields } = await signedUrlResponse.json();
 
-                // Upload chunks
-                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                    const start = chunkIndex * CHUNK_SIZE;
-                    const end = Math.min(start + CHUNK_SIZE, file.size);
-                    const chunk = file.slice(start, end);
+                // Create form data with signed URL fields
+                const formData = new FormData();
+                Object.entries(fields).forEach(([key, value]) => {
+                    formData.append(key, value);
+                });
+                formData.append('file', file);
 
-                    const formData = new FormData();
-                    formData.append('chunk', chunk);
-                    formData.append('uploadId', uploadId);
-                    formData.append('chunkIndex', chunkIndex);
+                // Upload directly to GCS
+                const uploadResponse = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
 
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload-chunk`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Failed to upload chunk ${chunkIndex}`);
-                    }
-
-                    uploadedChunks++;
-                    const progress = (uploadedChunks / totalChunks) * 100;
-                    setUploadProgress(progress);
+                if (!uploadResponse.ok) {
+                    throw new Error('Failed to upload to storage');
                 }
 
-                // Finalize the upload
+                // Notify server that upload is complete
                 const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        uploadId,
-                        fileName: file.name
+                        fileName: file.name,
+                        size: file.size
                     })
                 });
 
@@ -151,6 +137,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 }
 
                 setTotalStorageSize(prev => prev + file.size);
+                setUploadProgress(100);
                 console.log('Upload completed successfully');
             }
             

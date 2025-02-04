@@ -88,35 +88,74 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         setUploadProgress(0);
 
         try {
-            // Create FormData
-            const formData = new FormData();
-            formData.append('file', selectedFile);
+            const CHUNK_SIZE = 25 * 1024 * 1024; // 25MB chunks (to be safe under 32MB limit)
+            const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+            let uploadedChunks = 0;
 
-            // Use XMLHttpRequest for progress tracking
-            const xhr = new XMLHttpRequest();
-            
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const progress = (event.loaded / event.total) * 100;
-                    setUploadProgress(progress);
-                    setUploadStatus(`Uploading: ${Math.round(progress)}%`);
-                }
-            };
-
-            // Wrap XHR in a promise
-            await new Promise((resolve, reject) => {
-                xhr.onload = () => {
-                    if (xhr.status === 200) {
-                        resolve(xhr.response);
-                    } else {
-                        reject(new Error('Upload failed'));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('Upload failed'));
-                
-                xhr.open('POST', `${process.env.REACT_APP_API_URL}/api/files/upload`);
-                xhr.send(formData);
+            // Initialize upload session
+            const initResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/init-upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileName: selectedFile.name,
+                    fileSize: selectedFile.size,
+                    totalChunks
+                })
             });
+
+            if (!initResponse.ok) {
+                throw new Error('Failed to initialize upload');
+            }
+
+            const { uploadId } = await initResponse.json();
+            
+            // Upload chunks
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, selectedFile.size);
+                const chunk = selectedFile.slice(start, end);
+                
+                setUploadStatus(`Uploading chunk ${chunkIndex + 1} of ${totalChunks}`);
+
+                const formData = new FormData();
+                formData.append('chunk', chunk, 'chunk');
+                formData.append('uploadId', uploadId);
+                formData.append('chunkIndex', chunkIndex.toString());
+                formData.append('totalChunks', totalChunks.toString());
+
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload-chunk`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to upload chunk ${chunkIndex + 1}`);
+                }
+
+                uploadedChunks++;
+                const progress = (uploadedChunks / totalChunks) * 100;
+                setUploadProgress(progress);
+            }
+
+            // Finalize upload
+            setUploadStatus('Finalizing upload...');
+            const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    uploadId,
+                    fileName: selectedFile.name,
+                    totalChunks
+                })
+            });
+
+            if (!finalizeResponse.ok) {
+                throw new Error('Failed to finalize upload');
+            }
 
             setUploadStatus('Upload complete!');
             setTotalStorageSize(prev => prev + selectedFile.size);
@@ -128,7 +167,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         } finally {
             setSelectedFile(null);
             setIsUploading(false);
-            // Reset the file input by getting it by ID
+            // Reset the file input
             const fileInput = document.getElementById('file-select');
             if (fileInput) {
                 fileInput.value = '';

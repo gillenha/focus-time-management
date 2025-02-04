@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const fs = require('fs').promises;
+const Session = require('../models/Session');
 
 // Helper function to format duration
 function formatDuration(duration) {
@@ -17,6 +16,17 @@ function formatDuration(duration) {
         return duration;
     }
 }
+
+// Get all sessions
+router.get('/', async (req, res) => {
+    try {
+        const sessions = await Session.find().sort({ date: -1 });
+        res.json(sessions);
+    } catch (err) {
+        console.error('Error fetching sessions:', err);
+        res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+});
 
 // Freeflow route
 router.put('/freeflow', (req, res) => {
@@ -50,25 +60,26 @@ router.post('/log', async (req, res) => {
     sessionDetails.text = sessionDetails.text || '';
     sessionDetails.duration = formatDuration(sessionDetails.duration);
 
-    const sessionsFilePath = path.join(process.cwd(), 'sessions.json');
-    
     try {
-        let sessions = [];
-        try {
-            const fileContent = await fs.readFile(sessionsFilePath, 'utf8');
-            sessions = JSON.parse(fileContent);
-        } catch (err) {
-            if (err.code !== 'ENOENT') throw err;
-        }
+        const session = new Session(sessionDetails);
+        await session.save();
 
-        sessions.push(sessionDetails);
-        await fs.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2));
-
-        console.log('Session logged:', sessionDetails);
-        res.status(200).json({ message: 'Session details logged successfully', sessionDetails });
+        console.log('Session logged:', session);
+        res.status(200).json({ message: 'Session details logged successfully', session });
     } catch (err) {
         console.error('Error logging session:', err);
         res.status(500).json({ error: 'Failed to log session details' });
+    }
+});
+
+// Clear all sessions
+router.delete('/clear', async (req, res) => {
+    try {
+        await Session.deleteMany({});
+        res.status(200).json({ message: 'All sessions cleared successfully' });
+    } catch (err) {
+        console.error('Error clearing sessions:', err);
+        res.status(500).json({ error: 'Failed to clear sessions' });
     }
 });
 

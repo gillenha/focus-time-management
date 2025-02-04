@@ -13,6 +13,7 @@ const connectDB = require('./server/config/db');
 const quoteController = require('./server/controllers/quoteController');
 const quotesRouter = require('./server/routes/quotes');
 const filesRouter = require('./server/routes/files');
+const sessionsRouter = require('./server/routes/sessions');
 
 // Initialize Google Cloud Storage in production
 let storage;
@@ -105,6 +106,7 @@ app.use(bodyParser.json({ limit: '10kb' }));
 // API Routes
 app.use('/api/quotes', quotesRouter);
 app.use('/', filesRouter);
+app.use('/api/sessions', sessionsRouter);
 
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;
@@ -395,11 +397,9 @@ app.get('/mp3s/sizes', async (req, res) => {
 });
 
 // Import routers
-const sessionsRouter = require('./server/routes/sessions');
 const notionRouter = require('./server/routes/notion');
 
 // Mount API routers first
-app.use('/api/sessions', sessionsRouter);
 app.use('/api/notion', notionRouter);
 
 // Serve static files in both development and production

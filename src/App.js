@@ -198,7 +198,7 @@ function App() {
     fetchBackgroundImage(unsplashTheme, false);
   }, [unsplashTheme]);
 
-  const handleFreeFlowClick = () => {
+  const handleFreeFlowClick = async () => {
     if (isFreeflow) {
       console.log("Freeflow ended");
 
@@ -210,14 +210,52 @@ function App() {
 
       const now = new Date();
       const newSession = {
-        date: now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        date: now.toISOString(), // Send ISO string for MongoDB date
         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
         duration: formatDuration(time),
         text: currentSessionText
       };
-      const updatedHistory = [...sessionHistory, newSession];
-      setSessionHistory(updatedHistory);
-      localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+
+      try {
+        // Save to MongoDB
+        console.log('Attempting to save session to MongoDB:', newSession);
+        console.log('API URL:', `${process.env.REACT_APP_API_URL}/api/sessions/log`);
+        
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions/log`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newSession),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Server response:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData
+          });
+          throw new Error(`Failed to save session to MongoDB: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('Session saved to MongoDB:', result);
+
+        // Update local state and storage
+        const updatedHistory = [...sessionHistory, newSession];
+        setSessionHistory(updatedHistory);
+        localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+      } catch (error) {
+        console.error('Error saving session to MongoDB:', {
+          message: error.message,
+          stack: error.stack
+        });
+        // Still update local storage even if MongoDB save fails
+        const updatedHistory = [...sessionHistory, newSession];
+        setSessionHistory(updatedHistory);
+        localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+      }
       
       // First set freeflow to false to trigger fade out animation
       setIsFreeflow(false);

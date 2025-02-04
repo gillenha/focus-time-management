@@ -1,10 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
+const SessionHistory = ({ onClose }) => {
+    const [sessionHistory, setSessionHistory] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
     const [editText, setEditText] = useState('');
+
+    useEffect(() => {
+        fetchSessions();
+    }, []);
+
+    const fetchSessions = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/sessions`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch sessions');
+            }
+            const data = await response.json();
+            setSessionHistory(data);
+        } catch (error) {
+            console.error('Error fetching sessions:', error);
+        }
+    };
 
     const formatDuration = (duration) => {
         const [minutes, seconds] = duration.split(':').map(Number);
@@ -20,13 +38,12 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
         }
     };
 
-    const sendToServer = async (session) => {
+    const logSession = async (session) => {
         try {
             console.log('API_BASE_URL:', API_BASE_URL);
             console.log('Session data being sent:', JSON.stringify(session, null, 2));
 
-            // Send to your existing server
-            const serverResponse = await fetch(`${API_BASE_URL}/api/log-session`, {
+            const response = await fetch(`${API_BASE_URL}/api/sessions/log`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -34,62 +51,34 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
                 body: JSON.stringify(session),
             });
             
-            if (!serverResponse.ok) {
-                const errorData = await serverResponse.json();
+            if (!response.ok) {
+                const errorData = await response.json();
                 console.error('Server error response:', errorData);
-                throw new Error(`Failed to log session to server: ${JSON.stringify(errorData)}`);
+                throw new Error(`Failed to log session: ${JSON.stringify(errorData)}`);
             }
 
-            // Send to Notion
-            const notionResponse = await fetch(`${API_BASE_URL}/api/notion-log`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    properties: {
-                        Date: {
-                            type: "date",
-                            date: {
-                                start: new Date().toISOString()
-                            }
-                        },
-                        Time: {
-                            type: "rich_text",
-                            rich_text: [{
-                                type: "text",
-                                text: { content: session.time }
-                            }]
-                        },
-                        Duration: {
-                            type: "rich_text",
-                            rich_text: [{
-                                type: "text",
-                                text: { content: session.duration }
-                            }]
-                        },
-                        Notes: {
-                            type: "rich_text",
-                            rich_text: [{
-                                type: "text",
-                                text: { content: session.text }
-                            }]
-                        }
-                    }
-                }),
-            });
-
-            if (!notionResponse.ok) {
-                const notionError = await notionResponse.json();
-                console.error('Notion error details:', notionError);
-                throw new Error(`Failed to log session to Notion: ${JSON.stringify(notionError)}`);
-            }
-
-            const result = await serverResponse.json();
+            const result = await response.json();
             console.log('Server response:', result);
+            await fetchSessions(); // Refresh the sessions list
 
         } catch (error) {
             console.error('Error logging session:', error);
+        }
+    };
+
+    const clearHistory = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/sessions/clear`, {
+                method: 'DELETE',
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to clear sessions');
+            }
+            
+            setSessionHistory([]);
+        } catch (error) {
+            console.error('Error clearing sessions:', error);
         }
     };
 
@@ -99,13 +88,12 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
     };
 
     const saveEdit = (index) => {
-        // Here you would typically update the sessionHistory state in the parent component
         console.log(`Saving edit for session ${index}: ${editText}`);
         setEditingIndex(null);
     };
 
     return (
-            <div className="tw-fixed tw-inset-0 tw-bg-white tw-z-50">
+        <div className="tw-fixed tw-inset-0 tw-bg-white tw-z-50">
             <div className="tw-h-full tw-overflow-y-auto">
                 <div className="tw-p-6">
                     {/* Header */}
@@ -135,51 +123,50 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
                     {/* Session List */}
                     <div className="tw-mb-20">
                         <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
-                            {sessionHistory.slice().reverse().map((session, index) => {
-                                const reverseIndex = sessionHistory.length - 1 - index;
-                                return (
-                                    <li key={`session-${reverseIndex}`} 
-                                        onClick={() => console.log('Session clicked:', session)}
-                                        className="tw-bg-gray-50 tw-rounded-lg tw-p-4 tw-cursor-pointer hover:tw-bg-gray-100"
-                                    >
-                                        <div className="tw-flex tw-gap-8">
-                                            {/* Left Column - Date, Time, Duration */}
-                                            <div className="tw-space-y-2">
-                                                <div className="tw-flex tw-items-center">
-                                                    <span className="tw-text-sm tw-text-gray-500">Date: </span>
-                                                    <span className="tw-font-medium tw-ml-1">{session.date}</span>
-                                                </div>
-                                                <div className="tw-flex tw-items-center">
-                                                    <span className="tw-text-sm tw-text-gray-500">Time: </span>
-                                                    <span className="tw-font-medium tw-ml-1">{session.time}</span>
-                                                </div>
-                                                <div className="tw-flex tw-items-center">
-                                                    <span className="tw-text-sm tw-text-gray-500">Duration: </span>
-                                                    <span className="tw-font-medium tw-ml-1">{formatDuration(session.duration)}</span>
-                                                </div>
+                            {sessionHistory.map((session, index) => (
+                                <li key={session._id} 
+                                    onClick={() => console.log('Session clicked:', session)}
+                                    className="tw-bg-gray-50 tw-rounded-lg tw-p-4 tw-cursor-pointer hover:tw-bg-gray-100"
+                                >
+                                    <div className="tw-flex tw-gap-8">
+                                        {/* Left Column - Date, Time, Duration */}
+                                        <div className="tw-space-y-2">
+                                            <div className="tw-flex tw-items-center">
+                                                <span className="tw-text-sm tw-text-gray-500">Date: </span>
+                                                <span className="tw-font-medium tw-ml-1">
+                                                    {new Date(session.date).toLocaleDateString()}
+                                                </span>
                                             </div>
-
-                                            {/* Right Column - Notes */}
-                                            <div className="tw-flex tw-flex-col tw-items-start">
-                                                <span className="tw-text-sm tw-text-gray-500">Notes: </span>
-                                                <span className="tw-font-medium tw-mt-1">{session.text}</span>
+                                            <div className="tw-flex tw-items-center">
+                                                <span className="tw-text-sm tw-text-gray-500">Time: </span>
+                                                <span className="tw-font-medium tw-ml-1">{session.time}</span>
+                                            </div>
+                                            <div className="tw-flex tw-items-center">
+                                                <span className="tw-text-sm tw-text-gray-500">Duration: </span>
+                                                <span className="tw-font-medium tw-ml-1">{formatDuration(session.duration)}</span>
                                             </div>
                                         </div>
 
-                                        <div className="tw-flex tw-gap-2 tw-mt-4">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    sendToServer(session);
-                                                }}
-                                                className="btn-secondary"
-                                            >
-                                                Log to Server
-                                            </button>
+                                        {/* Right Column - Notes */}
+                                        <div className="tw-flex tw-flex-col tw-items-start">
+                                            <span className="tw-text-sm tw-text-gray-500">Notes: </span>
+                                            <span className="tw-font-medium tw-mt-1">{session.text}</span>
                                         </div>
-                                    </li>
-                                );
-                            })}
+                                    </div>
+
+                                    <div className="tw-flex tw-gap-2 tw-mt-4">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                logSession(session);
+                                            }}
+                                            className="btn-secondary"
+                                        >
+                                            Save Session
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
                         </ul>
                     </div>
 
@@ -187,16 +174,10 @@ const SessionHistory = ({ sessionHistory, onClearHistory, onClose }) => {
                     <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-4 tw-border-t tw-border-gray-200">
                         <div className="tw-flex tw-justify-end tw-space-x-3">
                             <button
-                                onClick={onClearHistory}
+                                onClick={clearHistory}
                                 className="btn-danger"
                             >
                                 Clear History
-                            </button>
-                            <button
-                                onClick={() => console.log("Data sent to Notion")}
-                                className="btn-secondary"
-                            >
-                                Send to Notion
                             </button>
                         </div>
                     </div>

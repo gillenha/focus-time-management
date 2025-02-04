@@ -204,71 +204,131 @@ router.post('/get-upload-url', ensureStorageInitialized, async (req, res) => {
 });
 
 // Handle chunk upload
-router.put('/upload-chunk/:fileName', ensureStorageInitialized, async (req, res) => {
-    const fileName = req.params.fileName;
-    const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-    const fullPath = `${targetFolder}/${fileName}`;
-    
+router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
     try {
-        if (process.env.NODE_ENV === 'production') {
-            const file = bucket.file(fullPath);
-            const writeStream = file.createWriteStream({
-                resumable: true,
-                metadata: {
-                    contentType: 'audio/mpeg'
-                }
-            });
+        console.log('Received chunk upload request:', {
+            body: req.body,
+            file: req.file ? {
+                originalname: req.file.originalname,
+                size: req.file.size,
+                path: req.file.path
+            } : null
+        });
 
-            // Handle errors during upload
-            writeStream.on('error', (error) => {
-                console.error('Error uploading to GCS:', error);
-                res.status(500).json({ 
-                    error: 'Upload failed',
-                    details: error.message
-                });
-            });
+        const uploadId = req.body.uploadId;
+        const chunkIndex = parseInt(req.body.chunkIndex);
 
-            // Handle successful upload
-            writeStream.on('finish', () => {
-                res.status(200).json({ 
-                    message: 'Upload successful',
-                    file: fullPath
-                });
-            });
-
-            // Stream the request directly to GCS
-            req.pipe(writeStream);
-        } else {
-            // For development, save to local filesystem
-            const mp3sDir = path.join(process.cwd(), 'mp3s');
-            const filePath = path.join(mp3sDir, fileName);
-            
-            const writeStream = fs.createWriteStream(filePath);
-            
-            writeStream.on('error', (error) => {
-                console.error('Error saving file:', error);
-                res.status(500).json({ 
-                    error: 'Upload failed',
-                    details: error.message
-                });
-            });
-
-            writeStream.on('finish', () => {
-                res.status(200).json({ 
-                    message: 'Upload successful',
-                    file: fileName
-                });
-            });
-
-            // Stream the request to local file
-            req.pipe(writeStream);
+        if (!uploadId || isNaN(chunkIndex)) {
+            throw new Error(`Invalid parameters: uploadId=${uploadId}, chunkIndex=${chunkIndex}`);
         }
+
+        const uploadData = uploads.get(uploadId);
+        console.log('Found upload data:', uploadData);
+        
+        if (!uploadData) {
+            throw new Error(`Upload not found for ID: ${uploadId}`);
+        }
+        
+        if (!req.file) {
+            throw new Error('No chunk file received');
+        }
+        
+        // Create chunk directory if it doesn't exist
+        if (!fs.existsSync(uploadData.tempDir)) {
+            fs.mkdirSync(uploadData.tempDir, { recursive: true });
+        }
+        
+        // Move chunk to temp directory
+        const chunkPath = path.join(uploadData.tempDir, `chunk-${chunkIndex}`);
+        console.log('Moving chunk to:', chunkPath);
+        
+        fs.renameSync(req.file.path, chunkPath);
+        
+        // Update received chunks count
+        uploadData.receivedChunks++;
+        uploads.set(uploadId, uploadData);
+        
+        console.log('Successfully processed chunk:', {
+            uploadId,
+            chunkIndex,
+            receivedChunks: uploadData.receivedChunks,
+            totalChunks: uploadData.totalChunks
+        });
+        
+        res.json({ 
+            message: 'Chunk received',
+            progress: {
+                received: uploadData.receivedChunks,
+                total: uploadData.totalChunks
+            }
+        });
     } catch (error) {
-        console.error('Upload error:', error);
+        console.error('Chunk upload error:', error);
+        // Clean up temp file if it exists
+        if (req.file && req.file.path) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (cleanupError) {
+                console.error('Failed to clean up temp file:', cleanupError);
+            }
+        }
         res.status(500).json({ 
-            error: 'Upload failed',
+            error: 'Failed to process chunk',
             details: error.message
         });
+    }
+});
+
+// Finalize upload
+router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
+    try {
+        const { uploadId, fileName } = req.body;
+        const uploadData = uploads.get(uploadId);
+        
+        if (!uploadData) {
+            throw new Error('Upload not found');
+        }
+        
+        if (uploadData.receivedChunks !== uploadData.totalChunks) {
+            throw new Error('Not all chunks received');
+        }
+        
+        // Combine chunks
+        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+        const blobPath = `${targetFolder}/${fileName}`;
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: 'audio/mpeg'
+            }
+        });
+        
+        // Process chunks in order
+        for (let i = 0; i < uploadData.totalChunks; i++) {
+            const chunkPath = path.join(uploadData.tempDir, `chunk-${i}`);
+            await new Promise((resolve, reject) => {
+                fs.createReadStream(chunkPath)
+                    .pipe(blobStream)
+                    .on('error', reject)
+                    .on('finish', resolve);
+            });
+        }
+        
+        // Clean up
+        fs.rmSync(uploadData.tempDir, { recursive: true, force: true });
+        uploads.delete(uploadId);
+        
+        res.json({
+            message: 'Upload completed successfully',
+            file: {
+                name: blobPath,
+                size: uploadData.fileSize
+            }
+        });
+    } catch (error) {
+        console.error('Finalize upload error:', error);
+        res.status(500).json({ error: 'Failed to finalize upload' });
     }
 });
 
@@ -396,91 +456,6 @@ router.post('/init-upload', ensureStorageInitialized, async (req, res) => {
     } catch (error) {
         console.error('Upload initialization error:', error);
         res.status(500).json({ error: 'Failed to initialize upload' });
-    }
-});
-
-// Handle chunk upload
-router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
-    try {
-        const { uploadId, chunkIndex } = req.body;
-        const uploadData = uploads.get(uploadId);
-        
-        if (!uploadData) {
-            throw new Error('Upload not found');
-        }
-        
-        if (!req.file) {
-            throw new Error('No chunk received');
-        }
-        
-        // Move chunk to temp directory
-        const chunkPath = path.join(uploadData.tempDir, `chunk-${chunkIndex}`);
-        fs.renameSync(req.file.path, chunkPath);
-        
-        // Update received chunks count
-        uploadData.receivedChunks++;
-        uploads.set(uploadId, uploadData);
-        
-        res.json({ message: 'Chunk received' });
-    } catch (error) {
-        console.error('Chunk upload error:', error);
-        if (req.file) {
-            fs.unlinkSync(req.file.path);
-        }
-        res.status(500).json({ error: 'Failed to process chunk' });
-    }
-});
-
-// Finalize upload
-router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
-    try {
-        const { uploadId, fileName } = req.body;
-        const uploadData = uploads.get(uploadId);
-        
-        if (!uploadData) {
-            throw new Error('Upload not found');
-        }
-        
-        if (uploadData.receivedChunks !== uploadData.totalChunks) {
-            throw new Error('Not all chunks received');
-        }
-        
-        // Combine chunks
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const blobPath = `${targetFolder}/${fileName}`;
-        const blob = bucket.file(blobPath);
-        const blobStream = blob.createWriteStream({
-            resumable: false,
-            metadata: {
-                contentType: 'audio/mpeg'
-            }
-        });
-        
-        // Process chunks in order
-        for (let i = 0; i < uploadData.totalChunks; i++) {
-            const chunkPath = path.join(uploadData.tempDir, `chunk-${i}`);
-            await new Promise((resolve, reject) => {
-                fs.createReadStream(chunkPath)
-                    .pipe(blobStream)
-                    .on('error', reject)
-                    .on('finish', resolve);
-            });
-        }
-        
-        // Clean up
-        fs.rmSync(uploadData.tempDir, { recursive: true, force: true });
-        uploads.delete(uploadId);
-        
-        res.json({
-            message: 'Upload completed successfully',
-            file: {
-                name: blobPath,
-                size: uploadData.fileSize
-            }
-        });
-    } catch (error) {
-        console.error('Finalize upload error:', error);
-        res.status(500).json({ error: 'Failed to finalize upload' });
     }
 });
 

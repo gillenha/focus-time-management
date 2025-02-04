@@ -85,40 +85,71 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     continue;
                 }
 
-                // Create FormData for the file
-                const formData = new FormData();
-                formData.append('file', file);
+                // Get the total number of chunks
+                const CHUNK_SIZE = 30 * 1024 * 1024; // 30MB chunks
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                let uploadedChunks = 0;
 
-                const uploadUrl = `${process.env.REACT_APP_API_URL}/api/files/upload`;
-                console.log('Starting upload to:', uploadUrl);
-
-                // Upload the file
-                const response = await fetch(uploadUrl, {
+                // Initialize the upload
+                const initResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/init-upload`, {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        fileSize: file.size,
+                        totalChunks
+                    })
                 });
 
-                console.log('Upload response received:', {
-                    status: response.status,
-                    statusText: response.statusText
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        throw new Error(errorData.error || errorData.details || 'Upload failed');
-                    } catch (e) {
-                        throw new Error(`Upload failed: ${response.statusText}`);
-                    }
+                if (!initResponse.ok) {
+                    throw new Error('Failed to initialize upload');
                 }
 
-                const responseData = await response.json();
-                console.log('Response data:', responseData);
+                const { uploadId } = await initResponse.json();
 
-                // Update progress
-                setUploadProgress(100);
+                // Upload chunks
+                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                    const start = chunkIndex * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, file.size);
+                    const chunk = file.slice(start, end);
+
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('uploadId', uploadId);
+                    formData.append('chunkIndex', chunkIndex);
+
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload-chunk`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to upload chunk ${chunkIndex}`);
+                    }
+
+                    uploadedChunks++;
+                    const progress = (uploadedChunks / totalChunks) * 100;
+                    setUploadProgress(progress);
+                }
+
+                // Finalize the upload
+                const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        uploadId,
+                        fileName: file.name
+                    })
+                });
+
+                if (!finalizeResponse.ok) {
+                    throw new Error('Failed to finalize upload');
+                }
+
                 setTotalStorageSize(prev => prev + file.size);
                 console.log('Upload completed successfully');
             }

@@ -5,6 +5,9 @@ const fs = require('fs');
 const multer = require('multer');
 const { Storage } = require('@google-cloud/storage');
 
+// Store upload metadata
+const uploads = new Map();
+
 // Configure multer for file handling
 const multerStorage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -32,75 +35,49 @@ const upload = multer({
 // Initialize Google Cloud Storage
 let storage;
 let bucket;
-let isInitializing = false;
-let initializationError = null;
 
 async function initializeStorage() {
-    if (isInitializing) {
-        console.log('Storage initialization already in progress');
-        return;
-    }
-    
-    if (bucket) {
-        console.log('Storage already initialized');
-        return;
-    }
-
     try {
-        isInitializing = true;
-        console.log('Initializing Google Cloud Storage...');
-        
         // Always use Application Default Credentials
+        // This will work with both Workload Identity Federation and Cloud Run's built-in authentication
         storage = new Storage();
         
         // Initialize the bucket
         bucket = storage.bucket('react-app-assets');
 
         // Verify bucket access
-        const [exists] = await bucket.exists();
-        if (!exists) {
-            throw new Error('Bucket does not exist');
+        try {
+            await bucket.exists();
+            console.log('Successfully connected to GCS bucket');
+        } catch (error) {
+            throw new Error(`Failed to access bucket: ${error.message}`);
         }
-        
-        console.log('Successfully connected to GCS bucket');
-        initializationError = null;
+
     } catch (error) {
         console.error('Failed to initialize Google Cloud Storage:', error);
-        initializationError = error;
-        bucket = null;
         throw error;
-    } finally {
-        isInitializing = false;
     }
 }
 
 // Initialize storage when the module loads
 initializeStorage().catch(error => {
-    console.error('Initial storage initialization failed:', error);
+    console.error('Storage initialization failed:', error);
 });
 
 // Middleware to ensure storage is initialized
 const ensureStorageInitialized = async (req, res, next) => {
-    if (bucket) {
-        return next();
-    }
-
-    if (initializationError) {
-        console.error('Using cached initialization error:', initializationError);
-        return res.status(500).json({ 
-            error: 'Storage not initialized',
-            details: initializationError.message
-        });
-    }
-
-    try {
-        await initializeStorage();
+    if (!bucket) {
+        try {
+            await initializeStorage();
+            next();
+        } catch (error) {
+            res.status(500).json({ 
+                error: 'Storage not initialized',
+                details: error.message
+            });
+        }
+    } else {
         next();
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Storage not initialized',
-            details: error.message
-        });
     }
 };
 
@@ -108,6 +85,11 @@ const ensureStorageInitialized = async (req, res, next) => {
 router.post('/upload', ensureStorageInitialized, upload.single('file'), async (req, res) => {
     console.log('Upload request received');
     try {
+        if (!bucket) {
+            console.error('Upload error: Google Cloud Storage not initialized');
+            throw new Error('Google Cloud Storage not initialized');
+        }
+        
         if (!req.file) {
             console.error('Upload error: No file received');
             return res.status(400).json({ error: 'No file uploaded' });
@@ -127,12 +109,11 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
 
         const blob = bucket.file(blobPath);
         const blobStream = blob.createWriteStream({
-            resumable: true,
+            resumable: false,
             metadata: {
                 contentType: 'audio/mpeg'
             },
-            timeout: 300000, // 5 minutes timeout
-            chunkSize: 5 * 1024 * 1024 // 5MB chunks
+            timeout: 240000 // 4 minutes timeout
         });
 
         // Set up error handling
@@ -388,97 +369,118 @@ router.get('/sizes', async (req, res) => {
     }
 });
 
-// Finalize upload (same for both environments)
+// Initialize upload
+router.post('/init-upload', ensureStorageInitialized, async (req, res) => {
+    try {
+        const { fileName, fileSize, totalChunks } = req.body;
+        const uploadId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+        const tempDir = path.join(process.cwd(), 'temp', uploadId);
+        
+        // Create temp directory for chunks
+        fs.mkdirSync(tempDir, { recursive: true });
+        
+        // Store upload metadata
+        const metadata = {
+            fileName,
+            fileSize,
+            totalChunks,
+            uploadId,
+            tempDir,
+            receivedChunks: 0
+        };
+        
+        // Store metadata in memory (in production, use Redis or similar)
+        uploads.set(uploadId, metadata);
+        
+        res.json({ uploadId });
+    } catch (error) {
+        console.error('Upload initialization error:', error);
+        res.status(500).json({ error: 'Failed to initialize upload' });
+    }
+});
+
+// Handle chunk upload
+router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
+    try {
+        const { uploadId, chunkIndex } = req.body;
+        const uploadData = uploads.get(uploadId);
+        
+        if (!uploadData) {
+            throw new Error('Upload not found');
+        }
+        
+        if (!req.file) {
+            throw new Error('No chunk received');
+        }
+        
+        // Move chunk to temp directory
+        const chunkPath = path.join(uploadData.tempDir, `chunk-${chunkIndex}`);
+        fs.renameSync(req.file.path, chunkPath);
+        
+        // Update received chunks count
+        uploadData.receivedChunks++;
+        uploads.set(uploadId, uploadData);
+        
+        res.json({ message: 'Chunk received' });
+    } catch (error) {
+        console.error('Chunk upload error:', error);
+        if (req.file) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: 'Failed to process chunk' });
+    }
+});
+
+// Finalize upload
 router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
     try {
-        const { uploadId, fileName, totalChunks } = req.body;
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const fullPath = `${targetFolder}/${fileName}`;
+        const { uploadId, fileName } = req.body;
+        const uploadData = uploads.get(uploadId);
         
-        console.log(`Finalizing upload for ${fileName} with ${totalChunks} chunks`);
-        const mp3sDir = path.join(process.cwd(), 'mp3s');
-        const finalPath = path.join(mp3sDir, fileName);
-        const writeStream = fs.createWriteStream(finalPath);
-
-        // Combine all chunks
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkPath = path.join(mp3sDir, `${uploadId}_${i}`);
-            console.log(`Processing chunk ${i}: ${chunkPath}`);
-            if (fs.existsSync(chunkPath)) {
-                const chunkData = fs.readFileSync(chunkPath);
-                writeStream.write(chunkData);
-                // Delete chunk after combining
-                fs.unlinkSync(chunkPath);
-            } else {
-                throw new Error(`Missing chunk file: ${i} at path ${chunkPath}`);
+        if (!uploadData) {
+            throw new Error('Upload not found');
+        }
+        
+        if (uploadData.receivedChunks !== uploadData.totalChunks) {
+            throw new Error('Not all chunks received');
+        }
+        
+        // Combine chunks
+        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+        const blobPath = `${targetFolder}/${fileName}`;
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: 'audio/mpeg'
             }
-        }
-
-        writeStream.end();
-
-        // Wait for write to finish
-        await new Promise((resolve, reject) => {
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
         });
-
-        console.log(`Combined file created at ${finalPath}`);
-
-        try {
-            // Upload to GCS using server credentials
-            console.log(`Reading file for GCS upload: ${finalPath}`);
-            const fileBuffer = fs.readFileSync(finalPath);
-            const file = bucket.file(fullPath);
-            
-            console.log(`Uploading to GCS: ${fullPath}`);
-            
-            // Use a promise to handle the upload
+        
+        // Process chunks in order
+        for (let i = 0; i < uploadData.totalChunks; i++) {
+            const chunkPath = path.join(uploadData.tempDir, `chunk-${i}`);
             await new Promise((resolve, reject) => {
-                const stream = file.createWriteStream({
-                    metadata: {
-                        contentType: 'audio/mpeg'
-                    },
-                    resumable: false // Disable resumable uploads for this final step
-                });
-
-                stream.on('error', (error) => {
-                    console.error('Stream error:', error);
-                    reject(error);
-                });
-
-                stream.on('finish', () => {
-                    console.log('Stream finished successfully');
-                    resolve();
-                });
-
-                stream.end(fileBuffer);
-            });
-
-            console.log('Upload to GCS successful');
-            
-            // Clean up
-            fs.unlinkSync(finalPath);
-            res.status(200).json({ 
-                message: 'Upload finalized and synced to GCS successfully',
-                path: fullPath
-            });
-        } catch (error) {
-            console.error('Error uploading to GCS:', error);
-            // Include more detailed error information
-            res.status(500).json({ 
-                error: 'Failed to upload to GCS',
-                details: error.message,
-                code: error.code,
-                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                fs.createReadStream(chunkPath)
+                    .pipe(blobStream)
+                    .on('error', reject)
+                    .on('finish', resolve);
             });
         }
-    } catch (error) {
-        console.error('Error finalizing upload:', error);
-        res.status(500).json({ 
-            error: 'Failed to finalize upload',
-            details: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        
+        // Clean up
+        fs.rmSync(uploadData.tempDir, { recursive: true, force: true });
+        uploads.delete(uploadId);
+        
+        res.json({
+            message: 'Upload completed successfully',
+            file: {
+                name: blobPath,
+                size: uploadData.fileSize
+            }
         });
+    } catch (error) {
+        console.error('Finalize upload error:', error);
+        res.status(500).json({ error: 'Failed to finalize upload' });
     }
 });
 

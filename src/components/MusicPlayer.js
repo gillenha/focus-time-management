@@ -93,19 +93,15 @@ function MusicPlayer({
     }
 
     try {
-      const audioPath = process.env.NODE_ENV === 'production'
-        ? playlistTracks[0].fileName
-        : `/mp3s/${playlistTracks[0].fileName}`;
-      
+      // Use the filename directly, AudioManager will handle the full URL
+      const audioPath = playlistTracks[0].fileName;
       console.log('Verifying first track:', audioPath);
+      
       const fullUrl = AudioManager.getFullAudioUrl(audioPath);
       const isValid = await AudioManager.verifyAudio(fullUrl);
       
       if (!isValid) {
         console.error('Audio verification failed. Please check if the audio files are available in the correct location.');
-        if (process.env.NODE_ENV === 'development') {
-          console.info('Development mode: Make sure your audio files are in the /mp3s directory and your development server is configured correctly.');
-        }
       }
       
       setIsAudioVerified(isValid);
@@ -161,11 +157,8 @@ function MusicPlayer({
   }, []);
 
   const getAudioFiles = useCallback(() => {
-    return playlistTracks.map(track => 
-      process.env.NODE_ENV === 'production'
-        ? track.fileName
-        : `/mp3s/${track.fileName}`
-    );
+    // AudioManager will handle the full URL construction
+    return playlistTracks.map(track => track.fileName);
   }, [playlistTracks]);
 
   return (

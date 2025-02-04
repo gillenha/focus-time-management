@@ -1,9 +1,5 @@
 // Default quotes that come with the application
 export const DEFAULT_QUOTES = [
-  '"The successful warrior is the average man, with laser-like focus." - Bruce Lee',
-  '"Concentrate all your thoughts upon the work at hand. The sun\'s rays do not burn until brought to a focus." - Alexander Graham Bell',
-  '"Where focus goes, energy flows." - Tony Robbins',
-  '"The hours don\'t suddenly appear. You have to steal them from comfort." - Derek Sivers',
   '"You should have, at most, two primary goals or tasks per day." - Tim Ferriss',
   '"Earn with your mind, not your time." - Naval',
   '"You can do anything, but you can\'t do everything. This is a hard lesson to learn in life. But the beauty of this is you don\'t have to do everything." - Shaan Puri',

@@ -70,80 +70,49 @@ class AudioManager {
 
     static getFullAudioUrl(relativePath) {
         console.log('Getting full audio URL for:', relativePath);
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
         
-        // Development environment
-        if (process.env.NODE_ENV === 'development') {
-            if (relativePath.startsWith('https://')) {
-                const filename = relativePath.split('/').pop();
-                relativePath = `/mp3s/${filename}`;
-            }
-            
-            // Ensure the path starts with /mp3s
-            const localPath = relativePath.startsWith('/mp3s') 
-                ? relativePath 
-                : `/mp3s/${relativePath}`;
-                
-            const fullUrl = `${apiUrl}${localPath}`;
-            console.log('Development URL:', fullUrl);
-            return fullUrl;
-        }
+        // Remove any leading slashes and 'mp3s/'
+        const filename = relativePath.split('/').pop();
         
-        // Production environment
-        if (process.env.NODE_ENV === 'production') {
-            if (relativePath.startsWith('http')) {
-                return relativePath;
-            }
-            
-            // Remove any leading slashes and 'mp3s/'
-            const filename = relativePath.split('/').pop();
-            return `https://storage.googleapis.com/react-app-assets/${filename}`;
-        }
+        // Get the target folder based on environment
+        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
         
-        // Fallback
-        const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-        return `${apiUrl}/${cleanPath}`;
+        // Always use GCP storage bucket URL
+        const bucketUrl = `https://storage.googleapis.com/react-app-assets/${targetFolder}/${filename}`;
+        console.log('Using bucket URL:', bucketUrl);
+        return bucketUrl;
     }
 
     static getBellAudioUrl() {
         console.log('Getting bell sound URL in environment:', process.env.NODE_ENV);
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+        // Bell sound is still served from static files
         if (process.env.NODE_ENV === 'development') {
-            return `${apiUrl}/effects/bell.mp3`;
+            return `${process.env.REACT_APP_API_URL}/effects/bell.mp3`;
         }
-        // In production, serve from static build files
         return '/effects/bell.mp3';
     }
 
     static async verifyAudio(url) {
         console.log('Verifying audio URL:', url);
         try {
-            if (process.env.NODE_ENV === 'development') {
-                // In development, verify directly from local server
-                const response = await fetch(url, { method: 'HEAD' });
+            // For Google Cloud Storage URLs
+            if (url.includes('storage.googleapis.com')) {
+                const response = await fetch(url, { 
+                    method: 'HEAD',
+                    headers: {
+                        'Origin': window.location.origin
+                    }
+                });
                 const isValid = response.ok;
-                console.log('Development audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
+                console.log('Audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
                 if (!isValid) {
                     console.error('Audio file not found at:', url);
                 }
                 return isValid;
             } else {
-                // In production, for Google Cloud Storage URLs
-                if (url.includes('storage.googleapis.com')) {
-                    const response = await fetch(url, { 
-                        method: 'HEAD',
-                        headers: {
-                            'Origin': window.location.origin
-                        }
-                    });
-                    const isValid = response.ok;
-                    console.log('Production audio verification result:', isValid ? 'success' : 'failed', 'Status:', response.status);
-                    return isValid;
-                } else {
-                    // For static files (like bell.mp3)
-                    const response = await fetch(url, { method: 'HEAD' });
-                    return response.ok;
-                }
+                // For static files (like bell.mp3)
+                const response = await fetch(url, { method: 'HEAD' });
+                return response.ok;
             }
         } catch (error) {
             console.error('Audio verification failed:', error.message);

@@ -11,6 +11,7 @@ const { format } = require('util');
 const connectDB = require('./server/config/db');
 const quoteController = require('./server/controllers/quoteController');
 const quotesRouter = require('./server/routes/quotes');
+const filesRouter = require('./server/routes/files');
 
 // Initialize Google Cloud Storage in production
 let storage;
@@ -88,7 +89,13 @@ app.use(cors({
     ? 'http://localhost:3000' 
     : '*',  // Allow all origins in production
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'Content-Range',  // Add this for chunked uploads
+    'X-Upload-Content-Type',
+    'X-Upload-Content-Length'
+  ]
 }));
 
 // Limit JSON body size
@@ -96,6 +103,7 @@ app.use(bodyParser.json({ limit: '10kb' }));
 
 // API Routes
 app.use('/api/quotes', quotesRouter);
+app.use('/', filesRouter);
 
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;
@@ -388,12 +396,10 @@ app.get('/mp3s/sizes', async (req, res) => {
 // Import routers
 const sessionsRouter = require('./server/routes/sessions');
 const notionRouter = require('./server/routes/notion');
-const filesRouter = require('./server/routes/files');
 
 // Mount API routers first
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/notion', notionRouter);
-app.use('/api/files', filesRouter);
 
 // Serve static files in both development and production
 app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));

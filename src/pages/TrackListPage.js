@@ -11,47 +11,34 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
     const fetchTracks = async () => {
         try {
-            let tracks;
-            let totalSize = 0;
-            
-            if (process.env.NODE_ENV === 'production') {
-                // In production, fetch from Google Cloud Storage
-                const response = await fetch('https://storage.googleapis.com/storage/v1/b/react-app-assets/o');
-                const data = await response.json();
-                tracks = data.items
-                    .filter(item => item.name.endsWith('.mp3'))
-                    .map(item => ({
-                        name: item.name,
-                        size: parseInt(item.size)
-                    }));
-                totalSize = tracks.reduce((acc, track) => acc + track.size, 0);
-            } else {
-                // In development, use local endpoint
-                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-                const response = await fetch(`${apiUrl}/mp3s`);
-                const data = await response.json();
-                
-                // Get file sizes for local files
-                const sizeResponse = await fetch(`${apiUrl}/mp3s/sizes`);
-                const sizeData = await sizeResponse.json();
-                
-                // Map the local files to match the expected structure
-                tracks = data.mp3s.map(fileName => ({
-                    name: fileName,
-                    size: sizeData[fileName] || 0
-                }));
-                
-                totalSize = Object.values(sizeData).reduce((acc, size) => acc + size, 0);
+            console.log('Fetching tracks from server...');
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/list-tracks`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch tracks');
             }
             
-            // Update total storage size
+            const data = await response.json();
+            console.log('Received tracks:', data);
+
+            if (!data.items || !Array.isArray(data.items)) {
+                console.error('Unexpected response format:', data);
+                return;
+            }
+
+            const tracks = data.items.map(item => ({
+                name: item.name.split('/').pop(), // Remove folder prefix
+                size: parseInt(item.size),
+                fullPath: item.name // Keep the full path for audio playback
+            }));
+            
+            const totalSize = tracks.reduce((acc, track) => acc + track.size, 0);
             setTotalStorageSize(totalSize);
             
             // Create unique IDs using filename hash
             const formattedTracks = tracks.map((track) => ({
                 id: `upload-${track.name.replace(/[^a-zA-Z0-9]/g, '')}`,
                 title: track.name.replace('.mp3', ''),
-                fileName: track.name,
+                fileName: track.fullPath, // Use full path for audio playback
                 size: track.size
             }));
             
@@ -60,6 +47,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
             );
             
+            console.log('Setting uploaded tracks:', filteredTracks);
             setUploadedTracks(filteredTracks);
         } catch (error) {
             console.error('Error fetching tracks:', error);
@@ -76,114 +64,50 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         for (let start = 0; start < file.size; start += MAX_CHUNK_SIZE) {
             const chunk = file.slice(start, start + MAX_CHUNK_SIZE);
             const end = Math.min(start + MAX_CHUNK_SIZE, file.size);
-            
-            // Calculate chunk number and total chunks
             const chunkNumber = Math.floor(start / MAX_CHUNK_SIZE);
             
             try {
-                if (process.env.NODE_ENV === 'production') {
-                    // For production: Use resumable upload protocol
-                    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/react-app-assets/o?uploadType=resumable&name=${encodeURIComponent(file.name)}`;
-                    
-                    // If this is the first chunk, initiate the resumable upload
-                    if (chunkNumber === 0) {
-                        const initResponse = await fetch(uploadUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Upload-Content-Type': 'audio/mpeg',
-                                'X-Upload-Content-Length': file.size.toString(),
-                            },
-                            body: JSON.stringify({ name: file.name }),
-                        });
-                        
-                        if (!initResponse.ok) throw new Error('Failed to initiate upload');
-                        
-                        // Get the resumable upload URL from the response
-                        const resumableUrl = initResponse.headers.get('Location');
-                        if (!resumableUrl) throw new Error('No resumable upload URL received');
-                        
-                        // Store the URL for subsequent chunks
-                        sessionStorage.setItem(`upload-${uploadId}`, resumableUrl);
-                    }
-                    
-                    // Get the stored resumable URL
-                    const resumableUrl = sessionStorage.getItem(`upload-${uploadId}`);
-                    if (!resumableUrl) throw new Error('Resumable upload URL not found');
-                    
-                    // Upload the chunk
-                    const response = await fetch(resumableUrl, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Range': `bytes ${start}-${end-1}/${file.size}`,
-                            'Content-Type': 'audio/mpeg',
-                        },
-                        body: chunk,
-                    });
-                    
-                    if (!response.ok && response.status !== 308) {
-                        throw new Error(`Chunk upload failed: ${response.status}`);
-                    }
-                    
-                    // If this was the last chunk, clean up
-                    if (end === file.size) {
-                        sessionStorage.removeItem(`upload-${uploadId}`);
-                    }
-                } else {
-                    // For development: Use chunked upload endpoint
-                    const formData = new FormData();
-                    formData.append('chunk', chunk);
-                    formData.append('chunkNumber', chunkNumber.toString());
-                    formData.append('totalChunks', totalChunks.toString());
-                    formData.append('fileName', file.name);
-                    formData.append('uploadId', uploadId);
-                    
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload-chunk`, {
-                        method: 'POST',
-                        body: formData,
-                    });
-                    
-                    if (!response.ok) throw new Error('Chunk upload failed');
+                // Upload chunk directly to server
+                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/upload-chunk/${uploadId}/${chunkNumber}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/octet-stream',
+                    },
+                    body: chunk
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Chunk upload failed: ${uploadResponse.status}`);
                 }
-                
+
                 uploadedChunks++;
                 const progress = (uploadedChunks / totalChunks) * 100;
                 setUploadProgress(Math.round(progress));
-                
+
+                // If this was the last chunk, finalize the upload
+                if (end === file.size) {
+                    const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/finalize-upload`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            uploadId,
+                            fileName: file.name,
+                            totalChunks
+                        }),
+                    });
+                    
+                    if (!finalizeResponse.ok) {
+                        const errorData = await finalizeResponse.json();
+                        throw new Error(errorData.details || 'Failed to finalize upload');
+                    }
+                }
             } catch (error) {
                 console.error(`Error uploading chunk ${chunkNumber}:`, error);
                 throw error;
             }
         }
-    };
-
-    const uploadFileWithProgress = (file, uploadUrl) => {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            
-            xhr.upload.addEventListener('progress', (event) => {
-                if (event.lengthComputable) {
-                    const progress = (event.loaded / event.total) * 100;
-                    setUploadProgress(Math.round(progress));
-                }
-            });
-
-            xhr.addEventListener('load', () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve(xhr.response);
-                } else {
-                    reject(new Error(`Upload failed with status ${xhr.status}`));
-                }
-            });
-
-            xhr.addEventListener('error', () => {
-                reject(new Error('Upload failed'));
-            });
-
-            xhr.open('PUT', uploadUrl);
-            xhr.setRequestHeader('Content-Type', 'audio/mpeg');
-            xhr.send(file);
-        });
     };
 
     const handleFileUpload = async (event) => {
@@ -206,24 +130,8 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                     return;
                 }
 
-                if (process.env.NODE_ENV === 'production') {
-                    // Use chunked upload for large files
-                    await uploadFileInChunks(file);
-                } else {
-                    // Development environment
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/upload`, {
-                        method: 'POST',
-                        body: formData,
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Upload failed');
-                    }
-                }
-
+                // Use chunked upload for both environments
+                await uploadFileInChunks(file);
                 setTotalStorageSize(prev => prev + file.size);
             }
             

@@ -77,4 +77,45 @@ exports.deleteQuote = async (req, res) => {
         console.error('Error deleting quote:', error);
         res.status(500).json({ error: 'Failed to delete quote', details: error.message });
     }
+};
+
+// Update a quote
+exports.updateQuote = async (req, res) => {
+    console.log('PUT /api/quotes/:id called with id:', req.params.id);
+    try {
+        const { id } = req.params;
+        const { text, author = 'Unknown' } = req.body;
+
+        if (!text) {
+            console.log('Quote text is missing');
+            return res.status(400).json({ error: 'Quote text is required' });
+        }
+
+        console.log('Finding and updating quote:', { id, text, author });
+        const quote = await Quote.findById(id);
+        
+        if (!quote) {
+            console.log('Quote not found');
+            return res.status(404).json({ error: 'Quote not found' });
+        }
+
+        // Prevent updating default quotes
+        if (quote.isDefault) {
+            console.log('Attempted to update default quote');
+            return res.status(403).json({ error: 'Cannot update default quotes' });
+        }
+
+        quote.text = text;
+        quote.author = author;
+        await quote.save();
+
+        // Return all quotes after update
+        console.log('Fetching updated quotes list...');
+        const quotes = await Quote.find().sort({ createdAt: -1 });
+        console.log('Quotes updated successfully:', quotes);
+        res.json({ quotes });
+    } catch (error) {
+        console.error('Error updating quote:', error);
+        res.status(500).json({ error: 'Failed to update quote', details: error.message });
+    }
 }; 

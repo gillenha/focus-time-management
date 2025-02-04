@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchQuotes, addQuote, deleteQuote } from '../services/quotesService';
 import { toast } from 'react-toastify';
+import { ListItemActions } from '../components/shared';
 
 const QuoteList = ({ onClose, isExiting }) => {
     const [quoteText, setQuoteText] = useState('');
@@ -8,6 +9,7 @@ const QuoteList = ({ onClose, isExiting }) => {
     const [quotes, setQuotes] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showQuotes, setShowQuotes] = useState(false);
+    const [editingQuote, setEditingQuote] = useState(null);
 
     useEffect(() => {
         loadQuotes();
@@ -31,24 +33,58 @@ const QuoteList = ({ onClose, isExiting }) => {
         if (!quoteText.trim()) return;
         
         try {
-            const formattedQuote = {
-                text: quoteText.trim(),
-                author: attribution.trim() || 'Unknown'
-            };
-            const updatedQuotes = await addQuote(formattedQuote);
-            setQuotes(updatedQuotes);
+            if (editingQuote) {
+                // Handle edit
+                const updatedQuote = {
+                    ...editingQuote,
+                    text: quoteText.trim(),
+                    author: attribution.trim() || 'Unknown'
+                };
+                // TODO: Add updateQuote service function
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updatedQuote),
+                });
+                
+                if (!response.ok) throw new Error('Failed to update quote');
+                
+                const updatedQuotes = quotes.map(q => 
+                    q._id === editingQuote._id ? updatedQuote : q
+                );
+                setQuotes(updatedQuotes);
+                setEditingQuote(null);
+                toast.success('Quote updated successfully');
+            } else {
+                // Handle add
+                const formattedQuote = {
+                    text: quoteText.trim(),
+                    author: attribution.trim() || 'Unknown'
+                };
+                const updatedQuotes = await addQuote(formattedQuote);
+                setQuotes(updatedQuotes);
+                toast.success('Quote added successfully');
+            }
             setQuoteText('');
             setAttribution('');
-            toast.success('Quote added successfully');
         } catch (error) {
-            toast.error('Failed to add quote');
-            console.error('Error adding quote:', error);
+            toast.error(editingQuote ? 'Failed to update quote' : 'Failed to add quote');
+            console.error('Error:', error);
         }
     };
 
-    const handleRemoveQuote = async (index) => {
+    const handleEdit = (quote) => {
+        setEditingQuote(quote);
+        setQuoteText(quote.text);
+        setAttribution(quote.author);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleRemoveQuote = async (quoteId) => {
         try {
-            const updatedQuotes = await deleteQuote(index);
+            const updatedQuotes = await deleteQuote(quoteId);
             setQuotes(updatedQuotes);
             toast.success('Quote removed successfully');
         } catch (error) {
@@ -154,25 +190,36 @@ const QuoteList = ({ onClose, isExiting }) => {
                                     ) : quotes.length === 0 ? (
                                         <p className="tw-text-center tw-text-white/50 tw-italic tw-py-8">No quotes available.</p>
                                     ) : (
-                                        quotes.map((quote, index) => (
+                                        quotes.map((quote) => (
                                             <div 
-                                                key={index} 
+                                                key={quote._id} 
                                                 className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto tw-bg-white/5 tw-rounded-lg hover:tw-bg-white/10"
                                             >
-                                                <p className="tw-text-white/90 tw-text-base tw-leading-relaxed tw-break-words">
-                                                    "{quote.text}"
-                                                    {quote.author && quote.author !== 'Unknown' && (
-                                                        <span className="tw-text-white/70 tw-ml-1">- {quote.author}</span>
-                                                    )}
-                                                </p>
-                                                <button
-                                                    onClick={() => handleRemoveQuote(quote._id)}
-                                                    className="tw-absolute tw-top-3 tw-right-3 tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity tw-rounded-full hover:tw-bg-red-500/20 tw-p-1.5 tw-cursor-pointer"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-3.5 tw-w-3.5 tw-text-white/70 hover:tw-text-red-500 tw-transition-colors" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                    </svg>
-                                                </button>
+                                                <div className="tw-flex tw-justify-between tw-items-start">
+                                                    <p className="tw-text-white/90 tw-text-base tw-leading-relaxed tw-break-words tw-pr-8">
+                                                        "{quote.text}"
+                                                        {quote.author && quote.author !== 'Unknown' && (
+                                                            <span className="tw-text-white/70 tw-ml-1">- {quote.author}</span>
+                                                        )}
+                                                    </p>
+                                                    <ListItemActions
+                                                        onEdit={() => handleEdit(quote)}
+                                                        onDelete={() => handleRemoveQuote(quote._id)}
+                                                        deleteConfirmTitle="Delete Quote"
+                                                        deleteConfirmMessage={`Are you sure you want to delete this quote: "${quote.text}"?`}
+                                                        className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
+                                                        editIcon={
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-white" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                            </svg>
+                                                        }
+                                                        deleteIcon={
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                            </svg>
+                                                        }
+                                                    />
+                                                </div>
                                             </div>
                                         ))
                                     )}

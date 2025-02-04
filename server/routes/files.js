@@ -6,7 +6,19 @@ const multer = require('multer');
 const { Storage } = require('@google-cloud/storage');
 
 // Configure multer for file handling
-const multerStorage = multer.memoryStorage();
+const multerStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        cb(null, tempDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
+    }
+});
+
 const upload = multer({
     storage: multerStorage,
     fileFilter: (req, file, cb) => {
@@ -67,100 +79,106 @@ const ensureStorageInitialized = async (req, res, next) => {
 };
 
 // Upload file
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', ensureStorageInitialized, upload.single('file'), async (req, res) => {
+    console.log('Upload request received');
     try {
         if (!bucket) {
+            console.error('Upload error: Google Cloud Storage not initialized');
             throw new Error('Google Cloud Storage not initialized');
         }
         
         if (!req.file) {
+            console.error('Upload error: No file received');
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        if (process.env.NODE_ENV === 'production') {
-            const blob = bucket.file(req.file.originalname);
-            const blobStream = blob.createWriteStream({
-                resumable: false,
-                metadata: {
-                    contentType: 'audio/mpeg'
-                }
-            });
+        console.log('File received:', {
+            originalname: req.file.originalname,
+            size: req.file.size,
+            path: req.file.path,
+            mimetype: req.file.mimetype
+        });
 
-            blobStream.on('error', (err) => {
-                console.error('Upload error:', err);
-                res.status(500).json({ error: 'Failed to upload file' });
-            });
+        // Always use GCS for both development and production
+        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+        const blobPath = `${targetFolder}/${req.file.originalname}`;
+        console.log('Uploading to GCS path:', blobPath);
 
-            blobStream.on('finish', () => {
-                res.status(200).json({
-                    message: 'File uploaded successfully',
-                    file: {
-                        name: req.file.originalname,
-                        size: req.file.size
-                    }
-                });
-            });
-
-            blobStream.end(req.file.buffer);
-        } else {
-            const mp3sDir = path.join(process.cwd(), 'mp3s');
-            if (!fs.existsSync(mp3sDir)) {
-                fs.mkdirSync(mp3sDir, { recursive: true });
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: true,
+            metadata: {
+                contentType: 'audio/mpeg'
             }
-            
-            fs.writeFileSync(path.join(mp3sDir, req.file.originalname), req.file.buffer);
-            res.json({
+        });
+
+        // Set up error handling
+        blobStream.on('error', (err) => {
+            console.error('GCS upload error:', err);
+            // Clean up temp file
+            fs.unlink(req.file.path, () => {});
+            res.status(500).json({ error: 'Failed to upload file', details: err.message });
+        });
+
+        // Set up completion handling
+        blobStream.on('finish', () => {
+            console.log('GCS upload completed successfully');
+            // Clean up temp file
+            fs.unlink(req.file.path, () => {});
+            res.status(200).json({
                 message: 'File uploaded successfully',
                 file: {
-                    name: req.file.originalname,
+                    name: blobPath,
                     size: req.file.size
                 }
             });
-        }
+        });
+
+        // Stream the file to GCS
+        console.log('Starting file stream to GCS');
+        fs.createReadStream(req.file.path).pipe(blobStream);
+
     } catch (error) {
+        // Clean up temp file on error
+        if (req.file) {
+            console.error('Cleaning up temp file after error');
+            fs.unlink(req.file.path, () => {});
+        }
         console.error('Upload error:', error);
-        res.status(500).json({ error: 'Failed to upload file' });
+        res.status(500).json({ error: 'Failed to upload file', details: error.message });
     }
 });
 
 // Get signed URL for chunked upload
-router.post('/get-upload-url', async (req, res) => {
+router.post('/get-upload-url', ensureStorageInitialized, async (req, res) => {
     try {
-        const { fileName, contentType, fileSize, chunkNumber, totalChunks, uploadId } = req.body;
+        const { fileName } = req.body;
         const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
         const fullPath = `${targetFolder}/${fileName}`;
 
         if (process.env.NODE_ENV === 'production') {
             const file = bucket.file(fullPath);
             
-            // Generate signed URL for this chunk
+            // Generate signed URL with resumable upload support
             const [signedUrl] = await file.getSignedUrl({
                 version: 'v4',
                 action: 'write',
                 expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-                contentType: contentType,
+                contentType: 'audio/mpeg',
                 queryParameters: { uploadType: 'resumable' }
             });
 
-            res.json({ 
-                signedUrl,
-                resumableUrl: signedUrl
-            });
+            res.json({ signedUrl });
         } else {
             // For development, create temporary file path
             const mp3sDir = path.join(process.cwd(), 'mp3s');
             if (!fs.existsSync(mp3sDir)) {
                 fs.mkdirSync(mp3sDir, { recursive: true });
             }
-
-            // Create a temporary file for the chunk
-            const chunkPath = path.join(mp3sDir, `${uploadId}_${chunkNumber}`);
             
-            // Return full URLs for development
-            const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '';
+            const baseUrl = 'http://localhost:8080/api/files';
             res.json({ 
-                signedUrl: `${baseUrl}/upload-chunk/${uploadId}/${chunkNumber}`,
-                resumableUrl: `${baseUrl}/upload-chunk/${uploadId}`
+                signedUrl: `${baseUrl}/upload-chunk/${fileName}`
             });
         }
     } catch (error) {
@@ -169,32 +187,70 @@ router.post('/get-upload-url', async (req, res) => {
     }
 });
 
-// Handle chunk upload in development and production
-router.put('/upload-chunk/:uploadId/:chunkNumber', ensureStorageInitialized, async (req, res) => {
+// Handle chunk upload
+router.put('/upload-chunk/:fileName', ensureStorageInitialized, async (req, res) => {
+    const fileName = req.params.fileName;
+    const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+    const fullPath = `${targetFolder}/${fileName}`;
+    
     try {
-        const { uploadId, chunkNumber } = req.params;
-        const mp3sDir = path.join(process.cwd(), 'mp3s');
-        
-        // Ensure temp directory exists
-        if (!fs.existsSync(mp3sDir)) {
-            fs.mkdirSync(mp3sDir, { recursive: true });
+        if (process.env.NODE_ENV === 'production') {
+            const file = bucket.file(fullPath);
+            const writeStream = file.createWriteStream({
+                resumable: true,
+                metadata: {
+                    contentType: 'audio/mpeg'
+                }
+            });
+
+            // Handle errors during upload
+            writeStream.on('error', (error) => {
+                console.error('Error uploading to GCS:', error);
+                res.status(500).json({ 
+                    error: 'Upload failed',
+                    details: error.message
+                });
+            });
+
+            // Handle successful upload
+            writeStream.on('finish', () => {
+                res.status(200).json({ 
+                    message: 'Upload successful',
+                    file: fullPath
+                });
+            });
+
+            // Stream the request directly to GCS
+            req.pipe(writeStream);
+        } else {
+            // For development, save to local filesystem
+            const mp3sDir = path.join(process.cwd(), 'mp3s');
+            const filePath = path.join(mp3sDir, fileName);
+            
+            const writeStream = fs.createWriteStream(filePath);
+            
+            writeStream.on('error', (error) => {
+                console.error('Error saving file:', error);
+                res.status(500).json({ 
+                    error: 'Upload failed',
+                    details: error.message
+                });
+            });
+
+            writeStream.on('finish', () => {
+                res.status(200).json({ 
+                    message: 'Upload successful',
+                    file: fileName
+                });
+            });
+
+            // Stream the request to local file
+            req.pipe(writeStream);
         }
-
-        // Save chunk to temp file
-        const chunkPath = path.join(mp3sDir, `${uploadId}_${chunkNumber}`);
-        const writeStream = fs.createWriteStream(chunkPath);
-        
-        await new Promise((resolve, reject) => {
-            req.pipe(writeStream)
-                .on('finish', resolve)
-                .on('error', reject);
-        });
-
-        res.status(200).json({ message: 'Chunk uploaded successfully' });
     } catch (error) {
-        console.error('Error handling chunk upload:', error);
+        console.error('Upload error:', error);
         res.status(500).json({ 
-            error: 'Failed to handle chunk upload',
+            error: 'Upload failed',
             details: error.message
         });
     }

@@ -7,7 +7,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const [selectedTracks, setSelectedTracks] = useState(new Set());
     const [totalStorageSize, setTotalStorageSize] = useState(0);
     const MAX_STORAGE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB in bytes
-    const MAX_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const fetchTracks = async () => {
         try {
@@ -54,86 +54,76 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
-    const uploadFileInChunks = async (file) => {
-        const totalChunks = Math.ceil(file.size / MAX_CHUNK_SIZE);
-        let uploadedChunks = 0;
-        const uploadId = `${Date.now()}-${file.name}`;
-
-        for (let start = 0; start < file.size; start += MAX_CHUNK_SIZE) {
-            const chunk = file.slice(start, start + MAX_CHUNK_SIZE);
-            const end = Math.min(start + MAX_CHUNK_SIZE, file.size);
-            const chunkNumber = Math.floor(start / MAX_CHUNK_SIZE);
-            
-            try {
-                // Update the URL to include /api/files prefix
-                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload-chunk/${uploadId}/${chunkNumber}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/octet-stream',
-                    },
-                    body: chunk
-                });
-
-                if (!uploadResponse.ok) {
-                    throw new Error(`Chunk upload failed: ${uploadResponse.status}`);
-                }
-
-                uploadedChunks++;
-                const progress = (uploadedChunks / totalChunks) * 100;
-                setUploadProgress(Math.round(progress));
-
-                // If this was the last chunk, finalize the upload
-                if (end === file.size) {
-                    // Update the finalize URL to include /api/files prefix
-                    const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            uploadId,
-                            fileName: file.name,
-                            totalChunks
-                        }),
-                    });
-                    
-                    if (!finalizeResponse.ok) {
-                        const errorData = await finalizeResponse.json();
-                        throw new Error(errorData.details || 'Failed to finalize upload');
-                    }
-                }
-            } catch (error) {
-                console.error(`Error uploading chunk ${chunkNumber}:`, error);
-                throw error;
-            }
-        }
-    };
-
     const handleFileUpload = async (event) => {
+        console.log('File upload handler triggered');
         const files = event.target.files;
-        if (!files.length) return;
+        if (!files.length) {
+            console.log('No files selected');
+            return;
+        }
 
+        console.log('Files selected:', files);
         setIsUploading(true);
         setUploadError('');
         setUploadProgress(0);
         
         try {
             for (const file of files) {
+                console.log('Processing file:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+                
                 if (!file.name.toLowerCase().endsWith('.mp3')) {
                     setUploadError('Only .mp3 files are allowed');
-                    return;
+                    continue;
                 }
 
                 if (totalStorageSize + file.size > MAX_STORAGE_SIZE) {
                     setUploadError('Storage limit of 5GB exceeded. Please delete some files before uploading more.');
-                    return;
+                    continue;
                 }
 
-                // Use chunked upload for both environments
-                await uploadFileInChunks(file);
+                // Create FormData for the file
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const uploadUrl = `${process.env.REACT_APP_API_URL}/api/files/upload`;
+                console.log('Starting upload to:', uploadUrl);
+
+                // Upload the file
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Upload response received:', {
+                    status: response.status,
+                    statusText: response.statusText
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        throw new Error(errorData.error || errorData.details || 'Upload failed');
+                    } catch (e) {
+                        throw new Error(`Upload failed: ${response.statusText}`);
+                    }
+                }
+
+                const responseData = await response.json();
+                console.log('Response data:', responseData);
+
+                // Update progress
+                setUploadProgress(100);
                 setTotalStorageSize(prev => prev + file.size);
+                console.log('Upload completed successfully');
             }
             
+            console.log('All files uploaded, refreshing track list');
             await fetchTracks();
         } catch (error) {
             console.error('Upload error:', error);
@@ -315,9 +305,6 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             </div>
         );
     };
-
-    // Add upload progress state
-    const [uploadProgress, setUploadProgress] = useState(0);
 
     const TrackItem = ({ track, sourceList }) => (
         <div

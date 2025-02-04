@@ -5,6 +5,11 @@ WORKDIR /app
 # Add cache busting
 ARG CACHE_BUST=1
 ARG REACT_APP_API_URL
+ARG REACT_APP_UNSPLASH_ACCESS_KEY
+
+# Set environment variables for the build
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_UNSPLASH_ACCESS_KEY=$REACT_APP_UNSPLASH_ACCESS_KEY
 
 # Copy package files first for better caching
 COPY package*.json ./
@@ -14,7 +19,7 @@ RUN npm install
 COPY . .
 
 # Build the app
-RUN REACT_APP_API_URL=$REACT_APP_API_URL npm run build
+RUN REACT_APP_API_URL=$REACT_APP_API_URL REACT_APP_UNSPLASH_ACCESS_KEY=$REACT_APP_UNSPLASH_ACCESS_KEY npm run build
 
 # Step 2: Set up Node.js server with the React Build
 FROM node:18

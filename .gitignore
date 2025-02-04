@@ -31,3 +31,8 @@ build/
 
 # Other large files or directories
 # Add any other large files or directories here
+
+# Environment Variables
+.env
+.env.development
+.env.production

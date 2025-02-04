@@ -12,7 +12,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const fetchTracks = async () => {
         try {
             console.log('Fetching tracks from server...');
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/list-tracks`);
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
             if (!response.ok) {
                 throw new Error('Failed to fetch tracks');
             }
@@ -57,8 +57,6 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const uploadFileInChunks = async (file) => {
         const totalChunks = Math.ceil(file.size / MAX_CHUNK_SIZE);
         let uploadedChunks = 0;
-
-        // Generate a unique upload ID for this file
         const uploadId = `${Date.now()}-${file.name}`;
 
         for (let start = 0; start < file.size; start += MAX_CHUNK_SIZE) {
@@ -67,8 +65,8 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             const chunkNumber = Math.floor(start / MAX_CHUNK_SIZE);
             
             try {
-                // Upload chunk directly to server
-                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/upload-chunk/${uploadId}/${chunkNumber}`, {
+                // Update the URL to include /api/files prefix
+                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/upload-chunk/${uploadId}/${chunkNumber}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/octet-stream',
@@ -86,7 +84,8 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
                 // If this was the last chunk, finalize the upload
                 if (end === file.size) {
-                    const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/finalize-upload`, {
+                    // Update the finalize URL to include /api/files prefix
+                    const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -264,28 +263,22 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         
         for (const track of selectedTrackObjects) {
             try {
-                if (process.env.NODE_ENV === 'production') {
-                    // In production, delete from Google Cloud Storage bucket
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/${track.fileName}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Failed to delete ${track.fileName}`);
+                // Always delete from Google Cloud Storage bucket
+                // The fileName should include the folder (test/ or tracks/)
+                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/${track.fileName}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
-                } else {
-                    // In development, use local endpoint
-                    const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s/${track.fileName}`, {
-                        method: 'DELETE'
-                    });
+                });
 
-                    if (!response.ok) {
-                        throw new Error(`Failed to delete ${track.fileName}`);
-                    }
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Delete response:', errorData);
+                    throw new Error(`Failed to delete ${track.fileName}: ${errorData.error || 'Unknown error'}`);
                 }
+
+                console.log(`Successfully deleted: ${track.fileName}`);
             } catch (error) {
                 console.error('Delete error:', error);
                 continue;

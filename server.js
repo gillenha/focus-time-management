@@ -105,7 +105,7 @@ app.use(bodyParser.json({ limit: '10kb' }));
 
 // API Routes
 app.use('/api/quotes', quotesRouter);
-app.use('/', filesRouter);
+app.use('/api/files', filesRouter);
 app.use('/api/sessions', sessionsRouter);
 
 app.put('/api/freeflow', (req, res) => {

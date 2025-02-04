@@ -231,22 +231,35 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
 });
 
 // Delete MP3 file
-router.delete('/:filename', async (req, res) => {
-    const filename = req.params.filename;
-
+router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
     try {
-        if (process.env.NODE_ENV === 'production') {
-            await bucket.file(filename).delete();
-        } else {
-            const filePath = path.join(process.cwd(), 'mp3s', filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+        const filename = req.params.filename;
+        console.log('Attempting to delete file:', filename);
+
+        if (!bucket) {
+            throw new Error('Storage not initialized');
         }
+
+        const file = bucket.file(filename);
+        const [exists] = await file.exists();
+
+        if (!exists) {
+            return res.status(404).json({ 
+                error: 'File not found',
+                details: `File ${filename} does not exist in bucket`
+            });
+        }
+
+        await file.delete();
+        console.log(`Successfully deleted file: ${filename}`);
         res.json({ message: 'File deleted successfully' });
+
     } catch (error) {
         console.error('Delete error:', error);
-        res.status(500).json({ error: 'Failed to delete file' });
+        res.status(500).json({ 
+            error: 'Failed to delete file',
+            details: error.message
+        });
     }
 });
 

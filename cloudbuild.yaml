@@ -11,6 +11,8 @@ steps:
       - '--build-arg'
       - 'REACT_APP_API_URL=https://focus-music-app-368754647823.us-central1.run.app'
       - '--build-arg'
+      - 'REACT_APP_UNSPLASH_ACCESS_KEY=_GJARTSuiQMs3WhAexgyH7u_T2hKry5jOKzjL6xhLfE'
+      - '--build-arg'
       - 'CACHE_BUST=$BUILD_ID'
       - '.'
 

@@ -400,12 +400,27 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         
         for (const track of selectedTrackObjects) {
             try {
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s/${track.fileName}`, {
-                    method: 'DELETE'
-                });
+                if (process.env.NODE_ENV === 'production') {
+                    // In production, delete from Google Cloud Storage bucket
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/${track.fileName}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`Failed to delete ${track.fileName}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to delete ${track.fileName}`);
+                    }
+                } else {
+                    // In development, use local endpoint
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s/${track.fileName}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to delete ${track.fileName}`);
+                    }
                 }
             } catch (error) {
                 console.error('Delete error:', error);

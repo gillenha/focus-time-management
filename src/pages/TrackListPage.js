@@ -128,7 +128,11 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         } finally {
             setSelectedFile(null);
             setIsUploading(false);
-            event.target.value = '';
+            // Reset the file input by getting it by ID
+            const fileInput = document.getElementById('file-select');
+            if (fileInput) {
+                fileInput.value = '';
+            }
         }
     };
 

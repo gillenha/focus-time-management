@@ -106,15 +106,21 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
 
         const blob = bucket.file(blobPath);
         const blobStream = blob.createWriteStream({
-            resumable: true,
+            resumable: false,
             metadata: {
                 contentType: 'audio/mpeg'
-            }
+            },
+            timeout: 240000 // 4 minutes timeout
         });
 
         // Set up error handling
         blobStream.on('error', (err) => {
             console.error('GCS upload error:', err);
+            console.error('Error details:', {
+                code: err.code,
+                message: err.message,
+                stack: err.stack
+            });
             // Clean up temp file
             fs.unlink(req.file.path, () => {});
             res.status(500).json({ error: 'Failed to upload file', details: err.message });
@@ -134,9 +140,16 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
             });
         });
 
-        // Stream the file to GCS
+        // Stream the file to GCS with progress logging
         console.log('Starting file stream to GCS');
-        fs.createReadStream(req.file.path).pipe(blobStream);
+        const fileStream = fs.createReadStream(req.file.path);
+        
+        fileStream.on('error', (err) => {
+            console.error('File read error:', err);
+            res.status(500).json({ error: 'Failed to read file', details: err.message });
+        });
+
+        fileStream.pipe(blobStream);
 
     } catch (error) {
         // Clean up temp file on error

@@ -8,6 +8,8 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
     const [totalStorageSize, setTotalStorageSize] = useState(0);
     const MAX_STORAGE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB in bytes
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [uploadStatus, setUploadStatus] = useState('');
 
     const fetchTracks = async () => {
         try {
@@ -54,101 +56,78 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
-    const handleFileUpload = async (event) => {
-        console.log('File upload handler triggered');
-        const files = event.target.files;
-        if (!files.length) {
-            console.log('No files selected');
+    const handleFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        console.log('File selected:', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+        });
+
+        if (!file.name.toLowerCase().endsWith('.mp3')) {
+            setUploadError('Only .mp3 files are allowed');
             return;
         }
 
-        console.log('Files selected:', files);
-        setIsUploading(true);
+        if (totalStorageSize + file.size > MAX_STORAGE_SIZE) {
+            setUploadError('Storage limit of 5GB exceeded. Please delete some files before uploading more.');
+            return;
+        }
+
+        setSelectedFile(file);
         setUploadError('');
+    };
+
+    const startUpload = async () => {
+        if (!selectedFile) return;
+
+        setIsUploading(true);
+        setUploadStatus('Preparing upload...');
         setUploadProgress(0);
-        
+
         try {
-            for (const file of files) {
-                console.log('Processing file:', {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type
-                });
-                
-                if (!file.name.toLowerCase().endsWith('.mp3')) {
-                    setUploadError('Only .mp3 files are allowed');
-                    continue;
-                }
+            // Create FormData
+            const formData = new FormData();
+            formData.append('file', selectedFile);
 
-                if (totalStorageSize + file.size > MAX_STORAGE_SIZE) {
-                    setUploadError('Storage limit of 5GB exceeded. Please delete some files before uploading more.');
-                    continue;
-                }
-
-                // Get signed URL for direct upload
-                const signedUrlResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/get-signed-url`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fileName: file.name,
-                        contentType: file.type
-                    })
-                });
-
-                if (!signedUrlResponse.ok) {
-                    throw new Error('Failed to get upload URL');
-                }
-
-                const { url, fields } = await signedUrlResponse.json();
-
-                // Create form data with signed URL fields
-                const formData = new FormData();
-                Object.entries(fields).forEach(([key, value]) => {
-                    formData.append(key, value);
-                });
-                formData.append('file', file);
-
-                // Upload directly to GCS
-                const uploadResponse = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!uploadResponse.ok) {
-                    throw new Error('Failed to upload to storage');
-                }
-
-                // Notify server that upload is complete
-                const finalizeResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/files/finalize-upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        fileName: file.name,
-                        size: file.size
-                    })
-                });
-
-                if (!finalizeResponse.ok) {
-                    throw new Error('Failed to finalize upload');
-                }
-
-                setTotalStorageSize(prev => prev + file.size);
-                setUploadProgress(100);
-                console.log('Upload completed successfully');
-            }
+            // Use XMLHttpRequest for progress tracking
+            const xhr = new XMLHttpRequest();
             
-            console.log('All files uploaded, refreshing track list');
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const progress = (event.loaded / event.total) * 100;
+                    setUploadProgress(progress);
+                    setUploadStatus(`Uploading: ${Math.round(progress)}%`);
+                }
+            };
+
+            // Wrap XHR in a promise
+            await new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error('Upload failed'));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Upload failed'));
+                
+                xhr.open('POST', `${process.env.REACT_APP_API_URL}/api/files/upload`);
+                xhr.send(formData);
+            });
+
+            setUploadStatus('Upload complete!');
+            setTotalStorageSize(prev => prev + selectedFile.size);
             await fetchTracks();
+            
         } catch (error) {
             console.error('Upload error:', error);
-            setUploadError(error.message || 'Failed to upload file(s)');
+            setUploadError(error.message || 'Failed to upload file');
         } finally {
+            setSelectedFile(null);
             setIsUploading(false);
-            setUploadProgress(0);
             event.target.value = '';
         }
     };
@@ -391,14 +370,13 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                                     <div>
                                         <input
                                             type="file"
-                                            onChange={handleFileUpload}
+                                            onChange={handleFileSelect}
                                             accept=".mp3"
-                                            multiple
                                             className="tw-hidden"
-                                            id="file-upload"
+                                            id="file-select"
                                         />
                                         <label 
-                                            htmlFor="file-upload" 
+                                            htmlFor="file-select" 
                                             className={`btn-primary tw-w-48 ${isUploading ? 'disabled' : ''}`}
                                         >
                                             {isUploading ? (
@@ -476,6 +454,61 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                                     />
                                 ))}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Upload Section */}
+                    <div className="tw-mb-6">
+                        <StorageUsage />
+                        
+                        <div className="tw-flex tw-flex-col tw-gap-4">
+                            <input
+                                type="file"
+                                accept=".mp3"
+                                onChange={handleFileSelect}
+                                disabled={isUploading}
+                                className="tw-hidden"
+                                id="file-select"
+                            />
+                            <label
+                                htmlFor="file-select"
+                                className={`tw-cursor-pointer tw-inline-flex tw-items-center tw-px-4 tw-py-2 tw-border tw-border-gray-300 tw-rounded-md tw-shadow-sm tw-text-sm tw-font-medium tw-text-gray-700 tw-bg-white hover:tw-bg-gray-50 ${
+                                    isUploading ? 'tw-opacity-50 tw-cursor-not-allowed' : ''
+                                }`}
+                            >
+                                Select MP3 File
+                            </label>
+
+                            {selectedFile && !isUploading && (
+                                <div className="tw-bg-gray-50 tw-p-4 tw-rounded-lg">
+                                    <p className="tw-text-sm tw-text-gray-600">Selected: {selectedFile.name}</p>
+                                    <p className="tw-text-sm tw-text-gray-600">Size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                    <button
+                                        onClick={startUpload}
+                                        className="tw-mt-2 tw-bg-blue-500 tw-text-white tw-px-4 tw-py-2 tw-rounded-md hover:tw-bg-blue-600"
+                                    >
+                                        Start Upload
+                                    </button>
+                                </div>
+                            )}
+
+                            {isUploading && (
+                                <div className="tw-bg-gray-50 tw-p-4 tw-rounded-lg">
+                                    <p className="tw-text-sm tw-text-gray-600">{uploadStatus}</p>
+                                    <div className="tw-w-full tw-bg-gray-200 tw-rounded-full tw-h-2 tw-mt-2">
+                                        <div
+                                            className="tw-h-2 tw-rounded-full tw-bg-blue-500"
+                                            style={{ width: `${uploadProgress}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {uploadError && (
+                                <div className="tw-text-red-500 tw-text-sm">
+                                    {uploadError}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

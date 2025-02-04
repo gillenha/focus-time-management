@@ -32,49 +32,75 @@ const upload = multer({
 // Initialize Google Cloud Storage
 let storage;
 let bucket;
+let isInitializing = false;
+let initializationError = null;
 
 async function initializeStorage() {
+    if (isInitializing) {
+        console.log('Storage initialization already in progress');
+        return;
+    }
+    
+    if (bucket) {
+        console.log('Storage already initialized');
+        return;
+    }
+
     try {
+        isInitializing = true;
+        console.log('Initializing Google Cloud Storage...');
+        
         // Always use Application Default Credentials
-        // This will work with both Workload Identity Federation and Cloud Run's built-in authentication
         storage = new Storage();
         
         // Initialize the bucket
         bucket = storage.bucket('react-app-assets');
 
         // Verify bucket access
-        try {
-            await bucket.exists();
-            console.log('Successfully connected to GCS bucket');
-        } catch (error) {
-            throw new Error(`Failed to access bucket: ${error.message}`);
+        const [exists] = await bucket.exists();
+        if (!exists) {
+            throw new Error('Bucket does not exist');
         }
-
+        
+        console.log('Successfully connected to GCS bucket');
+        initializationError = null;
     } catch (error) {
         console.error('Failed to initialize Google Cloud Storage:', error);
+        initializationError = error;
+        bucket = null;
         throw error;
+    } finally {
+        isInitializing = false;
     }
 }
 
 // Initialize storage when the module loads
 initializeStorage().catch(error => {
-    console.error('Storage initialization failed:', error);
+    console.error('Initial storage initialization failed:', error);
 });
 
 // Middleware to ensure storage is initialized
 const ensureStorageInitialized = async (req, res, next) => {
-    if (!bucket) {
-        try {
-            await initializeStorage();
-            next();
-        } catch (error) {
-            res.status(500).json({ 
-                error: 'Storage not initialized',
-                details: error.message
-            });
-        }
-    } else {
+    if (bucket) {
+        return next();
+    }
+
+    if (initializationError) {
+        console.error('Using cached initialization error:', initializationError);
+        return res.status(500).json({ 
+            error: 'Storage not initialized',
+            details: initializationError.message
+        });
+    }
+
+    try {
+        await initializeStorage();
         next();
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Storage not initialized',
+            details: error.message
+        });
     }
 };
 
@@ -82,11 +108,6 @@ const ensureStorageInitialized = async (req, res, next) => {
 router.post('/upload', ensureStorageInitialized, upload.single('file'), async (req, res) => {
     console.log('Upload request received');
     try {
-        if (!bucket) {
-            console.error('Upload error: Google Cloud Storage not initialized');
-            throw new Error('Google Cloud Storage not initialized');
-        }
-        
         if (!req.file) {
             console.error('Upload error: No file received');
             return res.status(400).json({ error: 'No file uploaded' });
@@ -106,11 +127,12 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
 
         const blob = bucket.file(blobPath);
         const blobStream = blob.createWriteStream({
-            resumable: false,
+            resumable: true,
             metadata: {
                 contentType: 'audio/mpeg'
             },
-            timeout: 240000 // 4 minutes timeout
+            timeout: 300000, // 5 minutes timeout
+            chunkSize: 5 * 1024 * 1024 // 5MB chunks
         });
 
         // Set up error handling

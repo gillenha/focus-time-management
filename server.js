@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 const multer = require('multer');
 const { format } = require('util');
+const { Storage } = require('@google-cloud/storage');
 const connectDB = require('./server/config/db');
 const quoteController = require('./server/controllers/quoteController');
 const quotesRouter = require('./server/routes/quotes');

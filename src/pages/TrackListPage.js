@@ -175,6 +175,13 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         }
     };
 
+    const clearUpload = () => {
+        setSelectedFile(null);
+        setIsUploading(false);
+        setUploadError('');
+        setUploadStatus('');
+    };
+
     useEffect(() => {
         fetchTracks();
     }, [playlistTracks]);
@@ -411,48 +418,10 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                                 {/* Action Buttons - Simplified */}
                                 <div className="tw-flex tw-justify-start tw-items-center tw-gap-4 tw-mt-4">
                                     <div>
-                                        <input
-                                            type="file"
-                                            onChange={handleFileSelect}
-                                            accept=".mp3"
-                                            className="tw-hidden"
-                                            id="file-select"
-                                        />
-                                        <label 
-                                            htmlFor="file-select" 
-                                            className={`btn-primary tw-w-48 ${isUploading ? 'disabled' : ''}`}
-                                        >
-                                            {isUploading ? (
-                                                <div className="tw-flex tw-flex-col tw-items-center">
-                                                    <span>Uploading... {uploadProgress}%</span>
-                                                    <div className="tw-w-full tw-bg-blue-200 tw-rounded-full tw-h-1 tw-mt-1">
-                                                        <div 
-                                                            className="tw-bg-blue-600 tw-h-1 tw-rounded-full" 
-                                                            style={{ width: `${uploadProgress}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="tw-h-4 tw-w-4 tw-mr-2"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                                    </svg>
-                                                    Upload MP3
-                                                </>
-                                            )}
-                                        </label>
-                                    </div>
-                                    <div>
                                         <button
                                             onClick={handleDeleteSelected}
                                             disabled={selectedTracks.size === 0}
-                                            className={`btn-danger tw-w-48 ${selectedTracks.size === 0 ? 'disabled' : ''}`}
+                                            className={`danger-button ${selectedTracks.size === 0 ? 'disabled' : ''}`}
                                         >
                                             Delete Selected
                                         </button>
@@ -502,7 +471,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
                     {/* Upload Section */}
                     <div className="tw-mb-6">
-                        <StorageUsage />
+
                         
                         <div className="tw-flex tw-flex-col tw-gap-4">
                             <input
@@ -515,9 +484,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                             />
                             <label
                                 htmlFor="file-select"
-                                className={`tw-cursor-pointer tw-inline-flex tw-items-center tw-px-4 tw-py-2 tw-border tw-border-gray-300 tw-rounded-md tw-shadow-sm tw-text-sm tw-font-medium tw-text-gray-700 tw-bg-white hover:tw-bg-gray-50 ${
-                                    isUploading ? 'tw-opacity-50 tw-cursor-not-allowed' : ''
-                                }`}
+                                className={`primary-button tw-w-fit tw-px-4 ${isUploading ? 'disabled' : ''}`}
                             >
                                 Select MP3 File
                             </label>
@@ -526,12 +493,20 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                                 <div className="tw-bg-gray-50 tw-p-4 tw-rounded-lg">
                                     <p className="tw-text-sm tw-text-gray-600">Selected: {selectedFile.name}</p>
                                     <p className="tw-text-sm tw-text-gray-600">Size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
-                                    <button
-                                        onClick={startUpload}
-                                        className="tw-mt-2 tw-bg-blue-500 tw-text-white tw-px-4 tw-py-2 tw-rounded-md hover:tw-bg-blue-600"
-                                    >
-                                        Start Upload
-                                    </button>
+                                    <div className="tw-flex tw-gap-4 tw-mt-4">
+                                        <button
+                                            onClick={startUpload}
+                                            className="secondary-button"
+                                        >
+                                            Start Upload
+                                        </button>
+                                        <button
+                                            onClick={clearUpload}
+                                            className="secondary-button tw-bg-red-400/40 tw-text-red-900"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 

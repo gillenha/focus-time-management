@@ -36,3 +36,8 @@ build/
 .env
 .env.development
 .env.production
+
+# Ignore temp directory and all its contents
+temp/
+**/temp/
+*.temp

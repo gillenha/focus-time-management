@@ -265,7 +265,6 @@ body, html {
 
 /* Global styling for primary-button and fade classes */
 .primary-button {
-  width: 90%;
   padding: 0.75rem 0; /* equivalent to tw-py-3 */
   background-color: #374151; /* equivalent to tw-bg-gray-700 */
   border-radius: 0.5rem; /* equivalent to tw-rounded-lg */
@@ -276,6 +275,49 @@ body, html {
   cursor: pointer; /* equivalent to tw-cursor-pointer */
   border: none; /* equivalent to tw-border-0 */
   transition: all 0.3s ease; /* equivalent to tw-transition-all */
+}
+
+.secondary-button {
+  padding: 0.75rem 0; /* equivalent to tw-py-3 */
+  background-color: #3c4d695d; /* equivalent to tw-bg-gray-700 */
+  color: #000000; /* equivalent to tw-text-white */
+  font-family: sans-serif; /* equivalent to tw-font-sans */
+  font-size: .75rem; /* equivalent to tw-text-lg */
+  padding: 0.5rem 1rem; /* equivalent to tw-px-4 */
+  border-radius: 0.5rem; /* equivalent to tw-rounded-lg */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25); /* equivalent to tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] */
+  border: none; /* remove default button border */
+  cursor: pointer; /* add pointer cursor like primary button */
+}
+
+.danger-button {
+  background-color: #b91c1c; /* equivalent to tw-bg-red-500 */
+  color: #ffffff; /* equivalent to tw-text-white */
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-family: sans-serif;
+  font-size: .75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(185, 28, 28, 0.25);
+}
+
+.danger-button:hover:not(:disabled) {
+  background-color: #991b1b;
+  box-shadow: 0 4px 6px rgba(185, 28, 28, 0.3);
+}
+
+.danger-button:active:not(:disabled) {
+  background-color: #7f1d1d;
+  transform: translateY(1px);
+}
+
+.danger-button:disabled {
+  background-color: #ef4444;
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .fadeOut {

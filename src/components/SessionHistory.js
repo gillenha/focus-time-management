@@ -1,20 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ListItemActions, EditDialog, DeleteDialog } from './shared';
 import { toast } from 'react-toastify';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-const SessionHistory = ({ onClose }) => {
+const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
     const [sessionHistory, setSessionHistory] = useState([]);
     const [editingSession, setEditingSession] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
     const [isClearHistoryDialogOpen, setIsClearHistoryDialogOpen] = useState(false);
-
-    useEffect(() => {
-        fetchSessions();
-    }, []);
 
     const fetchSessions = async () => {
         try {
@@ -24,11 +20,21 @@ const SessionHistory = ({ onClose }) => {
             }
             const data = await response.json();
             setSessionHistory(data);
+            onSessionsUpdate?.(data);
         } catch (error) {
             console.error('Error fetching sessions:', error);
             toast.error('Failed to load sessions');
         }
     };
+
+    useEffect(() => {
+        fetchSessions();
+    }, []);
+
+    // Expose fetchSessions to parent component
+    useImperativeHandle(ref, () => ({
+        fetchSessions
+    }));
 
     const formatDuration = (duration) => {
         const [minutes, seconds] = duration.split(':').map(Number);
@@ -260,6 +266,10 @@ const SessionHistory = ({ onClose }) => {
             </div>
         </div>
     );
+});
+
+SessionHistory.defaultProps = {
+    onSessionsUpdate: () => {} // Default no-op function
 };
 
 export default SessionHistory;

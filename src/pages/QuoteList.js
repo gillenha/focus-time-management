@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { fetchQuotes, addQuote, deleteQuote } from '../services/quotesService';
 import { toast } from 'react-toastify';
-import { ListItemActions } from '../components/shared';
+import { ListItemActions, CreateDialog, EditDialog, DeleteDialog } from '../components/shared';
 
 const QuoteList = ({ onClose, isExiting }) => {
-    const [quoteText, setQuoteText] = useState('');
-    const [attribution, setAttribution] = useState('');
     const [quotes, setQuotes] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showQuotes, setShowQuotes] = useState(false);
     const [editingQuote, setEditingQuote] = useState(null);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [quoteToDelete, setQuoteToDelete] = useState(null);
 
     useEffect(() => {
         loadQuotes();
@@ -28,70 +30,91 @@ const QuoteList = ({ onClose, isExiting }) => {
         }
     };
 
-    const handleAddQuote = async (e) => {
-        e.preventDefault();
-        if (!quoteText.trim()) return;
-        
+    const handleCreateQuote = async (formData) => {
         try {
-            if (editingQuote) {
-                // Handle edit
-                const updatedQuote = {
-                    ...editingQuote,
-                    text: quoteText.trim(),
-                    author: attribution.trim() || 'Unknown'
-                };
-                // TODO: Add updateQuote service function
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(updatedQuote),
-                });
-                
-                if (!response.ok) throw new Error('Failed to update quote');
-                
-                const updatedQuotes = quotes.map(q => 
-                    q._id === editingQuote._id ? updatedQuote : q
-                );
-                setQuotes(updatedQuotes);
-                setEditingQuote(null);
-                toast.success('Quote updated successfully');
-            } else {
-                // Handle add
-                const formattedQuote = {
-                    text: quoteText.trim(),
-                    author: attribution.trim() || 'Unknown'
-                };
-                const updatedQuotes = await addQuote(formattedQuote);
-                setQuotes(updatedQuotes);
-                toast.success('Quote added successfully');
-            }
-            setQuoteText('');
-            setAttribution('');
+            const formattedQuote = {
+                text: formData.text.trim(),
+                author: formData.author.trim() || 'Unknown'
+            };
+            const updatedQuotes = await addQuote(formattedQuote);
+            setQuotes(updatedQuotes);
+            setShowCreateDialog(false);
+            toast.success('Quote added successfully');
         } catch (error) {
-            toast.error(editingQuote ? 'Failed to update quote' : 'Failed to add quote');
+            toast.error('Failed to add quote');
             console.error('Error:', error);
         }
     };
 
     const handleEdit = (quote) => {
         setEditingQuote(quote);
-        setQuoteText(quote.text);
-        setAttribution(quote.author);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setShowEditDialog(true);
     };
 
-    const handleRemoveQuote = async (quoteId) => {
+    const handleUpdateQuote = async (editedText, editedAuthor) => {
         try {
-            const updatedQuotes = await deleteQuote(quoteId);
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...editingQuote,
+                    text: editedText,
+                    author: editedAuthor || 'Unknown'
+                }),
+            });
+            
+            if (!response.ok) throw new Error('Failed to update quote');
+            
+            const updatedQuotes = quotes.map(q => 
+                q._id === editingQuote._id ? { ...q, text: editedText, author: editedAuthor || 'Unknown' } : q
+            );
             setQuotes(updatedQuotes);
+            setEditingQuote(null);
+            toast.success('Quote updated successfully');
+        } catch (error) {
+            toast.error('Failed to update quote');
+            console.error('Error:', error);
+        }
+    };
+
+    const handleDeleteClick = (quote) => {
+        setQuoteToDelete(quote);
+        setShowDeleteDialog(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!quoteToDelete) return;
+        
+        try {
+            const updatedQuotes = await deleteQuote(quoteToDelete._id);
+            setQuotes(updatedQuotes);
+            setShowDeleteDialog(false);
+            setQuoteToDelete(null);
             toast.success('Quote removed successfully');
         } catch (error) {
             toast.error('Failed to remove quote');
             console.error('Error removing quote:', error);
         }
     };
+
+    const quoteFields = [
+        {
+            name: 'text',
+            label: 'Quote Text',
+            type: 'textarea',
+            placeholder: 'Enter an inspiring focus quote...',
+            required: true
+        },
+        {
+            name: 'author',
+            label: 'Attribution',
+            type: 'text',
+            placeholder: "Enter the quote's author...",
+            required: false
+        }
+    ];
 
     return (
         <div className={`tw-fixed tw-inset-0 tw-bg-black/90 tw-backdrop-blur-lg tw-z-50 ${isExiting ? 'tw-animate-slideOut' : 'tw-animate-slideIn'}`}>
@@ -128,102 +151,121 @@ const QuoteList = ({ onClose, isExiting }) => {
                         <div>
                             <h3 className="tw-text-lg tw-font-semibold tw-mb-4 tw-text-white/90">Focus Quotes</h3>
                             
-                            {/* Add New Quote Form */}
-                            <div className="tw-max-w-sm tw-mx-auto">
-                                <form onSubmit={handleAddQuote} className="tw-mb-8">
-                                    <div className="tw-flex tw-flex-col tw-space-y-4">
-                                        <div className="tw-flex tw-flex-col tw-space-y-1">
-                                            <label className="tw-text-sm tw-font-medium tw-text-white/80">Quote Text</label>
-                                            <textarea
-                                                value={quoteText}
-                                                onChange={(e) => setQuoteText(e.target.value)}
-                                                placeholder="Enter an inspiring focus quote..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-white/10 tw-bg-white/5 tw-px-4 tw-py-3 tw-text-white tw-shadow-sm tw-transition-all hover:tw-border-white/20 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 tw-resize-none tw-overflow-y-auto tw-h-32 placeholder:tw-text-white/30"
-                                            />
-                                        </div>
-                                        <div className="tw-flex tw-flex-col tw-space-y-1">
-                                            <label className="tw-text-sm tw-font-medium tw-text-white/80">Attribution (Optional)</label>
-                                            <input
-                                                type="text"
-                                                value={attribution}
-                                                onChange={(e) => setAttribution(e.target.value)}
-                                                placeholder="Enter the quote's author..."
-                                                className="tw-block tw-w-full tw-rounded-lg tw-border tw-border-white/10 tw-bg-white/5 tw-px-4 tw-py-3 tw-text-white tw-shadow-sm tw-transition-all hover:tw-border-white/20 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500 placeholder:tw-text-white/30"
-                                            />
-                                        </div>
-                                        <div>
-                                            <button
-                                                type="submit"
-                                                className="primary-button tw-w-[110%]"
-                                            >
-                                                Add Quote
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
+                            {/* Add New Quote Button */}
+                            <div className="tw-max-w-sm tw-mx-auto tw-mb-8">
+                                <button
+                                    onClick={() => setShowCreateDialog(true)}
+                                    className="primary-button tw-w-full"
+                                >
+                                    Add New Quote
+                                </button>
+                            </div>
 
-                                {/* Collapsible Quote List */}
-                                <div className="tw-mb-4 tw-flex tw-justify-center">
-                                    <button
-                                        onClick={() => setShowQuotes(!showQuotes)}
-                                        className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-white/90 hover:tw-text-white tw-cursor-pointer tw-transition-colors tw-bg-transparent tw-border-0 tw-appearance-none"
+                            {/* Create Dialog */}
+                            <CreateDialog
+                                isOpen={showCreateDialog}
+                                onClose={() => setShowCreateDialog(false)}
+                                onSubmit={handleCreateQuote}
+                                title="Add New Quote"
+                                fields={quoteFields}
+                                submitButtonText="Add Quote"
+                            />
+
+                            {/* Edit Dialog */}
+                            <EditDialog
+                                isOpen={showEditDialog}
+                                onClose={() => {
+                                    setShowEditDialog(false);
+                                    setEditingQuote(null);
+                                }}
+                                onConfirm={handleUpdateQuote}
+                                session={{
+                                    text: editingQuote?.text || '',
+                                    author: editingQuote?.author || ''
+                                }}
+                                dialogTitle="Edit Quote"
+                                textareaLabel="Quote Text"
+                                textareaPlaceholder="Enter your quote..."
+                                inputLabel="Attribution"
+                                inputPlaceholder="Enter the quote's author..."
+                                saveButtonText="Save"
+                                darkMode={true}
+                                showAttributionField={true}
+                            />
+
+                            {/* Delete Dialog */}
+                            <DeleteDialog
+                                isOpen={showDeleteDialog}
+                                onClose={() => {
+                                    setShowDeleteDialog(false);
+                                    setQuoteToDelete(null);
+                                }}
+                                onConfirm={handleConfirmDelete}
+                                title="Delete Quote"
+                                message={`Are you sure you want to delete this quote: "${quoteToDelete?.text}"?`}
+                                confirmButtonText="Delete"
+                                darkMode={true}
+                            />
+
+                            {/* Collapsible Quote List */}
+                            <div className="tw-mb-4 tw-flex tw-justify-center">
+                                <button
+                                    onClick={() => setShowQuotes(!showQuotes)}
+                                    className="tw-flex tw-items-center tw-text-lg tw-font-semibold tw-text-white/90 hover:tw-text-white tw-cursor-pointer tw-transition-colors tw-bg-transparent tw-border-0 tw-appearance-none"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className={`tw-h-5 tw-w-5 tw-mr-2 tw-transition-transform tw-duration-200 ${showQuotes ? 'tw-rotate-90' : ''}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
                                     >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className={`tw-h-5 tw-w-5 tw-mr-2 tw-transition-transform tw-duration-200 ${showQuotes ? 'tw-rotate-90' : ''}`}
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                        {showQuotes ? 'Hide Quotes' : 'See Quotes'}
-                                    </button>
-                                </div>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    {showQuotes ? 'Hide Quotes' : 'See Quotes'}
+                                </button>
+                            </div>
 
-                                {/* Quote List with fade animation */}
-                                <div className={`tw-space-y-3 tw-transition-opacity tw-duration-300 ${showQuotes ? 'tw-opacity-100' : 'tw-opacity-0 tw-h-0 tw-overflow-hidden'}`}>
-                                    {isLoading ? (
-                                        <div className="tw-flex tw-justify-center tw-py-8">
-                                            <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-blue-500 tw-border-t-transparent"></div>
-                                        </div>
-                                    ) : quotes.length === 0 ? (
-                                        <p className="tw-text-center tw-text-white/50 tw-italic tw-py-8">No quotes available.</p>
-                                    ) : (
-                                        quotes.map((quote) => (
-                                            <div 
-                                                key={quote._id} 
-                                                className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto tw-bg-white/5 tw-rounded-lg hover:tw-bg-white/10"
-                                            >
-                                                <div className="tw-flex tw-justify-between tw-items-start">
-                                                    <p className="tw-text-white/90 tw-text-base tw-leading-relaxed tw-break-words tw-pr-8">
-                                                        "{quote.text}"
-                                                        {quote.author && quote.author !== 'Unknown' && (
-                                                            <span className="tw-text-white/70 tw-ml-1">- {quote.author}</span>
-                                                        )}
-                                                    </p>
-                                                    <ListItemActions
-                                                        onEdit={() => handleEdit(quote)}
-                                                        onDelete={() => handleRemoveQuote(quote._id)}
-                                                        deleteConfirmTitle="Delete Quote"
-                                                        deleteConfirmMessage={`Are you sure you want to delete this quote: "${quote.text}"?`}
-                                                        className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
-                                                        editIcon={
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-white" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                            </svg>
-                                                        }
-                                                        deleteIcon={
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                            </svg>
-                                                        }
-                                                    />
-                                                </div>
+                            {/* Quote List with fade animation */}
+                            <div className={`tw-space-y-3 tw-transition-opacity tw-duration-300 ${showQuotes ? 'tw-opacity-100' : 'tw-opacity-0 tw-h-0 tw-overflow-hidden'}`}>
+                                {isLoading ? (
+                                    <div className="tw-flex tw-justify-center tw-py-8">
+                                        <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-blue-500 tw-border-t-transparent"></div>
+                                    </div>
+                                ) : quotes.length === 0 ? (
+                                    <p className="tw-text-center tw-text-white/50 tw-italic tw-py-8">No quotes available.</p>
+                                ) : (
+                                    quotes.map((quote) => (
+                                        <div 
+                                            key={quote._id} 
+                                            className="tw-group tw-relative tw-p-4 tw-transition-all tw-max-w-sm tw-mx-auto tw-bg-white/5 tw-rounded-lg hover:tw-bg-white/10"
+                                        >
+                                            <div className="tw-flex tw-justify-between tw-items-start">
+                                                <p className="tw-text-white/90 tw-text-base tw-leading-relaxed tw-break-words tw-pr-8">
+                                                    "{quote.text}"
+                                                    {quote.author && quote.author !== 'Unknown' && (
+                                                        <span className="tw-text-white/70 tw-ml-1">- {quote.author}</span>
+                                                    )}
+                                                </p>
+                                                <ListItemActions
+                                                    onEdit={() => handleEdit(quote)}
+                                                    onDelete={() => handleDeleteClick(quote)}
+                                                    className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
+                                                    editIcon={
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-white" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                        </svg>
+                                                    }
+                                                    deleteIcon={
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    }
+                                                />
                                             </div>
-                                        ))
-                                    )}
-                                </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
                     </div>

@@ -3,4 +3,5 @@ export { default as IconButton } from './IconButton';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as ListItemActions } from './ListItemActions';
 export { default as EditDialog } from './EditDialog';
-export { default as DeleteDialog } from './DeleteDialog'; 
+export { default as DeleteDialog } from './DeleteDialog';
+export { default as CreateDialog } from './CreateDialog'; 

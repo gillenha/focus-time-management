@@ -4,6 +4,7 @@ import ControlBar from './ControlBar';
 import SessionInput from './SessionInput';
 import AudioManager from '../utils/audioManager';
 import { fetchQuotes } from '../services/quotesService';
+import { toast } from 'react-toastify';
 
 const QUOTE_ROTATION_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds
 
@@ -113,37 +114,10 @@ function MusicPlayer({
     }
   };
 
-  const handleBeginSession = async () => {
-    console.log('Beginning session...');
-    const audioVerified = await verifyAudio();
-    
-    if (!audioVerified) {
-      console.error('Cannot start session: Audio verification failed');
-      return;
-    }
-
-    try {
-      const bellUrl = AudioManager.getBellAudioUrl();
-      console.log('Verifying bell sound:', bellUrl);
-      const isValid = await AudioManager.verifyAudio(bellUrl);
-      
-      if (isValid) {
-        const audio = new Audio(bellUrl);
-        await audio.play();
-      } else {
-        console.warn('Bell sound verification failed, continuing without bell sound');
-      }
-    } catch (error) {
-      console.error('Bell sound failed:', error);
-    }
-    
-    setSlideIn(true);
+  const handleBeginClick = (inputText, selectedProject) => {
     setSessionStarted(true);
-    onBeginClick(sessionInputValue);
-  };
-
-  const handleInputChange = (event) => {
-    setSessionInputValue(event.target.value);
+    setSlideIn(true);
+    onBeginClick(inputText, selectedProject);
   };
 
   const handleTrackEnd = useCallback(() => {
@@ -180,9 +154,9 @@ function MusicPlayer({
         {!sessionStarted && (
           <SessionInput
             inputValue={sessionInputValue}
-            onInputChange={handleInputChange}
-            onBeginClick={handleBeginSession}
-            fadeOut={slideIn}
+            onInputChange={(e) => setSessionInputValue(e.target.value)}
+            onBeginClick={handleBeginClick}
+            fadeOut={sessionStarted}
           />
         )}
 

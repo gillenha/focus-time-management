@@ -16,6 +16,7 @@ import Profile from './pages/Profile';
 import ChangeBackground from './pages/ChangeBackground';
 import TrackListPage from './pages/TrackListPage';
 import QuoteList from './pages/QuoteList';
+import Projects from './pages/Projects';
 
 function App() {
   const [isFreeflow, setIsFreeflow] = useState(false);
@@ -54,6 +55,8 @@ function App() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [showQuoteList, setShowQuoteList] = useState(false);
   const [isQuoteListExiting, setIsQuoteListExiting] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
+  const [isProjectsExiting, setIsProjectsExiting] = useState(false);
 
   // Add effect to load tracks from server if none in localStorage
   useEffect(() => {
@@ -210,10 +213,11 @@ function App() {
 
       const now = new Date();
       const newSession = {
-        date: now.toISOString(), // Send ISO string for MongoDB date
+        date: now.toISOString(),
         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
         duration: formatDuration(time),
-        text: currentSessionText
+        text: currentSessionText,
+        projectId: JSON.parse(localStorage.getItem('currentSession'))?.projectId || null
       };
 
       try {
@@ -294,11 +298,24 @@ function App() {
     localStorage.removeItem('sessionHistory');
   };
 
-  const handleBeginClick = (inputText) => {
+  const handleBeginClick = (inputText, projectId) => {
     setTimerActive(true);
     setCurrentSessionText(inputText);
     setSessionInputValue(inputText);
     setSessionStarted(true);
+    
+    // Save current session state with project
+    const sessionData = {
+      time,
+      timerActive: true,
+      text: inputText,
+      projectId,
+      isFreeflow,
+      showMusicPlayer,
+      sessionInputValue: inputText,
+      sessionStarted: true
+    };
+    localStorage.setItem('currentSession', JSON.stringify(sessionData));
   };
 
   const formatDuration = (duration) => {
@@ -404,7 +421,7 @@ function App() {
       
       // If session was active, automatically restart it
       if (savedSession.sessionStarted && savedSession.timerActive) {
-        handleBeginClick(savedSession.text);
+        handleBeginClick(savedSession.text, savedSession.projectId);
       }
     }
   }, []);
@@ -488,6 +505,18 @@ function App() {
     }
   };
 
+  const toggleProjects = () => {
+    if (showProjects) {
+      setIsProjectsExiting(true);
+      setTimeout(() => {
+        setShowProjects(false);
+        setIsProjectsExiting(false);
+      }, 300); // Match animation duration
+    } else {
+      setShowProjects(true);
+    }
+  };
+
   return (
     <div className="grid-container">
       <div 
@@ -564,6 +593,10 @@ function App() {
             setIsMenuOpen(false);
             toggleQuoteList();
           }}
+          onProjects={() => {
+            setIsMenuOpen(false);
+            toggleProjects();
+          }}
         />
         {showMusicPlayer && (
           <MusicPlayer
@@ -636,6 +669,12 @@ function App() {
         <QuoteList
           onClose={toggleQuoteList}
           isExiting={isQuoteListExiting}
+        />
+      )}
+      {(showProjects || isProjectsExiting) && (
+        <Projects
+          onClose={toggleProjects}
+          isExiting={isProjectsExiting}
         />
       )}
     </div>

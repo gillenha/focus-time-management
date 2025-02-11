@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImage, onTrackList, onQuoteList }) {
+function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImage, onTrackList, onQuoteList, onProjects }) {
   return (
     <div className={`menu ${isOpen ? 'open' : ''}`}>
       {/* Overlay */}
@@ -75,6 +75,19 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 >
                   <span>Session History</span>
                   <span className="tw-text-gray-400"></span>
+                </a>
+              </li>
+              <li>
+                <a 
+                  href="#" 
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  onClick={() => {
+                    onProjects();
+                    onClose();
+                  }}
+                >
+                  <span>Projects</span>
+                  <span className="tw-text-gray-400">📋</span>
                 </a>
               </li>
               <li>

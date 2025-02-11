@@ -29,24 +29,7 @@ function SessionInput({ inputValue, onInputChange, onBeginClick, fadeOut }) {
 
       <button
         onClick={onBeginClick}
-        className={`
-          tw-absolute
-          tw-bottom-24
-          tw-left-1/2
-          tw--translate-x-1/2
-          tw-w-[90%]
-          tw-py-3
-          tw-bg-gray-700
-          tw-rounded-lg
-          tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)]
-          tw-font-sans
-          tw-text-lg
-          tw-text-white
-          tw-cursor-pointer
-          tw-border-0
-          tw-transition-all
-          ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
-        `}
+        className={`primary-button tw-absolute tw-bottom-24 tw-left-1/2 tw--translate-x-1/2 ${fadeOut ? 'fadeOut' : 'opacity-100'}`}
       >
         Begin Session
       </button>

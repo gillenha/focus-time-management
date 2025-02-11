@@ -262,3 +262,26 @@ body, html {
 .tw-animate-slideOut {
   animation: slideOut 0.3s ease-out forwards;
 }
+
+/* Global styling for primary-button and fade classes */
+.primary-button {
+  width: 90%;
+  padding: 0.75rem 0; /* equivalent to tw-py-3 */
+  background-color: #374151; /* equivalent to tw-bg-gray-700 */
+  border-radius: 0.5rem; /* equivalent to tw-rounded-lg */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25); /* equivalent to tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] */
+  font-family: sans-serif; /* equivalent to tw-font-sans */
+  font-size: 1.125rem; /* equivalent to tw-text-lg */
+  color: #ffffff; /* equivalent to tw-text-white */
+  cursor: pointer; /* equivalent to tw-cursor-pointer */
+  border: none; /* equivalent to tw-border-0 */
+  transition: all 0.3s ease; /* equivalent to tw-transition-all */
+}
+
+.fadeOut {
+  animation: fadeOut 1s ease-out forwards;
+}
+
+.opacity-100 {
+  opacity: 1;
+}

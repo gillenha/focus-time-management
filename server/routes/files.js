@@ -43,21 +43,24 @@ let bucket;
 
 async function initializeStorage() {
     try {
-        // Always use Application Default Credentials
-        // This will work with both Workload Identity Federation and Cloud Run's built-in authentication
-        storage = new Storage();
-        
-        // Initialize the bucket
-        bucket = storage.bucket('react-app-assets');
+        const config = {};
+        if (process.env.NODE_ENV !== 'production') {
+            if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+                config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+                console.log('Using service account credentials from GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
+            } else {
+                console.warn('GOOGLE_APPLICATION_CREDENTIALS not set in development mode. Consider running "gcloud auth application-default login" or setting the variable in your .env file.');
+            }
+            if (process.env.GCLOUD_PROJECT_ID) {
+                config.projectId = process.env.GCLOUD_PROJECT_ID;
+            }
+        }
+        storage = new Storage(config);
+        bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
 
         // Verify bucket access
-        try {
-            await bucket.exists();
-            console.log('Successfully connected to GCS bucket');
-        } catch (error) {
-            throw new Error(`Failed to access bucket: ${error.message}`);
-        }
-
+        await bucket.exists();
+        console.log('Successfully connected to GCS bucket:', bucket.name);
     } catch (error) {
         console.error('Failed to initialize Google Cloud Storage:', error);
         throw error;

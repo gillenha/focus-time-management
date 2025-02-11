@@ -65,7 +65,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             {/* Apply Button */}
                             <button
                                 onClick={handleApplyTheme}
-                                className={`btn-primary ${selectedTheme === theme ? 'disabled' : ''}`}
+                                className={`primary-button tw-w-full tw-mx-auto tw-mb-4 ${selectedTheme === theme ? 'disabled' : ''}`}
                                 disabled={selectedTheme === theme}
                             >
                                 {selectedTheme === theme ? 'Current Theme' : 'Apply Theme'}

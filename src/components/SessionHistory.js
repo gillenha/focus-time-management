@@ -175,7 +175,7 @@ const SessionHistory = ({ onClose }) => {
                         <div className="tw-flex tw-justify-end tw-space-x-3">
                             <button
                                 onClick={clearHistory}
-                                className="btn-danger"
+                                className="primary-button tw-fixed tw-bottom-4 tw-right-8 tw-w-36"
                             >
                                 Clear History
                             </button>

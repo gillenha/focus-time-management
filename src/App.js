@@ -212,20 +212,20 @@ function App() {
       }
 
       const now = new Date();
+      const currentSession = JSON.parse(localStorage.getItem('currentSession'));
       const newSession = {
         date: now.toISOString(),
         time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
         duration: formatDuration(time),
         text: currentSessionText,
-        projectId: JSON.parse(localStorage.getItem('currentSession'))?.projectId || null
+        project: currentSession?.projectId || null
       };
 
       try {
         // Save to MongoDB
         console.log('Attempting to save session to MongoDB:', newSession);
-        console.log('API URL:', `${process.env.REACT_APP_API_URL}/api/sessions/log`);
         
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions/log`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -246,8 +246,8 @@ function App() {
         const result = await response.json();
         console.log('Session saved to MongoDB:', result);
 
-        // Update local state and storage
-        const updatedHistory = [...sessionHistory, newSession];
+        // Update local state with the populated session from the response
+        const updatedHistory = [...sessionHistory, result];
         setSessionHistory(updatedHistory);
         localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
       } catch (error) {
@@ -303,6 +303,13 @@ function App() {
     setCurrentSessionText(inputText);
     setSessionInputValue(inputText);
     setSessionStarted(true);
+    
+    // Play bell sound
+    const bell = new Audio(`${process.env.REACT_APP_API_URL}/effects/bell.mp3`);
+    bell.volume = volume;
+    bell.play().catch(error => {
+      console.error('Error playing bell sound:', error);
+    });
     
     // Save current session state with project
     const sessionData = {
@@ -444,10 +451,12 @@ function App() {
   // Auto-save current session
   useEffect(() => {
     if (timerActive || time > 0) {
+      const currentSession = JSON.parse(localStorage.getItem('currentSession'));
       const sessionData = {
         time,
         timerActive,
         text: currentSessionText,
+        projectId: currentSession?.projectId, // Preserve project ID
         isFreeflow,
         showMusicPlayer,
         sessionInputValue,

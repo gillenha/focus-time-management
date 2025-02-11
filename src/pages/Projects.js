@@ -180,7 +180,7 @@ const Projects = ({ onClose, isExiting }) => {
                                                 />
                                                 <button
                                                     type="submit"
-                                                    className="primary-button"
+                                                    className="primary-button tw-w-24"
                                                 >
                                                     Add
                                                 </button>

@@ -221,6 +221,12 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
                                                     <span className="tw-text-sm tw-text-gray-500">Duration: </span>
                                                     <span className="tw-font-medium tw-ml-1">{formatDuration(session.duration)}</span>
                                                 </div>
+                                                {session.project && (
+                                                    <div className="tw-flex tw-items-center">
+                                                        <span className="tw-text-sm tw-text-gray-500">Project: </span>
+                                                        <span className="tw-font-medium tw-ml-1">{session.project.name}</span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Right Column - Notes */}

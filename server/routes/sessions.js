@@ -17,14 +17,64 @@ function formatDuration(duration) {
     }
 }
 
-// Get all sessions
+// Get all sessions with project information
 router.get('/', async (req, res) => {
     try {
-        const sessions = await Session.find().sort({ date: -1 });
+        const sessions = await Session.find()
+            .populate('project', 'name') // Only populate the project name
+            .sort({ date: -1 });
         res.json(sessions);
     } catch (err) {
         console.error('Error fetching sessions:', err);
         res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+});
+
+// Create new session
+router.post('/', async (req, res) => {
+    try {
+        const { date, time, duration, text, project } = req.body;
+        const session = new Session({
+            date,
+            time,
+            duration,
+            text,
+            project // Include project ID if provided
+        });
+        const savedSession = await session.save();
+        const populatedSession = await Session.findById(savedSession._id)
+            .populate('project', 'name');
+        res.status(201).json(populatedSession);
+    } catch (err) {
+        console.error('Error creating session:', err);
+        res.status(500).json({ error: 'Failed to create session' });
+    }
+});
+
+// Update session
+router.put('/:id', async (req, res) => {
+    try {
+        const { text, project } = req.body;
+        const updatedSession = await Session.findByIdAndUpdate(
+            req.params.id,
+            { text, project },
+            { new: true }
+        ).populate('project', 'name');
+        res.json(updatedSession);
+    } catch (err) {
+        console.error('Error updating session:', err);
+        res.status(500).json({ error: 'Failed to update session' });
+    }
+});
+
+// Delete session
+router.delete('/:id', async (req, res) => {
+    try {
+        await Session.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Session deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting session:', err);
+        res.status(500).json({ error: 'Failed to delete session' });
     }
 });
 
@@ -39,114 +89,12 @@ router.delete('/clear', async (req, res) => {
     }
 });
 
-// Update a session
-router.put('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const updates = req.body;
-
-        const session = await Session.findById(id);
-        if (!session) {
-            return res.status(404).json({ error: 'Session not found' });
-        }
-
-        // Update only the text field
-        session.text = updates.text;
-        await session.save();
-
-        res.json(session);
-    } catch (err) {
-        console.error('Error updating session:', err);
-        res.status(500).json({ error: 'Failed to update session' });
-    }
-});
-
-// Delete a session
-router.delete('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const session = await Session.findById(id);
-        
-        if (!session) {
-            return res.status(404).json({ error: 'Session not found' });
-        }
-
-        await Session.findByIdAndDelete(id);
-        res.json({ message: 'Session deleted successfully' });
-    } catch (err) {
-        console.error('Error deleting session:', err);
-        res.status(500).json({ error: 'Failed to delete session' });
-    }
-});
-
-// Freeflow route
-router.put('/freeflow', (req, res) => {
-    const { time } = req.body;
-
-    if (!time) {
-        return res.status(400).json({ error: 'Time is required' });
-    }
-
-    res.status(200).json({ message: 'Time received successfully', time });
-});
-
-// Log session route
-router.post('/log', async (req, res) => {
-    const sessionDetails = req.body;
-    
-    console.log('Received session details:', sessionDetails);
-    
-    const requiredFields = ['date', 'time', 'duration'];
-    const missingFields = requiredFields.filter(field => !sessionDetails?.[field]);
-    
-    if (missingFields.length > 0) {
-        const errorMsg = `Incomplete session details. Missing fields: ${missingFields.join(', ')}`;
-        console.error(errorMsg);
-        return res.status(400).json({ 
-            error: errorMsg,
-            receivedData: sessionDetails 
-        });
-    }
-
-    sessionDetails.text = sessionDetails.text || '';
-    sessionDetails.duration = formatDuration(sessionDetails.duration);
-
-    try {
-        const session = new Session(sessionDetails);
-        await session.save();
-
-        console.log('Session logged:', session);
-        res.status(200).json({ message: 'Session details logged successfully', session });
-    } catch (err) {
-        console.error('Error logging session:', err);
-        res.status(500).json({ error: 'Failed to log session details' });
-    }
-});
-
-// Restore sessions from backup
+// Restore sessions (for import functionality)
 router.post('/restore', async (req, res) => {
     try {
         const sessions = req.body;
-        
-        if (!Array.isArray(sessions)) {
-            return res.status(400).json({ error: 'Request body must be an array of sessions' });
-        }
-
-        // Remove MongoDB-specific fields that might cause issues
-        const cleanedSessions = sessions.map(session => ({
-            date: session.date,
-            time: session.time,
-            duration: session.duration,
-            text: session.text || ''
-        }));
-
-        // Insert all sessions
-        const result = await Session.insertMany(cleanedSessions);
-        
-        res.status(200).json({ 
-            message: 'Sessions restored successfully', 
-            count: result.length 
-        });
+        const result = await Session.insertMany(sessions);
+        res.status(200).json({ count: result.length, message: 'Sessions restored successfully' });
     } catch (err) {
         console.error('Error restoring sessions:', err);
         res.status(500).json({ error: 'Failed to restore sessions' });

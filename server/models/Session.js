@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const sessionSchema = new mongoose.Schema({
   date: {
     type: Date,
-    required: true
+    default: Date.now
   },
   time: {
     type: String,
@@ -16,6 +16,10 @@ const sessionSchema = new mongoose.Schema({
   text: {
     type: String,
     default: ''
+  },
+  project: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project'
   }
 }, {
   timestamps: true

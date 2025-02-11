@@ -65,12 +65,12 @@ const SessionInput = ({ inputValue, onInputChange, onBeginClick, fadeOut }) => {
           tw-bottom-36
           tw-left-1/2
           tw--translate-x-1/2
-          tw-w-[83%]
-          tw-bg-white
+          tw-w-[90%]
+          tw-bg-gray-300
           tw-rounded-lg
-          tw-p-4
+          tw-p-2
           tw-font-sans
-          tw-text-lg
+          tw-text-xs
           tw-text-gray-800
           tw-border
           tw-border-gray-300
@@ -81,7 +81,7 @@ const SessionInput = ({ inputValue, onInputChange, onBeginClick, fadeOut }) => {
           ${fadeOut ? 'tw-animate-fadeOut' : 'tw-opacity-100'}
         `}
       >
-        <option value="">Select a project (optional)</option>
+        <option value="">What is this for?</option>
         {projects.length === 0 ? (
           <option disabled>Add a project in the projects page or leave blank for none</option>
         ) : (
@@ -95,7 +95,7 @@ const SessionInput = ({ inputValue, onInputChange, onBeginClick, fadeOut }) => {
 
       <button
         onClick={handleBeginClick}
-        className={`primary-button tw-absolute tw-bottom-24 tw-left-1/2 tw--translate-x-1/2 ${fadeOut ? 'fadeOut' : 'opacity-100'}`}
+        className={`primary-button tw-absolute tw-bottom-12 tw-left-1/2 tw-w-[90%] tw--translate-x-1/2 ${fadeOut ? 'fadeOut' : 'opacity-100'}`}
       >
         Begin Session
       </button>

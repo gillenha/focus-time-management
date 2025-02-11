@@ -11,13 +11,14 @@ function SessionHistoryPage({ onClose, isExiting }) {
 
   const handleExport = async () => {
     try {
+      // Fetch sessions with populated project data
       const response = await fetch(`${API_BASE_URL}/api/sessions`);
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');
       }
       const sessions = await response.json();
       
-      // Create a blob with the sessions data
+      // Create a blob with the sessions data (including project information)
       const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       
@@ -61,6 +62,7 @@ function SessionHistoryPage({ onClose, isExiting }) {
           
           const sessions = JSON.parse(result);
           
+          // Send sessions with project data to restore endpoint
           const response = await fetch(`${API_BASE_URL}/api/sessions/restore`, {
             method: 'POST',
             headers: {

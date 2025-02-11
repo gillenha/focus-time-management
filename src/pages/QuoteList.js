@@ -154,7 +154,7 @@ const QuoteList = ({ onClose, isExiting }) => {
                                         <div>
                                             <button
                                                 type="submit"
-                                                className="primary-button"
+                                                className="primary-button tw-w-[110%]"
                                             >
                                                 Add Quote
                                             </button>

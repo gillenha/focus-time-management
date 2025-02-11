@@ -1,10 +1,10 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { ListItemActions, EditDialog, DeleteDialog } from './shared';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
+import { ListItemActions, EditDialog, DeleteDialog, CreateDialog, DurationInput } from './shared';
 import { toast } from 'react-toastify';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
+const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref) => {
     const [sessionHistory, setSessionHistory] = useState([]);
     const [editingSession, setEditingSession] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -17,6 +17,10 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
         time: '',
         duration: ''
     });
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [durationValue, setDurationValue] = useState('00:00:00');
+    const [durationError, setDurationError] = useState('');
+    const fileInputRef = useRef(null);
 
     const fetchSessions = async () => {
         try {
@@ -124,13 +128,24 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
 
     // Add duration validation helper
     const validateDuration = (duration) => {
-        // Accept formats: MM:SS or HH:MM:SS
-        const durationRegex = /^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$/;
-        return durationRegex.test(duration);
+        if (!duration || duration === '00:00:00') {
+            return 'Please enter a valid duration';
+        }
+        
+        const [hours, minutes, seconds] = duration.split(':').map(Number);
+        if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+            return 'Invalid duration format';
+        }
+        
+        if (hours === 0 && minutes === 0 && seconds === 0) {
+            return 'Duration cannot be zero';
+        }
+        
+        return '';
     };
 
     // Add duration formatting helper
-    const formatDurationInput = (input) => {
+    const formatDurationInput = (input, showError) => {
         // Remove non-numeric characters
         const numbers = input.replace(/[^\d]/g, '');
         
@@ -147,17 +162,23 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
     };
 
     const handleDurationChange = (value) => {
-        // Format the duration as the user types
-        const formattedDuration = formatDurationInput(value);
-        setEditingFields(prev => ({ ...prev, duration: formattedDuration }));
+        const showError = () => {
+            toast.error('Please enter a valid time');
+            setDurationError('Please enter a valid time');
+        };
+        const formatted = formatDurationInput(value, showError);
+        setDurationValue(formatted);
+        setDurationError(validateDuration(formatted));
+        return formatted;
     };
 
     const handleSaveEdit = async () => {
         if (!editingSession) return;
 
         // Validate duration before saving
-        if (!validateDuration(editingFields.duration)) {
-            toast.error('Please enter a valid duration (MM:SS or HH:MM:SS)');
+        const durationValidationError = validateDuration(editingFields.duration);
+        if (durationValidationError) {
+            toast.error(durationValidationError);
             return;
         }
 
@@ -198,6 +219,127 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
         } catch (error) {
             console.error('Error updating session:', error);
             toast.error('Failed to update session');
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/sessions`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch sessions');
+            }
+            const sessions = await response.json();
+            
+            const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `sessions_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            toast.success('Sessions exported successfully');
+        } catch (error) {
+            console.error('Error exporting sessions:', error);
+            toast.error('Failed to export sessions');
+        }
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileSelect = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'application/json') {
+            toast.error('Please select a JSON file');
+            return;
+        }
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const result = e.target?.result;
+                    if (typeof result !== 'string') return;
+                    
+                    const sessions = JSON.parse(result);
+                    
+                    const response = await fetch(`${API_BASE_URL}/api/sessions/restore`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(sessions),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to restore sessions');
+                    }
+
+                    const data = await response.json();
+                    toast.success(`Successfully restored ${data.count} sessions`);
+                    
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
+
+                    fetchSessions();
+                } catch (error) {
+                    console.error('Error parsing or restoring sessions:', error);
+                    toast.error('Failed to restore sessions. Please check the file format.');
+                }
+            };
+            reader.readAsText(file);
+        } catch (error) {
+            console.error('Error reading file:', error);
+            toast.error('Failed to read the file');
+        }
+    };
+
+    const handleCreateSession = async (formData) => {
+        const durationValidationError = validateDuration(formData.duration);
+        if (durationValidationError) {
+            toast.error(durationValidationError);
+            return;
+        }
+
+        try {
+            const [year, month, day] = formData.date.split('-').map(Number);
+            const dateInLocalTimezone = new Date(year, month - 1, day);
+            
+            const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: formData.notes?.trim() || '',
+                    date: dateInLocalTimezone.toISOString(),
+                    time: formData.time,
+                    duration: formData.duration,
+                    project: formData.project || null
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create session');
+            }
+
+            fetchSessions();
+            setShowCreateDialog(false);
+            setDurationValue('00:00:00');
+            setDurationError('');
+            toast.success('Session created successfully');
+        } catch (error) {
+            console.error('Error creating session:', error);
+            toast.error('Failed to create session');
         }
     };
 
@@ -263,12 +405,22 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
                             },
                             {
                                 id: 'duration',
-                                label: 'Duration (MM:SS or HH:MM:SS)',
-                                type: 'text',
+                                label: 'Duration',
+                                type: 'custom',
                                 value: editingFields.duration,
-                                onChange: handleDurationChange,
-                                placeholder: '00:00',
-                                required: true
+                                onChange: (value) => {
+                                    setEditingFields(prev => ({ ...prev, duration: value }));
+                                    setDurationError(validateDuration(value));
+                                },
+                                renderInput: ({ value, onChange, error }) => (
+                                    <DurationInput
+                                        value={value}
+                                        onChange={onChange}
+                                        error={error}
+                                    />
+                                ),
+                                required: true,
+                                error: durationError
                             },
                             {
                                 id: 'notes',
@@ -365,17 +517,136 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
 
                     {/* Footer Actions - Now fixed at bottom */}
                     <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-4 tw-border-t tw-border-gray-200">
-                        <div className="tw-flex tw-justify-end tw-space-x-3">
-                            <button
-                                onClick={handleClearHistoryClick}
-                                className="danger-button tw-fixed tw-bottom-4 tw-right-8 tw-w-36"
-                            >
-                                Clear History
-                            </button>
+                        <div className="tw-flex tw-justify-between tw-items-center">
+                            <div className="tw-flex tw-items-center tw-gap-4">
+                                <button
+                                    onClick={handleExport}
+                                    className="tw-p-2 tw-rounded-lg tw-bg-gray-100 hover:tw-bg-gray-200 tw-transition-colors"
+                                    title="Export Sessions"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="tw-h-5 tw-w-5 tw-text-gray-600"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="17 8 12 3 7 8" />
+                                        <line x1="12" y1="3" x2="12" y2="15" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={handleImportClick}
+                                    className="tw-p-2 tw-rounded-lg tw-bg-gray-100 hover:tw-bg-gray-200 tw-transition-colors"
+                                    title="Import Sessions"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="tw-h-5 tw-w-5 tw-text-gray-600"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="7 10 12 15 17 10" />
+                                        <line x1="12" y1="15" x2="12" y2="3" />
+                                    </svg>
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".json,application/json"
+                                    onChange={handleFileSelect}
+                                    className="tw-hidden"
+                                />
+                            </div>
+                            <div className="tw-flex tw-items-center tw-gap-4">
+                                <button
+                                    onClick={() => setShowCreateDialog(true)}
+                                    className="primary-button tw-h-10 tw-w-36 tw-flex tw-items-center tw-justify-center tw-text-sm"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="tw-h-4 tw-w-4 tw-mr-2"
+                                        viewBox="0 0 20 15"
+                                        fill="currentColor"
+                                    >
+                                        <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    Add Session
+                                </button>
+                                <button
+                                    onClick={handleClearHistoryClick}
+                                    className="danger-button tw-h-10 tw-w-36 tw-flex tw-items-center tw-justify-center tw-text-sm"
+                                >
+                                    Clear History
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <CreateDialog
+                isOpen={showCreateDialog}
+                onClose={() => {
+                    setShowCreateDialog(false);
+                    setDurationValue('00:00:00');
+                    setDurationError('');
+                }}
+                onSubmit={handleCreateSession}
+                title="Add New Session"
+                fields={[
+                    {
+                        name: 'date',
+                        label: 'Date',
+                        type: 'date',
+                        required: true,
+                        value: new Date().toISOString().split('T')[0]
+                    },
+                    {
+                        name: 'time',
+                        label: 'Time',
+                        type: 'time',
+                        required: true,
+                        value: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+                    },
+                    {
+                        name: 'duration',
+                        label: 'Duration',
+                        type: 'custom',
+                        value: durationValue,
+                        onChange: (value) => {
+                            setDurationValue(value);
+                            setDurationError(validateDuration(value));
+                        },
+                        renderInput: ({ value, onChange, error }) => (
+                            <DurationInput
+                                value={value}
+                                onChange={onChange}
+                                error={error}
+                            />
+                        ),
+                        required: true,
+                        error: durationError
+                    },
+                    {
+                        name: 'notes',
+                        label: 'Session Notes',
+                        type: 'textarea',
+                        placeholder: 'Enter session notes...',
+                        required: false
+                    }
+                ]}
+                submitButtonText="Create"
+            />
         </div>
     );
 });

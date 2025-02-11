@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ListItemActions } from './shared';
-import { EditDialog } from './shared';
+import { ListItemActions, EditDialog, DeleteDialog } from './shared';
 import { toast } from 'react-toastify';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
@@ -9,6 +8,9 @@ const SessionHistory = ({ onClose }) => {
     const [sessionHistory, setSessionHistory] = useState([]);
     const [editingSession, setEditingSession] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [sessionToDelete, setSessionToDelete] = useState(null);
+    const [isClearHistoryDialogOpen, setIsClearHistoryDialogOpen] = useState(false);
 
     useEffect(() => {
         fetchSessions();
@@ -42,6 +44,10 @@ const SessionHistory = ({ onClose }) => {
         }
     };
 
+    const handleClearHistoryClick = () => {
+        setIsClearHistoryDialogOpen(true);
+    };
+
     const clearHistory = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/api/sessions/clear`, {
@@ -65,9 +71,16 @@ const SessionHistory = ({ onClose }) => {
         setIsEditDialogOpen(true);
     };
 
-    const handleDelete = async (sessionId) => {
+    const handleDeleteClick = (session) => {
+        setSessionToDelete(session);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleDelete = async () => {
+        if (!sessionToDelete) return;
+
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionToDelete._id}`, {
                 method: 'DELETE',
             });
 
@@ -75,11 +88,13 @@ const SessionHistory = ({ onClose }) => {
                 throw new Error('Failed to delete session');
             }
 
-            setSessionHistory(prev => prev.filter(session => session._id !== sessionId));
+            setSessionHistory(prev => prev.filter(session => session._id !== sessionToDelete._id));
             toast.success('Session deleted successfully');
         } catch (error) {
             console.error('Error deleting session:', error);
             toast.error('Failed to delete session');
+        } finally {
+            setSessionToDelete(null);
         }
     };
 
@@ -154,6 +169,27 @@ const SessionHistory = ({ onClose }) => {
                         session={editingSession}
                     />
 
+                    {/* Delete Dialog */}
+                    <DeleteDialog
+                        isOpen={isDeleteDialogOpen}
+                        onClose={() => {
+                            setIsDeleteDialogOpen(false);
+                            setSessionToDelete(null);
+                        }}
+                        onConfirm={handleDelete}
+                        title="Delete Session"
+                        message={sessionToDelete ? `Are you sure you want to delete this session from ${new Date(sessionToDelete.date).toLocaleDateString()}?` : ''}
+                    />
+
+                    {/* Clear History Dialog */}
+                    <DeleteDialog
+                        isOpen={isClearHistoryDialogOpen}
+                        onClose={() => setIsClearHistoryDialogOpen(false)}
+                        onConfirm={clearHistory}
+                        title="Clear All Session History"
+                        message="Are you sure you want to clear all session history? This action cannot be undone."
+                    />
+
                     {/* Session List */}
                     <div className="tw-mb-20">
                         <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
@@ -190,9 +226,7 @@ const SessionHistory = ({ onClose }) => {
 
                                         <ListItemActions
                                             onEdit={() => handleEdit(session)}
-                                            onDelete={() => handleDelete(session._id)}
-                                            deleteConfirmTitle="Delete Session"
-                                            deleteConfirmMessage={`Are you sure you want to delete this session from ${new Date(session.date).toLocaleDateString()}?`}
+                                            onDelete={() => handleDeleteClick(session)}
                                             className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
                                             editIcon={
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-gray-500 hover:tw-text-gray-700" viewBox="0 0 20 20" fill="currentColor">
@@ -215,8 +249,8 @@ const SessionHistory = ({ onClose }) => {
                     <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-4 tw-border-t tw-border-gray-200">
                         <div className="tw-flex tw-justify-end tw-space-x-3">
                             <button
-                                onClick={clearHistory}
-                                className="primary-button tw-fixed tw-bottom-4 tw-right-8 tw-w-36"
+                                onClick={handleClearHistoryClick}
+                                className="danger-button tw-fixed tw-bottom-4 tw-right-8 tw-w-36"
                             >
                                 Clear History
                             </button>

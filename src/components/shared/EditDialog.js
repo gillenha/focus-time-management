@@ -39,7 +39,7 @@ const EditDialog = ({ isOpen, onClose, onConfirm, session }) => {
                             onConfirm(editText);
                             onClose();
                         }}
-                        className="primary-button tw-p-2 tw-text-sm"
+                        className="primary-button tw-p-2 tw-text-xs"
                     >
                         Save Changes
                     </button>

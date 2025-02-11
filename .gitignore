@@ -40,4 +40,4 @@ build/
 # Ignore temp directory and all its contents
 temp/
 **/temp/
-*.temp
+*.tempsessions_backup.json

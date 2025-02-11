@@ -28,6 +28,17 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Clear all sessions
+router.delete('/clear', async (req, res) => {
+    try {
+        await Session.deleteMany({});
+        res.status(200).json({ message: 'All sessions cleared successfully' });
+    } catch (err) {
+        console.error('Error clearing sessions:', err);
+        res.status(500).json({ error: 'Failed to clear sessions' });
+    }
+});
+
 // Update a session
 router.put('/:id', async (req, res) => {
     try {
@@ -112,14 +123,33 @@ router.post('/log', async (req, res) => {
     }
 });
 
-// Clear all sessions
-router.delete('/clear', async (req, res) => {
+// Restore sessions from backup
+router.post('/restore', async (req, res) => {
     try {
-        await Session.deleteMany({});
-        res.status(200).json({ message: 'All sessions cleared successfully' });
+        const sessions = req.body;
+        
+        if (!Array.isArray(sessions)) {
+            return res.status(400).json({ error: 'Request body must be an array of sessions' });
+        }
+
+        // Remove MongoDB-specific fields that might cause issues
+        const cleanedSessions = sessions.map(session => ({
+            date: session.date,
+            time: session.time,
+            duration: session.duration,
+            text: session.text || ''
+        }));
+
+        // Insert all sessions
+        const result = await Session.insertMany(cleanedSessions);
+        
+        res.status(200).json({ 
+            message: 'Sessions restored successfully', 
+            count: result.length 
+        });
     } catch (err) {
-        console.error('Error clearing sessions:', err);
-        res.status(500).json({ error: 'Failed to clear sessions' });
+        console.error('Error restoring sessions:', err);
+        res.status(500).json({ error: 'Failed to restore sessions' });
     }
 });
 

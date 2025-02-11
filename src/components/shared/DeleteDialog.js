@@ -47,7 +47,7 @@ const DeleteDialog = ({
                             onConfirm();
                             onClose();
                         }}
-                        className={baseClasses.confirmButton}
+                        className={`${baseClasses.confirmButton} tw-w-24 tw-text-sm tw-p-2`}
                     >
                         {confirmButtonText}
                     </button>

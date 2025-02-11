@@ -6,6 +6,11 @@ const projectSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    projectDetails: {
+        type: String,
+        default: '',
+        trim: true
+    },
     createdAt: {
         type: Date,
         default: Date.now

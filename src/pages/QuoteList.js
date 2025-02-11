@@ -12,10 +12,23 @@ const QuoteList = ({ onClose, isExiting }) => {
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [quoteToDelete, setQuoteToDelete] = useState(null);
+    const [editingFields, setEditingFields] = useState({
+        text: '',
+        author: ''
+    });
 
     useEffect(() => {
         loadQuotes();
     }, []);
+
+    useEffect(() => {
+        if (editingQuote) {
+            setEditingFields({
+                text: editingQuote.text || '',
+                author: editingQuote.author || ''
+            });
+        }
+    }, [editingQuote]);
 
     const loadQuotes = async () => {
         try {
@@ -51,7 +64,7 @@ const QuoteList = ({ onClose, isExiting }) => {
         setShowEditDialog(true);
     };
 
-    const handleUpdateQuote = async (editedText, editedAuthor) => {
+    const handleUpdateQuote = async () => {
         try {
             const response = await fetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
                 method: 'PUT',
@@ -60,18 +73,22 @@ const QuoteList = ({ onClose, isExiting }) => {
                 },
                 body: JSON.stringify({
                     ...editingQuote,
-                    text: editedText,
-                    author: editedAuthor || 'Unknown'
+                    text: editingFields.text.trim(),
+                    author: editingFields.author?.trim() || 'Unknown'
                 }),
             });
             
             if (!response.ok) throw new Error('Failed to update quote');
             
             const updatedQuotes = quotes.map(q => 
-                q._id === editingQuote._id ? { ...q, text: editedText, author: editedAuthor || 'Unknown' } : q
+                q._id === editingQuote._id 
+                    ? { ...q, text: editingFields.text.trim(), author: editingFields.author?.trim() || 'Unknown' } 
+                    : q
             );
             setQuotes(updatedQuotes);
+            setShowEditDialog(false);
             setEditingQuote(null);
+            setEditingFields({ text: '', author: '' });
             toast.success('Quote updated successfully');
         } catch (error) {
             toast.error('Failed to update quote');
@@ -177,20 +194,31 @@ const QuoteList = ({ onClose, isExiting }) => {
                                 onClose={() => {
                                     setShowEditDialog(false);
                                     setEditingQuote(null);
+                                    setEditingFields({ text: '', author: '' });
                                 }}
                                 onConfirm={handleUpdateQuote}
-                                session={{
-                                    text: editingQuote?.text || '',
-                                    author: editingQuote?.author || ''
-                                }}
-                                dialogTitle="Edit Quote"
-                                textareaLabel="Quote Text"
-                                textareaPlaceholder="Enter your quote..."
-                                inputLabel="Attribution"
-                                inputPlaceholder="Enter the quote's author..."
-                                saveButtonText="Save"
+                                title="Edit Quote"
                                 darkMode={true}
-                                showAttributionField={true}
+                                fields={[
+                                    {
+                                        id: 'text',
+                                        label: 'Quote Text',
+                                        type: 'textarea',
+                                        value: editingFields.text,
+                                        onChange: (value) => setEditingFields(prev => ({ ...prev, text: value })),
+                                        placeholder: 'Enter an inspiring focus quote...',
+                                        required: true
+                                    },
+                                    {
+                                        id: 'author',
+                                        label: 'Attribution',
+                                        type: 'text',
+                                        value: editingFields.author,
+                                        onChange: (value) => setEditingFields(prev => ({ ...prev, author: value })),
+                                        placeholder: "Enter the quote's author...",
+                                        required: false
+                                    }
+                                ]}
                             />
 
                             {/* Delete Dialog */}
@@ -250,7 +278,7 @@ const QuoteList = ({ onClose, isExiting }) => {
                                                 <ListItemActions
                                                     onEdit={() => handleEdit(quote)}
                                                     onDelete={() => handleDeleteClick(quote)}
-                                                    className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
+                                                    className="tw-opacity-50 group-hover:tw-opacity-100 tw-transition-opacity"
                                                     editIcon={
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-white/70 hover:tw-text-white" viewBox="0 0 20 20" fill="currentColor">
                                                             <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />

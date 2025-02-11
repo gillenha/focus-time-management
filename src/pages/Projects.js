@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ListItemActions, EditDialog, DeleteDialog } from '../components/shared';
+import { ListItemActions, EditDialog, DeleteDialog, CreateDialog } from '../components/shared';
 import { toast } from 'react-toastify';
 
 const Projects = ({ onClose, isExiting }) => {
     const [projects, setProjects] = useState([]);
-    const [projectName, setProjectName] = useState('');
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -29,15 +29,15 @@ const Projects = ({ onClose, isExiting }) => {
         fetchProjects();
     }, []);
 
-    const handleAddProject = async (e) => {
-        e.preventDefault();
-        if (!projectName.trim()) {
+    const handleAddProject = async (formData) => {
+        if (!formData.name.trim()) {
             toast.error('Please enter a project name');
             return;
         }
 
         const newProject = {
-            name: projectName.trim(),
+            name: formData.name.trim(),
+            projectDetails: formData.details?.trim() || '',
             createdAt: new Date().toISOString()
         };
 
@@ -56,7 +56,7 @@ const Projects = ({ onClose, isExiting }) => {
 
             const data = await response.json();
             setProjects(prev => [...prev, data.project]);
-            setProjectName('');
+            setIsCreateDialogOpen(false);
             toast.success('Project created successfully');
         } catch (error) {
             console.error('Error creating project:', error);
@@ -69,8 +69,8 @@ const Projects = ({ onClose, isExiting }) => {
         setIsEditDialogOpen(true);
     };
 
-    const handleSaveEdit = async (newName) => {
-        if (!newName.trim()) {
+    const handleSaveEdit = async () => {
+        if (!editingProject?.name?.trim()) {
             toast.error('Please enter a project name');
             return;
         }
@@ -82,7 +82,9 @@ const Projects = ({ onClose, isExiting }) => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    name: newName.trim()
+                    name: editingProject.name.trim(),
+                    projectDetails: editingProject.projectDetails?.trim() || '',
+                    createdAt: editingProject.createdAt
                 }),
             });
 
@@ -93,10 +95,11 @@ const Projects = ({ onClose, isExiting }) => {
             const data = await response.json();
             setProjects(prev => prev.map(p => 
                 p._id === editingProject._id 
-                    ? data.project
+                    ? { ...data.project }
                     : p
             ));
             setEditingProject(null);
+            setIsEditDialogOpen(false);
             toast.success('Project updated successfully');
         } catch (error) {
             console.error('Error updating project:', error);
@@ -163,31 +166,41 @@ const Projects = ({ onClose, isExiting }) => {
                         <div>
                             <h3 className="tw-text-lg tw-font-semibold tw-mb-4 tw-text-gray-700">My Projects</h3>
                             <div className="tw-max-w-lg tw-mx-auto">
-                                {/* Add Project Form */}
-                                <form onSubmit={handleAddProject} className="tw-mb-8">
-                                    <div className="tw-flex tw-flex-col tw-space-y-4">
-                                        <div className="tw-flex tw-flex-col tw-space-y-1">
-                                            <label className="tw-text-sm tw-font-medium tw-text-gray-700">
-                                                New Project Name
-                                            </label>
-                                            <div className="tw-flex tw-space-x-2">
-                                                <input
-                                                    type="text"
-                                                    value={projectName}
-                                                    onChange={(e) => setProjectName(e.target.value)}
-                                                    placeholder="Enter project name..."
-                                                    className="tw-flex-1 tw-block tw-w-full tw-rounded-lg tw-border tw-border-gray-300 tw-bg-white tw-px-4 tw-py-3 tw-text-gray-700 tw-shadow-sm tw-transition-all hover:tw-border-gray-400 focus:tw-border-blue-500 focus:tw-ring-1 focus:tw-ring-blue-500"
-                                                />
-                                                <button
-                                                    type="submit"
-                                                    className="primary-button tw-w-24"
-                                                >
-                                                    Add
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
+                                {/* Add Project Button */}
+                                <div className="tw-mb-8">
+                                    <button
+                                        onClick={() => setIsCreateDialogOpen(true)}
+                                        className="primary-button tw-w-full"
+                                    >
+                                        Add New Project
+                                    </button>
+                                </div>
+
+                                {/* Create Dialog */}
+                                <CreateDialog
+                                    isOpen={isCreateDialogOpen}
+                                    onClose={() => setIsCreateDialogOpen(false)}
+                                    onSubmit={handleAddProject}
+                                    title="Add New Project"
+                                    fields={[
+                                        {
+                                            name: 'name',
+                                            label: 'Project Name',
+                                            type: 'text',
+                                            placeholder: 'Enter project name...',
+                                            required: true
+                                        },
+                                        {
+                                            name: 'details',
+                                            label: 'Project Details',
+                                            type: 'textarea',
+                                            placeholder: 'Enter project details...',
+                                            required: false
+                                        }
+                                    ]}
+                                    submitButtonText="Add Project"
+                                    darkMode={false}
+                                />
 
                                 {/* Projects List */}
                                 <div className="tw-space-y-4">
@@ -199,9 +212,14 @@ const Projects = ({ onClose, isExiting }) => {
                                                 key={project._id}
                                                 className="tw-group tw-relative tw-bg-gray-50 tw-rounded-lg tw-p-4 hover:tw-bg-gray-100"
                                             >
-                                                <div className="tw-flex tw-justify-between tw-items-center">
-                                                    <div>
+                                                <div className="tw-flex tw-justify-between tw-items-start">
+                                                    <div className="tw-flex-1">
                                                         <h4 className="tw-font-medium tw-text-gray-900">{project.name}</h4>
+                                                        {project.projectDetails && (
+                                                            <p className="tw-text-sm tw-text-gray-600 tw-mt-1 tw-mb-2">
+                                                                {project.projectDetails}
+                                                            </p>
+                                                        )}
                                                         <p className="tw-text-sm tw-text-gray-500">
                                                             Created: {new Date(project.createdAt).toLocaleDateString()}
                                                         </p>
@@ -238,10 +256,28 @@ const Projects = ({ onClose, isExiting }) => {
                             setEditingProject(null);
                         }}
                         onConfirm={handleSaveEdit}
-                        session={{
-                            date: editingProject?.createdAt,
-                            text: editingProject?.name
-                        }}
+                        title="Edit Project"
+                        darkMode={false}
+                        fields={[
+                            {
+                                id: 'name',
+                                label: 'Project Name',
+                                type: 'text',
+                                value: editingProject?.name || '',
+                                onChange: (value) => setEditingProject(prev => ({ ...prev, name: value })),
+                                placeholder: 'Enter project name...',
+                                required: true
+                            },
+                            {
+                                id: 'projectDetails',
+                                label: 'Project Details',
+                                type: 'textarea',
+                                value: editingProject?.projectDetails || '',
+                                onChange: (value) => setEditingProject(prev => ({ ...prev, projectDetails: value })),
+                                placeholder: 'Enter project details...',
+                                required: false
+                            }
+                        ]}
                     />
 
                     {/* Delete Dialog */}

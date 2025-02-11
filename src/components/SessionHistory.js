@@ -11,6 +11,12 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
     const [isClearHistoryDialogOpen, setIsClearHistoryDialogOpen] = useState(false);
+    const [editingFields, setEditingFields] = useState({
+        text: '',
+        date: '',
+        time: '',
+        duration: ''
+    });
 
     const fetchSessions = async () => {
         try {
@@ -30,6 +36,18 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
     useEffect(() => {
         fetchSessions();
     }, []);
+
+    // Update editingFields when editingSession changes
+    useEffect(() => {
+        if (editingSession) {
+            setEditingFields({
+                text: editingSession.text || '',
+                date: new Date(editingSession.date).toISOString().split('T')[0],
+                time: editingSession.time || '',
+                duration: editingSession.duration || ''
+            });
+        }
+    }, [editingSession]);
 
     // Expose fetchSessions to parent component
     useImperativeHandle(ref, () => ({
@@ -104,13 +122,52 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
         }
     };
 
-    const handleSaveEdit = async (newText) => {
+    // Add duration validation helper
+    const validateDuration = (duration) => {
+        // Accept formats: MM:SS or HH:MM:SS
+        const durationRegex = /^(?:(?:([01]?\d|2[0-3]):)?([0-5]?\d):)?([0-5]?\d)$/;
+        return durationRegex.test(duration);
+    };
+
+    // Add duration formatting helper
+    const formatDurationInput = (input) => {
+        // Remove non-numeric characters
+        const numbers = input.replace(/[^\d]/g, '');
+        
+        if (numbers.length <= 2) {
+            // Just seconds
+            return numbers;
+        } else if (numbers.length <= 4) {
+            // MM:SS
+            return `${numbers.slice(0, -2)}:${numbers.slice(-2)}`;
+        } else {
+            // HH:MM:SS
+            return `${numbers.slice(0, -4)}:${numbers.slice(-4, -2)}:${numbers.slice(-2)}`;
+        }
+    };
+
+    const handleDurationChange = (value) => {
+        // Format the duration as the user types
+        const formattedDuration = formatDurationInput(value);
+        setEditingFields(prev => ({ ...prev, duration: formattedDuration }));
+    };
+
+    const handleSaveEdit = async () => {
         if (!editingSession) return;
+
+        // Validate duration before saving
+        if (!validateDuration(editingFields.duration)) {
+            toast.error('Please enter a valid duration (MM:SS or HH:MM:SS)');
+            return;
+        }
 
         try {
             const updatedSession = {
                 ...editingSession,
-                text: newText.trim()
+                text: editingFields.text.trim(),
+                date: new Date(editingFields.date).toISOString(),
+                time: editingFields.time,
+                duration: editingFields.duration
             };
 
             const response = await fetch(`${API_BASE_URL}/api/sessions/${editingSession._id}`, {
@@ -126,10 +183,18 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
             }
 
             const updatedSessions = sessionHistory.map(session =>
-                session._id === editingSession._id ? { ...session, text: newText.trim() } : session
+                session._id === editingSession._id ? updatedSession : session
             );
             setSessionHistory(updatedSessions);
             toast.success('Session updated successfully');
+            setIsEditDialogOpen(false);  // Close the dialog
+            setEditingSession(null);     // Clear the editing session
+            setEditingFields({           // Reset the fields
+                text: '',
+                date: '',
+                time: '',
+                duration: ''
+            });
         } catch (error) {
             console.error('Error updating session:', error);
             toast.error('Failed to update session');
@@ -170,9 +235,50 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate }, ref) => {
                         onClose={() => {
                             setIsEditDialogOpen(false);
                             setEditingSession(null);
+                            setEditingFields({
+                                text: '',
+                                date: '',
+                                time: '',
+                                duration: ''
+                            });
                         }}
                         onConfirm={handleSaveEdit}
-                        session={editingSession}
+                        title="Edit Session"
+                        fields={[
+                            {
+                                id: 'date',
+                                label: 'Date',
+                                type: 'date',
+                                value: editingFields.date,
+                                onChange: (value) => setEditingFields(prev => ({ ...prev, date: value })),
+                                required: true
+                            },
+                            {
+                                id: 'time',
+                                label: 'Time',
+                                type: 'time',
+                                value: editingFields.time,
+                                onChange: (value) => setEditingFields(prev => ({ ...prev, time: value })),
+                                required: true
+                            },
+                            {
+                                id: 'duration',
+                                label: 'Duration (MM:SS or HH:MM:SS)',
+                                type: 'text',
+                                value: editingFields.duration,
+                                onChange: handleDurationChange,
+                                placeholder: '00:00',
+                                required: true
+                            },
+                            {
+                                id: 'notes',
+                                label: 'Session Notes',
+                                type: 'textarea',
+                                value: editingFields.text,
+                                onChange: (value) => setEditingFields(prev => ({ ...prev, text: value })),
+                                placeholder: 'Enter session notes...'
+                            }
+                        ]}
                     />
 
                     {/* Delete Dialog */}

@@ -28,6 +28,46 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Update a session
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const session = await Session.findById(id);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        // Update only the text field
+        session.text = updates.text;
+        await session.save();
+
+        res.json(session);
+    } catch (err) {
+        console.error('Error updating session:', err);
+        res.status(500).json({ error: 'Failed to update session' });
+    }
+});
+
+// Delete a session
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const session = await Session.findById(id);
+        
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        await Session.findByIdAndDelete(id);
+        res.json({ message: 'Session deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting session:', err);
+        res.status(500).json({ error: 'Failed to delete session' });
+    }
+});
+
 // Freeflow route
 router.put('/freeflow', (req, res) => {
     const { time } = req.body;

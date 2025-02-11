@@ -154,7 +154,7 @@ const QuoteList = ({ onClose, isExiting }) => {
                                         <div>
                                             <button
                                                 type="submit"
-                                                className="tw-w-full tw-px-4 tw-py-2 tw-bg-blue-500 tw-text-white tw-rounded-lg hover:tw-bg-blue-600 tw-transition-colors tw-duration-200"
+                                                className="primary-button"
                                             >
                                                 Add Quote
                                             </button>

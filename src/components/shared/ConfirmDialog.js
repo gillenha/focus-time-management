@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import ActionButton from './ActionButton';
 
 const ConfirmDialog = ({
   isOpen,
@@ -14,6 +13,19 @@ const ConfirmDialog = ({
 }) => {
   if (!isOpen) return null;
 
+  const getButtonClass = () => {
+    switch (variant) {
+      case 'danger':
+        return 'danger-button';
+      case 'primary':
+        return 'primary-button';
+      case 'secondary':
+        return 'secondary-button';
+      default:
+        return 'primary-button';
+    }
+  };
+
   return (
     <div className="tw-fixed tw-inset-0 tw-bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-50">
       <div className="tw-bg-white tw-rounded-lg tw-p-6 tw-max-w-sm tw-w-full tw-mx-4">
@@ -21,24 +33,22 @@ const ConfirmDialog = ({
         <p className="tw-text-gray-600 tw-mb-6">{message}</p>
         
         <div className="tw-flex tw-justify-end tw-space-x-4">
-          <ActionButton
-            variant="ghost"
+          <button
             onClick={onClose}
-            size="medium"
+            className="secondary-button"
           >
             {cancelLabel}
-          </ActionButton>
+          </button>
           
-          <ActionButton
-            variant={variant}
+          <button
             onClick={() => {
               onConfirm();
               onClose();
             }}
-            size="medium"
+            className={getButtonClass()}
           >
             {confirmLabel}
-          </ActionButton>
+          </button>
         </div>
       </div>
     </div>

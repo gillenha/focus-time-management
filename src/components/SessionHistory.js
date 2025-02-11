@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ListItemActions } from './shared';
+import { EditDialog } from './shared';
 import { toast } from 'react-toastify';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
@@ -7,7 +8,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 const SessionHistory = ({ onClose }) => {
     const [sessionHistory, setSessionHistory] = useState([]);
     const [editingSession, setEditingSession] = useState(null);
-    const [editText, setEditText] = useState('');
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     useEffect(() => {
         fetchSessions();
@@ -61,7 +62,7 @@ const SessionHistory = ({ onClose }) => {
 
     const handleEdit = (session) => {
         setEditingSession(session);
-        setEditText(session.text);
+        setIsEditDialogOpen(true);
     };
 
     const handleDelete = async (sessionId) => {
@@ -82,13 +83,13 @@ const SessionHistory = ({ onClose }) => {
         }
     };
 
-    const handleSaveEdit = async () => {
+    const handleSaveEdit = async (newText) => {
         if (!editingSession) return;
 
         try {
             const updatedSession = {
                 ...editingSession,
-                text: editText.trim()
+                text: newText.trim()
             };
 
             const response = await fetch(`${API_BASE_URL}/api/sessions/${editingSession._id}`, {
@@ -104,11 +105,9 @@ const SessionHistory = ({ onClose }) => {
             }
 
             const updatedSessions = sessionHistory.map(session =>
-                session._id === editingSession._id ? { ...session, text: editText.trim() } : session
+                session._id === editingSession._id ? { ...session, text: newText.trim() } : session
             );
             setSessionHistory(updatedSessions);
-            setEditingSession(null);
-            setEditText('');
             toast.success('Session updated successfully');
         } catch (error) {
             console.error('Error updating session:', error);
@@ -144,34 +143,16 @@ const SessionHistory = ({ onClose }) => {
                         <h2 className="tw-text-xl tw-font-bold tw-text-gray-800">Session History</h2>
                     </div>
 
-                    {/* Edit Form */}
-                    {editingSession && (
-                        <div className="tw-mb-6 tw-p-4 tw-bg-gray-50 tw-rounded-lg">
-                            <textarea
-                                value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
-                                className="tw-w-full tw-p-2 tw-border tw-border-gray-300 tw-rounded tw-mb-2"
-                                rows="3"
-                            />
-                            <div className="tw-flex tw-justify-end tw-gap-2">
-                                <button
-                                    onClick={() => {
-                                        setEditingSession(null);
-                                        setEditText('');
-                                    }}
-                                    className="secondary-button"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleSaveEdit}
-                                    className="primary-button"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    {/* Edit Dialog */}
+                    <EditDialog
+                        isOpen={isEditDialogOpen}
+                        onClose={() => {
+                            setIsEditDialogOpen(false);
+                            setEditingSession(null);
+                        }}
+                        onConfirm={handleSaveEdit}
+                        session={editingSession}
+                    />
 
                     {/* Session List */}
                     <div className="tw-mb-20">

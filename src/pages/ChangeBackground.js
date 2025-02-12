@@ -3,14 +3,15 @@ import {
     Tree,
     Waves,
     Snowflake,
-    Circle,
     Island,
     Lightning,
     Building,
     Binoculars,
     Cactus,
     Mountains,
-    Sailboat
+    Sailboat,
+    Leaf,
+    Star
 } from "@phosphor-icons/react"
 
 const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackgroundImage }) => {
@@ -73,6 +74,16 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             {/* Replace select with grid */}
                             <div className="tw-grid tw-grid-cols-2 tw-gap-4 tw-cursor-pointer">
                                 {[
+                                    {
+                                        value: "landscape?featured=true&order_by=popular",
+                                        label: "Featured",
+                                        icon: <Star size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    {
+                                        value: "tranquil zen garden meditation peaceful",
+                                        label: "Tranquil",
+                                        icon: <Leaf size={32} weight="thin" className="tw-mb-2" />
+                                    },
                                     { 
                                         value: "scenic landscape nature", 
                                         label: "Nature",
@@ -87,11 +98,6 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         value: "snowy mountain landscape", 
                                         label: "Winter",
                                         icon: <Snowflake size={32} weight="thin" className="tw-mb-2" />
-                                    },
-                                    { 
-                                        value: "traditional japanese temple", 
-                                        label: "Japan",
-                                        icon: <Circle size={32} weight="thin" className="tw-mb-2" />    
                                     },
                                     { 
                                         value: "tropical paradise beach", 

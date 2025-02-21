@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import './MusicPlayer.css';
 import ControlBar from './ControlBar';
 import SessionInput from './SessionInput';
@@ -7,6 +7,34 @@ import { fetchQuotes } from '../services/quotesService';
 import { toast } from 'react-toastify';
 
 const QUOTE_ROTATION_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+function JumpButton({ controlBarRef }) {
+  const handleJump = () => {
+    if (controlBarRef.current?.audioRef?.current) {
+      const duration = controlBarRef.current.audioRef.current.getDuration();
+      if (duration) {
+        const randomPosition = Math.floor(Math.random() * duration);
+        controlBarRef.current.audioRef.current.seekToPosition(randomPosition);
+      }
+    }
+  };
+
+  return (
+    <button
+      onClick={handleJump}
+      className={`
+        tw-absolute tw-top-[30%] tw-left-1/2 tw--translate-x-1/2
+        tw-bg-gray-600 tw-text-white tw-px-4 tw-py-2 tw-rounded-full
+        tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0
+        tw-transition-all tw-duration-500 tw-ease-out
+        hover:tw-bg-gray-700 hover:tw-shadow-lg
+        tw-animate-fadeIn tw-cursor-pointer
+      `}
+    >
+      Jump
+    </button>
+  );
+}
 
 function MusicPlayer({ 
   isFreeflow, 
@@ -28,6 +56,8 @@ function MusicPlayer({
   const [quotes, setQuotes] = useState([]);
   const [showQuote, setShowQuote] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [showJumpButton, setShowJumpButton] = useState(false);
+  const controlBarRef = useRef(null);
 
   // Load quotes on mount
   useEffect(() => {
@@ -85,6 +115,16 @@ function MusicPlayer({
       setShowQuote(false);
     }
   }, [sessionStarted]);
+
+  // Add new effect for jump button
+  useEffect(() => {
+    if (showControls && showQuote) {
+      const timer = setTimeout(() => {
+        setShowJumpButton(true);
+      }, 1000); // Show 1 second after controls and quote
+      return () => clearTimeout(timer);
+    }
+  }, [showControls, showQuote]);
 
   const verifyAudio = async () => {
     if (playlistTracks.length === 0) {
@@ -182,6 +222,7 @@ function MusicPlayer({
               ${showControls ? 'tw-opacity-100' : 'tw-opacity-0'}
             `}>
               <ControlBar
+                ref={controlBarRef}
                 setTimerActive={setTimerActive}
                 volume={volume}
                 onVolumeChange={onVolumeChange}
@@ -192,6 +233,7 @@ function MusicPlayer({
                 isSequential={true}
               />
             </div>
+            {showJumpButton && <JumpButton controlBarRef={controlBarRef} />}
           </>
         )}
       </div>

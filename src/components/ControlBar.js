@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import AudioManager from '../utils/audioManager';
 
-function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onCleanup, currentTrackIndex, onTrackEnd }) {
+const ControlBar = forwardRef(({ setTimerActive, volume, onVolumeChange, audioFiles, onCleanup, currentTrackIndex, onTrackEnd }, ref) => {
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
   const hasInitialized = useRef(false);
+
+  // Expose audioRef through forwarded ref
+  useEffect(() => {
+    if (ref) {
+      ref.current = {
+        audioRef
+      };
+    }
+  }, [ref]);
 
   const setupAudioElement = useCallback((audio) => {
     audio.volume = volume;
@@ -15,11 +25,33 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onClea
       }
     };
 
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
+    };
+
     audio.addEventListener('volumechange', handleVolumeChange);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    
     return () => {
       audio.removeEventListener('volumechange', handleVolumeChange);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, [volume, onVolumeChange]);
+
+  // Add seek function
+  const seekToPosition = useCallback((position) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = position;
+    }
+  }, []);
+
+  // Expose seek function and duration through ref
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.seekToPosition = seekToPosition;
+      audioRef.current.getDuration = () => duration;
+    }
+  }, [seekToPosition, duration]);
 
   // Add real-time volume control
   useEffect(() => {
@@ -158,7 +190,7 @@ function ControlBar({ setTimerActive, volume, onVolumeChange, audioFiles, onClea
       </button>
     </div>
   );
-}
+});
 
 export default ControlBar;
 

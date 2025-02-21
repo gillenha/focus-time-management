@@ -58,7 +58,8 @@ async function initializeStorage() {
         }
         
         storage = new Storage(config);
-        bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+        // Always use just the bucket name, no folders
+        bucket = storage.bucket('react-app-assets');
 
         // Verify bucket access
         await bucket.exists();
@@ -205,21 +206,22 @@ router.post('/get-signed-url', ensureStorageInitialized, async (req, res) => {
 
 // Finalize upload
 router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
+    const { uploadId } = req.body;
+    
     try {
-        const { uploadId, fileName, totalChunks } = req.body;
-        const metadata = uploads.get(uploadId);
+        const uploadInfo = uploads.get(uploadId);
+        if (!uploadInfo) {
+            return res.status(404).json({ error: 'Upload not found' });
+        }
+
+        const { fileName, tempDir, totalChunks } = uploadInfo;
+        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        const destinationPath = `${folder}${fileName}`;
         
-        if (!metadata) {
-            throw new Error('Upload session not found');
-        }
-
-        if (metadata.receivedChunks !== totalChunks) {
-            throw new Error(`Missing chunks. Received ${metadata.receivedChunks} of ${totalChunks}`);
-        }
-
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const blobPath = `${targetFolder}/${fileName}`;
-        const blob = bucket.file(blobPath);
+        console.log(`Finalizing upload: ${fileName} to ${destinationPath}`);
+        
+        // Create a write stream to GCS
+        const blob = bucket.file(destinationPath);
         const blobStream = blob.createWriteStream({
             resumable: false,
             metadata: {
@@ -227,46 +229,43 @@ router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
             }
         });
 
-        // Combine chunks and stream to GCS
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkPath = path.join(metadata.tempDir, `chunk-${i}`);
-            const chunkData = fs.readFileSync(chunkPath);
-            blobStream.write(chunkData);
-        }
-
-        // End the stream and wait for upload to complete
+        // Handle upload completion
         await new Promise((resolve, reject) => {
-            blobStream.end();
-            blobStream.on('finish', resolve);
             blobStream.on('error', reject);
-        });
+            blobStream.on('finish', resolve);
 
-        // Clean up temp directory
-        fs.rmSync(metadata.tempDir, { recursive: true, force: true });
-        uploads.delete(uploadId);
-
-        res.json({
-            message: 'Upload finalized successfully',
-            file: {
-                name: blobPath,
-                size: metadata.fileSize
+            // Combine and stream chunks
+            for (let i = 0; i < totalChunks; i++) {
+                const chunkPath = path.join(tempDir, `chunk-${i}`);
+                const chunkData = fs.readFileSync(chunkPath);
+                blobStream.write(chunkData);
             }
+            blobStream.end();
         });
+
+        // Clean up
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        uploads.delete(uploadId);
+        
+        console.log(`Upload finalized successfully: ${destinationPath}`);
+        res.json({ success: true, fileName: destinationPath });
     } catch (error) {
         console.error('Finalize error:', error);
-        res.status(500).json({ error: 'Failed to finalize upload' });
+        res.status(500).json({ 
+            error: 'Failed to finalize upload',
+            details: error.message
+        });
     }
 });
 
 // List MP3 files with folder support
 router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
     try {
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const prefix = `${targetFolder}/`;
+        // Use folder as prefix when listing files
+        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        console.log(`Listing files from bucket: ${bucket.name}, folder: ${folder}`);
         
-        console.log(`Listing files from bucket with prefix: ${prefix}`);
-        
-        const [files] = await bucket.getFiles({ prefix });
+        const [files] = await bucket.getFiles({ prefix: folder });
         const items = await Promise.all(files
             .filter(file => file.name.endsWith('.mp3'))
             .map(async file => {
@@ -277,7 +276,7 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
                 };
             }));
             
-        console.log(`Found ${items.length} files in bucket`);
+        console.log(`Found ${items.length} files in ${folder}`);
         res.json({ items });
     } catch (error) {
         console.error('Error listing files:', error);

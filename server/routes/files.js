@@ -44,21 +44,21 @@ let bucket;
 async function initializeStorage() {
     try {
         const config = {};
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV === 'production') {
+            // In production, use default credentials provided by Cloud Run
+            console.log('Using default Cloud Run service account credentials');
+        } else {
+            // In development, use local credentials
             if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
                 config.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
                 console.log('Using service account credentials from GOOGLE_APPLICATION_CREDENTIALS:', process.env.GOOGLE_APPLICATION_CREDENTIALS);
             } else {
                 console.warn('GOOGLE_APPLICATION_CREDENTIALS not set in development mode. Consider running "gcloud auth application-default login" or setting the variable in your .env file.');
             }
-            if (process.env.GCLOUD_PROJECT_ID) {
-                config.projectId = process.env.GCLOUD_PROJECT_ID;
-            }
         }
+        
         storage = new Storage(config);
-        // Remove /test from bucket name if present
-        const bucketName = process.env.GCS_BUCKET_NAME.split('/')[0];
-        bucket = storage.bucket(bucketName);
+        bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
         // Verify bucket access
         await bucket.exists();

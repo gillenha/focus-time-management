@@ -1,9 +1,31 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+const envFile = `.env.${process.env.NODE_ENV}`;
+const envPath = path.resolve(process.cwd(), envFile);
+
+console.log('Current working directory:', process.cwd());
+console.log('Looking for environment file:', envPath);
+console.log('File exists:', fs.existsSync(envPath));
+
+try {
+  require('dotenv').config({
+    path: envPath,
+    debug: process.env.NODE_ENV === 'development'
+  });
+  
+  console.log('Environment loaded successfully');
+  console.log('Loaded environment variables:', {
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    NODE_ENV: process.env.NODE_ENV,
+    GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME
+  });
+} catch (error) {
+  console.error('Error loading environment:', error);
+}
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 const helmet = require('helmet');
 const { Client } = require('@notionhq/client');
 const multer = require('multer');

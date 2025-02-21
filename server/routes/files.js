@@ -56,7 +56,9 @@ async function initializeStorage() {
             }
         }
         storage = new Storage(config);
-        bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
+        // Remove /test from bucket name if present
+        const bucketName = process.env.GCS_BUCKET_NAME.split('/')[0];
+        bucket = storage.bucket(bucketName);
 
         // Verify bucket access
         await bucket.exists();

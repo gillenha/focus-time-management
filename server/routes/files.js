@@ -287,6 +287,37 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
     }
 });
 
+// List images from my-images folder
+router.get('/list-images', ensureStorageInitialized, async (req, res) => {
+    try {
+        const folder = 'my-images/';
+        console.log(`Listing images from bucket: ${bucket.name}, folder: ${folder}`);
+        
+        const [files] = await bucket.getFiles({ prefix: folder });
+        const items = await Promise.all(files
+            .filter(file => file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/))
+            .map(async file => {
+                const [metadata] = await file.getMetadata();
+                const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+                return {
+                    name: file.name,
+                    size: parseInt(metadata.size),
+                    url: publicUrl,
+                    contentType: metadata.contentType
+                };
+            }));
+            
+        console.log(`Found ${items.length} images in ${folder}`);
+        res.json({ items });
+    } catch (error) {
+        console.error('Error listing images:', error);
+        res.status(500).json({ 
+            error: 'Failed to list images',
+            details: error.message
+        });
+    }
+});
+
 // Delete MP3 file
 router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
     try {

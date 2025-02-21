@@ -142,38 +142,73 @@ function App() {
         }
       }
 
-      const response = await fetch(
-        `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant&featured=true`,
-        {
-          headers: {
-            Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
-          }
+      if (theme === 'my-images') {
+        // Fetch from our GCS bucket
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
+        if (!response.ok) throw new Error('Failed to fetch images');
+        
+        const data = await response.json();
+        if (!data.items || data.items.length === 0) {
+          throw new Error('No images found in my-images folder');
         }
-      );
-      
-      if (!response.ok) throw new Error('Failed to fetch image');
-      
-      const data = await response.json();
-      
-      setBackgroundImage(data.urls.full);
-      
-      setPhotographer({
-        name: data.user.name || '',
-        username: data.user.username || '',
-        link: data.user.links.html || '',
-        photoLink: data.links.html || '',
-        description: data.description || data.alt_description || ''
-      });
-      
-      localStorage.setItem('backgroundImage', data.urls.full);
-      localStorage.setItem('photographer', JSON.stringify({
-        name: data.user.name || '',
-        username: data.user.username || '',
-        link: data.user.links.html || '',
-        photoLink: data.links.html || '',
-        description: data.description || data.alt_description || ''
-      }));
-      localStorage.setItem('lastImageFetch', Date.now().toString());
+
+        // Pick a random image from the list
+        const randomImage = data.items[Math.floor(Math.random() * data.items.length)];
+        
+        setBackgroundImage(randomImage.url);
+        setPhotographer({
+          name: 'My Images',
+          username: '',
+          link: '',
+          photoLink: '',
+          description: randomImage.name.split('/').pop()
+        });
+
+        localStorage.setItem('backgroundImage', randomImage.url);
+        localStorage.setItem('photographer', JSON.stringify({
+          name: 'My Images',
+          username: '',
+          link: '',
+          photoLink: '',
+          description: randomImage.name.split('/').pop()
+        }));
+        localStorage.setItem('lastImageFetch', Date.now().toString());
+        
+      } else {
+        // Existing Unsplash API call
+        const response = await fetch(
+          `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant&featured=true`,
+          {
+            headers: {
+              Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
+            }
+          }
+        );
+        
+        if (!response.ok) throw new Error('Failed to fetch image');
+        
+        const data = await response.json();
+        
+        setBackgroundImage(data.urls.full);
+        
+        setPhotographer({
+          name: data.user.name || '',
+          username: data.user.username || '',
+          link: data.user.links.html || '',
+          photoLink: data.links.html || '',
+          description: data.description || data.alt_description || ''
+        });
+        
+        localStorage.setItem('backgroundImage', data.urls.full);
+        localStorage.setItem('photographer', JSON.stringify({
+          name: data.user.name || '',
+          username: data.user.username || '',
+          link: data.user.links.html || '',
+          photoLink: data.links.html || '',
+          description: data.description || data.alt_description || ''
+        }));
+        localStorage.setItem('lastImageFetch', Date.now().toString());
+      }
       
     } catch (error) {
       console.error('Error fetching image:', error);
@@ -532,7 +567,7 @@ function App() {
         className="background" 
         style={{ backgroundImage: `url(${backgroundImage})` }}
       ></div>
-      {photographer.name && (
+      {photographer.name && photographer.name !== 'My Images' && (
         <div className="photo-attribution">
           <a 
             href={photographer.photoLink} 

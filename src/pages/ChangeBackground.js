@@ -11,7 +11,8 @@ import {
     Mountains,
     Sailboat,
     Leaf,
-    Star
+    Star,
+    Image
 } from "@phosphor-icons/react"
 
 const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackgroundImage }) => {
@@ -74,6 +75,11 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                             {/* Replace select with grid */}
                             <div className="tw-grid tw-grid-cols-2 tw-gap-4 tw-cursor-pointer">
                                 {[
+                                    {
+                                        value: "my-images",
+                                        label: "My Images",
+                                        icon: <Image size={32} weight="thin" className="tw-mb-2" />
+                                    },
                                     {
                                         value: "landscape?featured=true&order_by=popular",
                                         label: "Featured",

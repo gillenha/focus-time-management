@@ -11,11 +11,11 @@ const QUOTE_ROTATION_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds
 function JumpButton({ controlBarRef }) {
   const handleJump = () => {
     if (controlBarRef.current?.audioRef?.current) {
-      const duration = controlBarRef.current.audioRef.current.getDuration();
-      if (duration) {
-        const randomPosition = Math.floor(Math.random() * duration);
-        controlBarRef.current.audioRef.current.seekToPosition(randomPosition);
-      }
+      const audio = controlBarRef.current.audioRef.current;
+      const currentPosition = audio.currentTime;
+      const duration = audio.duration;
+      const newPosition = Math.min(currentPosition + 20, duration);
+      controlBarRef.current.audioRef.current.seekToPosition(newPosition);
     }
   };
 
@@ -31,7 +31,7 @@ function JumpButton({ controlBarRef }) {
         tw-animate-fadeIn tw-cursor-pointer
       `}
     >
-      Jump
+      →
     </button>
   );
 }

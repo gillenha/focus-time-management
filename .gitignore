@@ -26,6 +26,9 @@ node_modules/
 # Build directory
 build/
 
+# virtual environment
+.venv/
+
 # MP3 files
 /mp3s
 

@@ -267,6 +267,69 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         setUploadStatus('');
     };
     
+    // Randomize playlist function
+    const randomizePlaylist = () => {
+        if (playlistTracks.length <= 1) return; // No need to randomize if 1 or fewer tracks
+        
+        const shuffledTracks = [...playlistTracks];
+        
+        // Fisher-Yates shuffle algorithm
+        for (let i = shuffledTracks.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledTracks[i], shuffledTracks[j]] = [shuffledTracks[j], shuffledTracks[i]];
+        }
+        
+        setPlaylistTracks(shuffledTracks);
+    };
+
+    // Add all uploaded tracks to playlist
+    const addAllToPlaylist = () => {
+        if (uploadedTracks.length === 0) return;
+        
+        // Filter out tracks that are already in playlist (prevent duplicates)
+        const tracksToAdd = uploadedTracks.filter(track => 
+            !playlistTracks.some(pTrack => pTrack.fileName === track.fileName)
+        );
+        
+        if (tracksToAdd.length === 0) return; // All tracks already in playlist
+        
+        // Convert to playlist format and add to playlist
+        const playlistTracks_new = tracksToAdd.map(track => ({
+            ...track,
+            id: `playlist-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+        }));
+        
+        setPlaylistTracks(current => [...current, ...playlistTracks_new]);
+        
+        // Remove from uploaded tracks
+        setUploadedTracks(current => 
+            current.filter(track => 
+                !tracksToAdd.some(addedTrack => addedTrack.fileName === track.fileName)
+            )
+        );
+    };
+
+    // Clear all playlist tracks back to uploaded (except keep one track)
+    const clearAllPlaylist = () => {
+        if (playlistTracks.length <= 1) return; // Need at least 2 tracks to clear all but one
+        
+        // Keep the first track, move the rest back to uploaded
+        const tracksToMove = playlistTracks.slice(1); // All tracks except the first one
+        const trackToKeep = playlistTracks[0]; // Keep the first track
+        
+        // Convert tracks to uploaded format
+        const uploadedTracks_new = tracksToMove.map(track => ({
+            ...track,
+            id: `upload-${track.fileName.replace(/[^a-zA-Z0-9]/g, '')}`
+        }));
+        
+        // Add to uploaded tracks
+        setUploadedTracks(current => [...current, ...uploadedTracks_new]);
+        
+        // Keep only the first track in playlist
+        setPlaylistTracks([trackToKeep]);
+    };
+    
     // Update isUploading based on queue status
     useEffect(() => {
         const hasActiveUploads = uploadQueue.some(item => 
@@ -556,7 +619,31 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                         <div className="tw-bg-gray-50 tw-rounded-xl tw-p-4">
                             {/* Section Header */}
                             <div className="tw-mb-4">
-                                <h3 className="tw-text-lg tw-font-bold tw-text-gray-800 tw-mb-2">Uploaded Tracks</h3>
+                                <div className="tw-flex tw-justify-between tw-items-center tw-mb-2">
+                                    <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Uploaded Tracks</h3>
+                                    {uploadedTracks.length > 0 && (
+                                        <button
+                                            onClick={addAllToPlaylist}
+                                            className="secondary-button tw-px-3 tw-py-1 tw-text-sm tw-transition-all tw-duration-200 hover:tw-scale-105"
+                                            title="Add all tracks to playlist"
+                                        >
+                                            <svg 
+                                                className="tw-w-4 tw-h-4 tw-mr-1" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round" 
+                                                    strokeWidth={2} 
+                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6" 
+                                                />
+                                            </svg>
+                                            Add All
+                                        </button>
+                                    )}
+                                </div>
                                 
                                 {/* Storage Usage */}
                                 <StorageUsage />
@@ -612,7 +699,55 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
                         {/* Focus Playlist Section */}
                         <div className="tw-bg-gray-50 tw-rounded-xl tw-p-4">
-                            <h3 className="tw-text-lg tw-font-bold tw-text-gray-800 tw-mb-4">My Focus Playlist</h3>
+                            <div className="tw-flex tw-justify-between tw-items-center tw-mb-4">
+                                <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">My Focus Playlist</h3>
+                                <div className="tw-flex tw-gap-2">
+                                    {playlistTracks.length > 1 && (
+                                        <button
+                                            onClick={clearAllPlaylist}
+                                            className="secondary-button tw-bg-red-400/40 tw-text-red-900 tw-px-3 tw-py-1 tw-text-sm tw-transition-all tw-duration-200 hover:tw-scale-105"
+                                            title="Clear all tracks from playlist (keep one)"
+                                        >
+                                            <svg 
+                                                className="tw-w-4 tw-h-4 tw-mr-1" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round" 
+                                                    strokeWidth={2} 
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                                                />
+                                            </svg>
+                                            Clear All
+                                        </button>
+                                    )}
+                                    {playlistTracks.length > 1 && (
+                                        <button
+                                            onClick={randomizePlaylist}
+                                            className="secondary-button tw-px-3 tw-py-1 tw-text-sm tw-transition-all tw-duration-200 hover:tw-scale-105"
+                                            title="Randomize playlist order"
+                                        >
+                                            <svg 
+                                                className="tw-w-4 tw-h-4 tw-mr-1" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path 
+                                                    strokeLinecap="round" 
+                                                    strokeLinejoin="round" 
+                                                    strokeWidth={2} 
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                                                />
+                                            </svg>
+                                            Randomize
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             <div 
                                 className="tw-min-h-[200px]"
                                 onDragOver={handleDragOver}

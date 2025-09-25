@@ -413,6 +413,33 @@ router.post('/init-upload', ensureStorageInitialized, async (req, res) => {
     }
 });
 
+// Bulk upload status endpoint
+router.get('/upload-status/:uploadIds', ensureStorageInitialized, async (req, res) => {
+    try {
+        const uploadIds = req.params.uploadIds.split(',');
+        const statuses = {};
+        
+        uploadIds.forEach(id => {
+            const uploadInfo = uploads.get(id);
+            if (uploadInfo) {
+                statuses[id] = {
+                    status: 'active',
+                    receivedChunks: uploadInfo.receivedChunks,
+                    totalChunks: uploadInfo.totalChunks,
+                    progress: Math.round((uploadInfo.receivedChunks / uploadInfo.totalChunks) * 100)
+                };
+            } else {
+                statuses[id] = { status: 'not_found' };
+            }
+        });
+        
+        res.json(statuses);
+    } catch (error) {
+        console.error('Error getting upload status:', error);
+        res.status(500).json({ error: 'Failed to get upload status' });
+    }
+});
+
 // Upload chunk
 router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
     try {
@@ -483,6 +510,36 @@ router.post('/upload-chunk', upload.single('chunk'), async (req, res) => {
             error: 'Failed to upload chunk',
             details: error.message
         });
+    }
+});
+
+// Bulk cleanup endpoint (for cancelled uploads)
+router.post('/cleanup-uploads', ensureStorageInitialized, async (req, res) => {
+    try {
+        const { uploadIds } = req.body;
+        let cleanedCount = 0;
+        
+        for (const uploadId of uploadIds || []) {
+            const uploadInfo = uploads.get(uploadId);
+            if (uploadInfo && uploadInfo.tempDir) {
+                try {
+                    // Clean up temp files
+                    fs.rmSync(uploadInfo.tempDir, { recursive: true, force: true });
+                    uploads.delete(uploadId);
+                    cleanedCount++;
+                } catch (cleanupError) {
+                    console.error(`Failed to cleanup ${uploadId}:`, cleanupError);
+                }
+            }
+        }
+        
+        res.json({ 
+            message: `Cleaned up ${cleanedCount} upload sessions`,
+            cleanedCount 
+        });
+    } catch (error) {
+        console.error('Cleanup error:', error);
+        res.status(500).json({ error: 'Failed to cleanup uploads' });
     }
 });
 

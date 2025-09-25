@@ -38,28 +38,39 @@ const filesRouter = require('./server/routes/files');
 const sessionsRouter = require('./server/routes/sessions');
 const projectRoutes = require('./server/routes/projects');
 
-// Initialize Google Cloud Storage in production
+// Initialize Google Cloud Storage in production only
 let storage;
 let bucket;
-if (process.env.NODE_ENV === 'production') {
-    try {
-        console.log('Initializing Google Cloud Storage...');
-        storage = new Storage({
-            projectId: 'harry-gillen-builder',
-            // Use Application Default Credentials
-            keyFilename: undefined
-        });
-        bucket = storage.bucket('react-app-assets');
-        console.log('Successfully initialized Google Cloud Storage');
-    } catch (error) {
-        console.error('Failed to initialize Google Cloud Storage:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code,
-            errors: error.errors
-        });
+
+const initializeStorage = async () => {
+    if (process.env.NODE_ENV === 'production') {
+        try {
+            console.log('Initializing Google Cloud Storage...');
+            const { GoogleAuth } = require('google-auth-library');
+            
+            // Check if credentials are available
+            const auth = new GoogleAuth();
+            await auth.getDefaultProjectId();
+            
+            storage = new Storage({
+                projectId: process.env.GCLOUD_PROJECT_ID || 'harry-gillen-builder',
+            });
+            bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
+            console.log('Successfully initialized Google Cloud Storage');
+            return true;
+        } catch (error) {
+            console.error('Failed to initialize Google Cloud Storage:', error.message);
+            console.log('Continuing without Cloud Storage - using local filesystem');
+            return false;
+        }
+    } else {
+        console.log('Development mode - using local filesystem for file storage');
+        return false;
     }
-}
+};
+
+// Initialize storage but don't block the server startup
+const storageReady = initializeStorage();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -125,6 +136,16 @@ app.use(cors({
 
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+        port: PORT
+    });
+});
 
 // API Routes
 app.use('/api/quotes', quotesRouter);
@@ -289,7 +310,9 @@ app.post('/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        if (process.env.NODE_ENV === 'production') {
+        const isStorageReady = await storageReady;
+        
+        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
             // Upload to Google Cloud Storage
             const blob = bucket.file(req.file.originalname);
             const blobStream = blob.createWriteStream({
@@ -316,7 +339,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
             blobStream.end(req.file.buffer);
         } else {
-            // Development: Save to local directory
+            // Development or fallback: Save to local directory
             const mp3sDir = path.join(__dirname, 'mp3s');
             if (!fs.existsSync(mp3sDir)) {
                 fs.mkdirSync(mp3sDir, { recursive: true });
@@ -340,7 +363,9 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 // List MP3 files
 app.get('/mp3s', async (req, res) => {
     try {
-        if (process.env.NODE_ENV === 'production') {
+        const isStorageReady = await storageReady;
+        
+        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
             const [files] = await bucket.getFiles();
             const mp3s = files
                 .filter(file => file.name.endsWith('.mp3'))
@@ -366,7 +391,9 @@ app.delete('/mp3s/:filename', async (req, res) => {
     const filename = req.params.filename;
 
     try {
-        if (process.env.NODE_ENV === 'production') {
+        const isStorageReady = await storageReady;
+        
+        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
             await bucket.file(filename).delete();
         } else {
             const filePath = path.join(__dirname, 'mp3s', filename);
@@ -389,7 +416,9 @@ app.delete('/api/quotes/:id', quoteController.deleteQuote);
 // Add endpoint to get file sizes
 app.get('/mp3s/sizes', async (req, res) => {
     try {
-        if (process.env.NODE_ENV === 'production') {
+        const isStorageReady = await storageReady;
+        
+        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
             const [files] = await bucket.getFiles();
             const sizes = {};
             for (const file of files) {

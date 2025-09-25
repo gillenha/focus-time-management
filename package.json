@@ -32,9 +32,11 @@
     "start": "react-scripts start",
     "start:dev": "NODE_ENV=development react-scripts start",
     "start:server:dev": "NODE_ENV=development nodemon server.js",
+    "dev": "unset REACT_APP_API_URL && concurrently \"npm run start:server:dev\" \"npm run start:dev\"",
     "build": "NODE_ENV=production react-scripts build",
     "dist": "electron-builder",
-    "deploy": "gcloud app deploy"
+    "deploy": "gcloud app deploy",
+    "test": "react-scripts test"
   },
   "eslintConfig": {
     "extends": [

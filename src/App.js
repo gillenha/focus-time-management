@@ -64,15 +64,15 @@ function App() {
       if (playlistTracks.length === 0) {
         try {
           console.log('Loading tracks from server...');
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/mp3s`);
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
           const data = await response.json();
           
-          if (data.mp3s && data.mp3s.length > 0) {
-            console.log('Tracks loaded from server:', data.mp3s);
-            const formattedTracks = data.mp3s.map(fileName => ({
-              id: `playlist-${fileName.replace(/[^a-zA-Z0-9]/g, '')}`,
-              title: fileName.replace('.mp3', ''),
-              fileName: fileName
+          if (data.items && data.items.length > 0) {
+            console.log('Tracks loaded from server:', data.items);
+            const formattedTracks = data.items.map(item => ({
+              id: `playlist-${item.name.replace(/[^a-zA-Z0-9]/g, '')}`,
+              title: item.name.replace('.mp3', '').replace(/^(test\/|tracks\/)/, ''),
+              fileName: item.name
             }));
             
             setPlaylistTracks(formattedTracks);
@@ -394,7 +394,7 @@ function App() {
 
   const fetchTotalFocusTime = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/total-focus-time');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/total-focus-time`);
       const data = await response.json();
       setTotalFocusedTime(data.totalFocusTime);
     } catch (error) {

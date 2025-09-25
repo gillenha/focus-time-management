@@ -40,17 +40,20 @@ class AudioManager {
                     return audioFiles;
                     
                 } else {
-                    // In development, use local manifest
-                    const response = await fetch(`${apiUrl}/mp3s`);
+                    // In development, use GCP test folder
+                    const response = await fetch(`${apiUrl}/api/files/list-tracks`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch audio manifest');
                     }
                     const audioFiles = await response.json();
                     
+                    // Extract file names from the items array
+                    const trackNames = audioFiles.items.map(item => item.name);
+                    
                     // Cache the result
-                    this.manifestCache = audioFiles.mp3s;
-                    console.log('Development: Using local files:', audioFiles.mp3s);
-                    return audioFiles.mp3s;
+                    this.manifestCache = trackNames;
+                    console.log('Development: Using GCP test files:', trackNames);
+                    return trackNames;
                 }
                 
             } catch (error) {

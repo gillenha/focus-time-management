@@ -4,15 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Frontend Development
-- `npm start` - Start React development server (port 3000)
-- `npm run start:dev` - Start with NODE_ENV=development
+### Development
+- `npm run dev` - Start both frontend and backend in development mode (recommended)
+  - Frontend runs on http://localhost:3000
+  - Backend API runs on http://localhost:8080  
+  - Automatically handles environment variable conflicts
+- `npm start` - Start React development server only (port 3000)
+- `npm run start:dev` - Start React with NODE_ENV=development
+- `npm run start:server:dev` - Start Express server only in development with nodemon
+- `node server.js` - Start production server (port 8080)
+
+### Building
 - `npm run build` - Build production React bundle
 - `npm run dist` - Build Electron distribution
 
-### Backend Development  
-- `npm run start:server:dev` - Start Express server in development with nodemon
-- `node server.js` - Start production server (port 8080)
+### Testing
+- Uses Jest and React Testing Library (included with Create React App)
+- Run tests with `npm test` (interactive watch mode)
+- Single test file: `npm test App.test.js`
+- Test file located at `src/App.test.js`
 
 ### Deployment
 - `npm run deploy` - Deploy to Google Cloud Platform using gcloud

@@ -38,33 +38,26 @@ const filesRouter = require('./server/routes/files');
 const sessionsRouter = require('./server/routes/sessions');
 const projectRoutes = require('./server/routes/projects');
 
-// Initialize Google Cloud Storage in production only
+// Initialize Google Cloud Storage for both development and production
 let storage;
 let bucket;
 
 const initializeStorage = async () => {
-    if (process.env.NODE_ENV === 'production') {
-        try {
-            console.log('Initializing Google Cloud Storage...');
-            const { GoogleAuth } = require('google-auth-library');
-            
-            // Check if credentials are available
-            const auth = new GoogleAuth();
-            await auth.getDefaultProjectId();
-            
-            storage = new Storage({
-                projectId: process.env.GCLOUD_PROJECT_ID || 'harry-gillen-builder',
-            });
-            bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
-            console.log('Successfully initialized Google Cloud Storage');
-            return true;
-        } catch (error) {
-            console.error('Failed to initialize Google Cloud Storage:', error.message);
-            console.log('Continuing without Cloud Storage - using local filesystem');
-            return false;
-        }
-    } else {
-        console.log('Development mode - using local filesystem for file storage');
+    try {
+        console.log('Initializing Google Cloud Storage...');
+        
+        storage = new Storage({
+            projectId: process.env.GCLOUD_PROJECT_ID || 'harry-gillen-builder',
+        });
+        bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
+        
+        // Test the connection
+        await bucket.exists();
+        console.log('Successfully initialized Google Cloud Storage');
+        return true;
+    } catch (error) {
+        console.error('Failed to initialize Google Cloud Storage:', error.message);
+        console.log('ERROR: GCP storage is required - no local filesystem fallback');
         return false;
     }
 };
@@ -312,48 +305,37 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         const isStorageReady = await storageReady;
         
-        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
-            // Upload to Google Cloud Storage
-            const blob = bucket.file(req.file.originalname);
-            const blobStream = blob.createWriteStream({
-                resumable: false,
-                metadata: {
-                    contentType: 'audio/mpeg'
-                }
-            });
+        if (!isStorageReady || !bucket) {
+            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
+        }
 
-            blobStream.on('error', (err) => {
-                console.error('Upload error:', err);
-                res.status(500).json({ error: 'Failed to upload file' });
-            });
-
-            blobStream.on('finish', () => {
-                res.status(200).json({
-                    message: 'File uploaded successfully',
-                    file: {
-                        name: req.file.originalname,
-                        size: req.file.size
-                    }
-                });
-            });
-
-            blobStream.end(req.file.buffer);
-        } else {
-            // Development or fallback: Save to local directory
-            const mp3sDir = path.join(__dirname, 'mp3s');
-            if (!fs.existsSync(mp3sDir)) {
-                fs.mkdirSync(mp3sDir, { recursive: true });
+        // Always upload to Google Cloud Storage
+        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+        const blobPath = `${targetFolder}/${req.file.originalname}`;
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: 'audio/mpeg'
             }
-            
-            fs.writeFileSync(path.join(mp3sDir, req.file.originalname), req.file.buffer);
-            res.json({
+        });
+
+        blobStream.on('error', (err) => {
+            console.error('Upload error:', err);
+            res.status(500).json({ error: 'Failed to upload file' });
+        });
+
+        blobStream.on('finish', () => {
+            res.status(200).json({
                 message: 'File uploaded successfully',
                 file: {
-                    name: req.file.originalname,
+                    name: blobPath,
                     size: req.file.size
                 }
             });
-        }
+        });
+
+        blobStream.end(req.file.buffer);
     } catch (error) {
         console.error('Upload error:', error);
         res.status(500).json({ error: 'Failed to upload file' });
@@ -365,21 +347,17 @@ app.get('/mp3s', async (req, res) => {
     try {
         const isStorageReady = await storageReady;
         
-        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
-            const [files] = await bucket.getFiles();
-            const mp3s = files
-                .filter(file => file.name.endsWith('.mp3'))
-                .map(file => file.name);
-            res.json({ mp3s });
-        } else {
-            const mp3sDir = path.join(__dirname, 'mp3s');
-            if (!fs.existsSync(mp3sDir)) {
-                fs.mkdirSync(mp3sDir, { recursive: true });
-            }
-            const files = fs.readdirSync(mp3sDir);
-            const mp3s = files.filter(file => file.endsWith('.mp3'));
-            res.json({ mp3s });
+        if (!isStorageReady || !bucket) {
+            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
         }
+
+        // Use environment-specific folder
+        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        const [files] = await bucket.getFiles({ prefix: folder });
+        const mp3s = files
+            .filter(file => file.name.endsWith('.mp3'))
+            .map(file => file.name);
+        res.json({ mp3s });
     } catch (error) {
         console.error('Error listing files:', error);
         res.status(500).json({ error: 'Failed to list files' });
@@ -393,14 +371,11 @@ app.delete('/mp3s/:filename', async (req, res) => {
     try {
         const isStorageReady = await storageReady;
         
-        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
-            await bucket.file(filename).delete();
-        } else {
-            const filePath = path.join(__dirname, 'mp3s', filename);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+        if (!isStorageReady || !bucket) {
+            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
         }
+
+        await bucket.file(filename).delete();
         res.json({ message: 'File deleted successfully' });
     } catch (error) {
         console.error('Delete error:', error);
@@ -418,31 +393,21 @@ app.get('/mp3s/sizes', async (req, res) => {
     try {
         const isStorageReady = await storageReady;
         
-        if (process.env.NODE_ENV === 'production' && isStorageReady && bucket) {
-            const [files] = await bucket.getFiles();
-            const sizes = {};
-            for (const file of files) {
-                if (file.name.endsWith('.mp3')) {
-                    const [metadata] = await file.getMetadata();
-                    sizes[file.name] = parseInt(metadata.size);
-                }
-            }
-            res.json(sizes);
-        } else {
-            const mp3sDir = path.join(__dirname, 'mp3s');
-            if (!fs.existsSync(mp3sDir)) {
-                fs.mkdirSync(mp3sDir, { recursive: true });
-            }
-            const files = fs.readdirSync(mp3sDir);
-            const sizes = {};
-            for (const file of files) {
-                if (file.endsWith('.mp3')) {
-                    const stats = fs.statSync(path.join(mp3sDir, file));
-                    sizes[file] = stats.size;
-                }
-            }
-            res.json(sizes);
+        if (!isStorageReady || !bucket) {
+            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
         }
+
+        // Use environment-specific folder
+        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        const [files] = await bucket.getFiles({ prefix: folder });
+        const sizes = {};
+        for (const file of files) {
+            if (file.name.endsWith('.mp3')) {
+                const [metadata] = await file.getMetadata();
+                sizes[file.name] = parseInt(metadata.size);
+            }
+        }
+        res.json(sizes);
     } catch (error) {
         console.error('Error getting file sizes:', error);
         res.status(500).json({ error: 'Failed to get file sizes' });
@@ -456,7 +421,6 @@ const notionRouter = require('./server/routes/notion');
 app.use('/api/notion', notionRouter);
 
 // Serve static files in both development and production
-app.use('/mp3s', express.static(path.join(__dirname, 'mp3s')));
 app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
 
 // Additional static files in production
@@ -464,7 +428,7 @@ if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'build')));
     
     // Catch-all route for React app routes only (not API routes)
-    app.get(/^(?!\/(api|mp3s|effects)).*/, (req, res) => {
+    app.get(/^(?!\/(api|effects)).*/, (req, res) => {
         res.sendFile(path.join(__dirname, 'build', 'index.html'));
     });
 }

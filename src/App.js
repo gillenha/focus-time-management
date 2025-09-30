@@ -126,21 +126,46 @@ function App() {
     return () => clearInterval(timer);
   }, [timerActive, time]);
 
+  // Utility function to validate if a URL is a valid image
+  const isValidImageUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+
+    // Check if URL has valid image extensions
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i;
+    const hasImageExtension = imageExtensions.test(url);
+
+    // Check if URL starts with http/https
+    const isValidUrl = /^https?:\/\/.+/i.test(url);
+
+    // For URLs without extensions but from known image hosts (like Unsplash)
+    const knownImageHosts = [
+      'images.unsplash.com',
+      'unsplash.com',
+      'storage.googleapis.com',
+      'images.pexels.com',
+      'pixabay.com'
+    ];
+    const isFromImageHost = knownImageHosts.some(host => url.includes(host));
+
+    return isValidUrl && (hasImageExtension || isFromImageHost);
+  };
+
+  // Utility function to test if image URL actually loads
+  const testImageLoad = (url) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+
+      // Timeout after 5 seconds
+      setTimeout(() => resolve(false), 5000);
+    });
+  };
+
   const fetchBackgroundImage = async (theme, forceUpdate = false) => {
     try {
-      const lastFetch = localStorage.getItem('lastImageFetch');
-      const timeSinceLastFetch = Date.now() - parseInt(lastFetch || '0');
-      
-      // If not forcing update and less than 1 hour since last fetch, use cached image
-      if (!forceUpdate && lastFetch && timeSinceLastFetch < 3600000) {
-        const cachedImage = localStorage.getItem('backgroundImage');
-        const cachedPhotographer = localStorage.getItem('photographer');
-        if (cachedImage && cachedPhotographer) {
-          setBackgroundImage(cachedImage);
-          setPhotographer(JSON.parse(cachedPhotographer));
-          return;
-        }
-      }
+      console.log('Fetching fresh background image for theme:', theme);
 
       if (theme === 'my-images') {
         // Fetch from our GCS bucket
@@ -164,16 +189,80 @@ function App() {
           description: randomImage.name.split('/').pop()
         });
 
-        localStorage.setItem('backgroundImage', randomImage.url);
-        localStorage.setItem('photographer', JSON.stringify({
-          name: 'My Images',
-          username: '',
-          link: '',
-          photoLink: '',
-          description: randomImage.name.split('/').pop()
-        }));
-        localStorage.setItem('lastImageFetch', Date.now().toString());
-        
+        // No caching - always fetch fresh images
+
+      } else if (theme === 'favorites') {
+        // Handle favorites from MongoDB with validation
+        const customImage = localStorage.getItem('customBackgroundImage');
+        let imageUrl = null;
+        let imageTitle = 'From your favorites collection';
+        let isValidImage = false;
+
+        if (customImage) {
+          console.log('Testing custom favorite image:', customImage);
+          isValidImage = isValidImageUrl(customImage) && await testImageLoad(customImage);
+          if (isValidImage) {
+            imageUrl = customImage;
+          } else {
+            console.warn('Custom favorite image failed validation or load test');
+          }
+        }
+
+        // If no custom image or custom image failed, try getting from API
+        if (!isValidImage) {
+          console.log('Fetching favorites from API...');
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/favorites`);
+          if (response.ok) {
+            const favorites = await response.json();
+            if (favorites.length > 0) {
+              console.log(`Found ${favorites.length} favorites, selecting randomly...`);
+
+              // Shuffle the favorites array to randomize selection
+              const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
+
+              // Try each favorite in random order until we find a working one
+              for (const favorite of shuffledFavorites) {
+                console.log('Testing favorite image:', favorite.title, favorite.imageUrl);
+                const isValid = isValidImageUrl(favorite.imageUrl) && await testImageLoad(favorite.imageUrl);
+                if (isValid) {
+                  imageUrl = favorite.imageUrl;
+                  imageTitle = favorite.title;
+                  isValidImage = true;
+                  console.log('Selected valid favorite:', favorite.title);
+                  break;
+                }
+                console.warn('Favorite image failed validation:', favorite.title);
+              }
+            }
+          }
+        }
+
+        if (isValidImage && imageUrl) {
+          console.log('Using valid favorite image:', imageUrl);
+          setBackgroundImage(imageUrl);
+          setPhotographer({
+            name: 'Favorites',
+            username: '',
+            link: '',
+            photoLink: imageUrl,
+            description: imageTitle
+          });
+          // No caching - always fetch fresh images
+        } else {
+          // All favorites failed - use fallback
+          console.error('All favorite images failed validation - using fallback');
+          const fallbackUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDgwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjQwMCIgeT0iMjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNkI3Mjg0IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiPkZhdm9yaXRlIEltYWdlIE5vdCBGb3VuZDwvdGV4dD4KPHR5ZXh0IHg9IjQwMCIgeT0iMzIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUI5QkEwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiPkxpbmsgaGFzIG5vIGltYWdlIG9yIGZhaWxlZCB0byBsb2FkPC90ZXh0Pgo8L3N2Zz4K';
+          setBackgroundImage(fallbackUrl);
+          setPhotographer({
+            name: 'Error',
+            username: '',
+            link: '',
+            photoLink: '',
+            description: 'Favorite image link has no image or failed to load'
+          });
+          // No caching - always fetch fresh images
+        }
+
       } else {
         // Existing Unsplash API call
         const response = await fetch(
@@ -199,41 +288,32 @@ function App() {
           description: data.description || data.alt_description || ''
         });
         
-        localStorage.setItem('backgroundImage', data.urls.full);
-        localStorage.setItem('photographer', JSON.stringify({
-          name: data.user.name || '',
-          username: data.user.username || '',
-          link: data.user.links.html || '',
-          photoLink: data.links.html || '',
-          description: data.description || data.alt_description || ''
-        }));
-        localStorage.setItem('lastImageFetch', Date.now().toString());
+        // No caching - always fetch fresh images
       }
       
     } catch (error) {
       console.error('Error fetching image:', error);
-      // Use cached values
-      const cachedImage = localStorage.getItem('backgroundImage');
-      const cachedPhotographer = localStorage.getItem('photographer');
-      
-      if (cachedImage && cachedPhotographer) {
-        setBackgroundImage(cachedImage);
-        setPhotographer(JSON.parse(cachedPhotographer));
-      } else {
-        setBackgroundImage('/images/test.jpg');
-        setPhotographer({ 
-          name: '', 
-          username: '', 
-          link: '',
-          photoLink: '' 
-        });
-      }
+      // Use fallback image instead of cache
+      setBackgroundImage('/images/test.jpg');
+      setPhotographer({
+        name: 'Error',
+        username: '',
+        link: '',
+        photoLink: '',
+        description: 'Failed to load background image'
+      });
     }
   };
 
   useEffect(() => {
-    // This will respect the 30-minute cache
-    fetchBackgroundImage(unsplashTheme, false);
+    // Clear any existing image cache on app load
+    localStorage.removeItem('backgroundImage');
+    localStorage.removeItem('photographer');
+    localStorage.removeItem('lastImageFetch');
+    localStorage.removeItem('customBackgroundImage');
+
+    // Always fetch fresh images (no caching)
+    fetchBackgroundImage(unsplashTheme, true);
   }, [unsplashTheme]);
 
   const handleFreeFlowClick = async () => {

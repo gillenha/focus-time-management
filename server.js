@@ -37,6 +37,7 @@ const quotesRouter = require('./server/routes/quotes');
 const filesRouter = require('./server/routes/files');
 const sessionsRouter = require('./server/routes/sessions');
 const projectRoutes = require('./server/routes/projects');
+const favoritesRouter = require('./server/routes/favorites');
 
 // Initialize Google Cloud Storage for both development and production
 let storage;
@@ -145,6 +146,7 @@ app.use('/api/quotes', quotesRouter);
 app.use('/api/files', filesRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/projects', projectRoutes);
+app.use('/api/favorites', favoritesRouter);
 
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;

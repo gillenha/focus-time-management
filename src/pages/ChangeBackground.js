@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState, useEffect } from 'react';
+import {
     Tree,
     Waves,
     Snowflake,
@@ -12,14 +12,49 @@ import {
     Sailboat,
     Leaf,
     Star,
-    Image
+    Image,
+    Heart
 } from "@phosphor-icons/react"
+import { fetchFavorites } from '../services/favoritesService';
 
 const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackgroundImage }) => {
     const [selectedTheme, setSelectedTheme] = useState(theme);
+    const [favorites, setFavorites] = useState([]);
+    const [showFavorites, setShowFavorites] = useState(false);
+
+    // Fetch favorites from API
+    useEffect(() => {
+        const loadFavorites = async () => {
+            try {
+                const favoritesData = await fetchFavorites();
+                console.log('Loaded favorites:', favoritesData);
+                setFavorites(favoritesData);
+            } catch (error) {
+                console.error('Error fetching favorites:', error);
+            }
+        };
+
+        loadFavorites();
+    }, []);
 
     const handleThemeChange = (e) => {
+        console.log('Theme changed to:', e.target.value);
         setSelectedTheme(e.target.value);
+
+        // Handle special cases
+        if (e.target.value === 'favorites') {
+            console.log('Showing favorites, count:', favorites.length);
+            setShowFavorites(true);
+        } else {
+            setShowFavorites(false);
+        }
+    };
+
+    const handleFavoriteSelect = (favorite) => {
+        console.log('Selected favorite:', favorite);
+        // For now, we'll store the URL in localStorage and handle it in App.js
+        localStorage.setItem('customBackgroundImage', favorite.imageUrl);
+        setSelectedTheme('custom-background');
     };
 
     const handleApplyTheme = () => {
@@ -79,6 +114,11 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         value: "my-images",
                                         label: "My Images",
                                         icon: <Image size={32} weight="thin" className="tw-mb-2" />
+                                    },
+                                    {
+                                        value: "favorites",
+                                        label: "Favorites",
+                                        icon: <Heart size={32} weight="thin" className="tw-mb-2" />
                                     },
                                     {
                                         value: "landscape?featured=true&order_by=popular",
@@ -165,6 +205,39 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                     </button>
                                 ))}
                             </div>
+
+                            {/* Favorites Display */}
+                            {showFavorites && (
+                                <div className="tw-mt-6 tw-space-y-4">
+                                    <h4 className="tw-text-md tw-font-semibold tw-text-gray-800">Favorite Images</h4>
+                                    <div className="tw-grid tw-grid-cols-2 tw-gap-4 tw-max-h-64 tw-overflow-y-auto">
+                                        {favorites.map((favorite) => (
+                                            <div
+                                                key={favorite._id}
+                                                onClick={() => handleFavoriteSelect(favorite)}
+                                                className="tw-relative tw-cursor-pointer tw-group tw-rounded-lg tw-overflow-hidden tw-border tw-border-gray-200 hover:tw-border-gray-400 tw-transition-all"
+                                            >
+                                                <img
+                                                    src={favorite.imageUrl}
+                                                    alt={favorite.title}
+                                                    className="tw-w-full tw-h-24 tw-object-cover tw-group-hover:tw-scale-105 tw-transition-transform"
+                                                    onError={(e) => {
+                                                        console.warn('Failed to load favorite image:', favorite.imageUrl);
+                                                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2IiBzdHJva2U9IiNEREREREQiIHN0cm9rZS13aWR0aD0iMSIvPgo8dGV4dCB4PSIxMDAiIHk9IjQ1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUI5QkEwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiPkJyb2tlbiBJbWFnZTwvdGV4dD4KPHR5ZXh0IHg9IjEwMCIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNDQ0NDQ0MiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCI+TGluayBOb3QgRm91bmQ8L3RleHQ+Cjwvc3ZnPgo=';
+                                                        e.target.parentElement.classList.add('tw-opacity-50');
+                                                    }}
+                                                />
+                                                <div className="tw-absolute tw-bottom-0 tw-left-0 tw-right-0 tw-bg-black tw-bg-opacity-50 tw-text-white tw-text-xs tw-p-2">
+                                                    <p className="tw-truncate">{favorite.title}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {favorites.length === 0 && (
+                                        <p className="tw-text-gray-500 tw-text-center tw-py-8">No favorite images yet. Add images via command line!</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

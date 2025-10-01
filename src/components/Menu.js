@@ -19,7 +19,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
       >
         <div className="tw-p-4">
           <div className="tw-flex tw-justify-between tw-items-center tw-mb-6">
-            <p className="tw-text-xl tw-font-bold tw-text-gray-800">Focus App</p>
+            <p className="tw-text-xl tw-font-bold tw-text-gray-800">Flow State Music</p>
             <button 
               onClick={onClose}
               className="tw-text-gray-500 
@@ -51,7 +51,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                   }}
                 >
                   <span>Profile</span>
-                  <span className="tw-text-gray-400">👤</span>
+                  <span className="tw-text-gray-400"></span>
                 </a>
               </li>
             </ul>
@@ -87,7 +87,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                   }}
                 >
                   <span>Projects</span>
-                  <span className="tw-text-gray-400">📋</span>
+                  <span className="tw-text-gray-400"></span>
                 </a>
               </li>
               <li>
@@ -113,7 +113,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                   }}
                 >
                   <span>Track List</span>
-                  <span className="tw-text-gray-400">🎵</span>
+                  <span className="tw-text-gray-400"></span>
                 </a>
               </li>
               <li>
@@ -126,7 +126,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                   }}
                 >
                   <span>Quote List</span>
-                  <span className="tw-text-gray-400">💭</span>
+                  <span className="tw-text-gray-400"></span>
                 </a>
               </li>
             </ul>

@@ -1,9 +1,21 @@
 node_modules
 .git
-.env
 *.log
 
 # Environment files
+.env
 .env.*
 .env.development
 .env.production
+
+# Local data (persisted via Docker volume)
+data/
+temp/
+
+# Build artifacts
+build/
+dist/
+
+# Dev/IDE files
+.DS_Store
+.vscode

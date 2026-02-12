@@ -128,7 +128,7 @@ function MusicPlayer({
 
   const verifyAudio = async () => {
     if (playlistTracks.length === 0) {
-      console.error('No tracks available to play');
+      console.warn('No tracks available to play');
       setIsAudioVerified(false);
       return false;
     }
@@ -202,20 +202,22 @@ function MusicPlayer({
 
         {sessionStarted && (
           <>
-            <p className={`
-              tw-text-white/80 
-              tw-text-sm 
-              tw-mt-60 
-              tw-italic
-              tw-transition-opacity 
-              tw-duration-1000
-              ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
-            `}>
-              "{currentQuote.text}"
-              {currentQuote.author && currentQuote.author !== 'Unknown' && (
-                <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
-              )}
-            </p>
+            {currentQuote && currentQuote.text && (
+              <p className={`
+                tw-text-white/80
+                tw-text-sm
+                tw-mt-60
+                tw-italic
+                tw-transition-opacity
+                tw-duration-1000
+                ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
+              `}>
+                "{currentQuote.text}"
+                {currentQuote.author && currentQuote.author !== 'Unknown' && (
+                  <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
+                )}
+              </p>
+            )}
             <div className={`
               tw-transition-opacity 
               tw-duration-1000

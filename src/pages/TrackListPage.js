@@ -20,7 +20,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
     const fetchTracks = async () => {
         try {
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://devpigh.local:8082';
             console.log('Fetching tracks from server...');
             console.log('Using API URL:', apiUrl);
             const response = await fetch(`${apiUrl}/api/files/list-tracks`);
@@ -124,7 +124,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
         if (selectedFiles.length === 0) return;
 
         setIsUploading(true);
-        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://devpigh.local:8082';
         
         try {
             // Add files to upload manager queue
@@ -168,7 +168,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             let uploadedChunks = 0;
 
             // Initialize upload session
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://devpigh.local:8082';
             const initResponse = await fetch(`${apiUrl}/api/files/init-upload`, {
                 method: 'POST',
                 headers: {
@@ -508,7 +508,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             try {
                 // Delete from Google Cloud Storage bucket
                 // The fileName should include the folder (test/ or tracks/)
-                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://devpigh.local:8082';
                 const response = await fetch(`${apiUrl}/api/files/${track.fileName}`, {
                     method: 'DELETE',
                     headers: {

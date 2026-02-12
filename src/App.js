@@ -141,7 +141,7 @@ function App() {
     const knownImageHosts = [
       'images.unsplash.com',
       'unsplash.com',
-      'storage.googleapis.com',
+      'devpigh.local',
       'images.pexels.com',
       'pixabay.com'
     ];
@@ -191,95 +191,31 @@ function App() {
 
         // No caching - always fetch fresh images
 
-      } else if (theme === 'favorites') {
-        // Handle favorites from MongoDB with validation
-        const customImage = localStorage.getItem('customBackgroundImage');
-        let imageUrl = null;
-        let imageTitle = 'From your favorites collection';
-        let isValidImage = false;
-
-        if (customImage) {
-          console.log('Testing custom favorite image:', customImage);
-          isValidImage = isValidImageUrl(customImage) && await testImageLoad(customImage);
-          if (isValidImage) {
-            imageUrl = customImage;
-          } else {
-            console.warn('Custom favorite image failed validation or load test');
-          }
-        }
-
-        // If no custom image or custom image failed, try getting from API
-        if (!isValidImage) {
-          console.log('Fetching favorites from API...');
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/favorites`);
-          if (response.ok) {
-            const favorites = await response.json();
-            if (favorites.length > 0) {
-              console.log(`Found ${favorites.length} favorites, selecting randomly...`);
-
-              // Shuffle the favorites array to randomize selection
-              const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
-
-              // Try each favorite in random order until we find a working one
-              for (const favorite of shuffledFavorites) {
-                console.log('Testing favorite image:', favorite.title, favorite.imageUrl);
-                const isValid = isValidImageUrl(favorite.imageUrl) && await testImageLoad(favorite.imageUrl);
-                if (isValid) {
-                  imageUrl = favorite.imageUrl;
-                  imageTitle = favorite.title;
-                  isValidImage = true;
-                  console.log('Selected valid favorite:', favorite.title);
-                  break;
-                }
-                console.warn('Favorite image failed validation:', favorite.title);
-              }
-            }
-          }
-        }
-
-        if (isValidImage && imageUrl) {
-          console.log('Using valid favorite image:', imageUrl);
-          setBackgroundImage(imageUrl);
-          setPhotographer({
-            name: 'Favorites',
-            username: '',
-            link: '',
-            photoLink: imageUrl,
-            description: imageTitle
-          });
-          // No caching - always fetch fresh images
-        } else {
-          // All favorites failed - use fallback
-          console.error('All favorite images failed validation - using fallback');
-          const fallbackUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDgwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjQwMCIgeT0iMjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNkI3Mjg0IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiPkZhdm9yaXRlIEltYWdlIE5vdCBGb3VuZDwvdGV4dD4KPHR5ZXh0IHg9IjQwMCIgeT0iMzIwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOUI5QkEwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTYiPkxpbmsgaGFzIG5vIGltYWdlIG9yIGZhaWxlZCB0byBsb2FkPC90ZXh0Pgo8L3N2Zz4K';
-          setBackgroundImage(fallbackUrl);
-          setPhotographer({
-            name: 'Error',
-            username: '',
-            link: '',
-            photoLink: '',
-            description: 'Favorite image link has no image or failed to load'
-          });
-          // No caching - always fetch fresh images
-        }
-
       } else {
-        // Existing Unsplash API call
+        // Unsplash API call - requires an API key
+        const unsplashKey = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
+        if (!unsplashKey) {
+          console.warn('No Unsplash API key configured - using fallback background');
+          setBackgroundImage('/images/test.jpg');
+          setPhotographer({ name: '', username: '', link: '', photoLink: '', description: '' });
+          return;
+        }
+
         const response = await fetch(
           `https://api.unsplash.com/photos/random?query=${theme}&orientation=landscape&content_filter=high&order_by=relevant&featured=true`,
           {
             headers: {
-              Authorization: `Client-ID ${process.env.REACT_APP_UNSPLASH_ACCESS_KEY}`
+              Authorization: `Client-ID ${unsplashKey}`
             }
           }
         );
-        
+
         if (!response.ok) throw new Error('Failed to fetch image');
-        
+
         const data = await response.json();
-        
+
         setBackgroundImage(data.urls.full);
-        
+
         setPhotographer({
           name: data.user.name || '',
           username: data.user.username || '',
@@ -287,8 +223,6 @@ function App() {
           photoLink: data.links.html || '',
           description: data.description || data.alt_description || ''
         });
-        
-        // No caching - always fetch fresh images
       }
       
     } catch (error) {
@@ -296,11 +230,11 @@ function App() {
       // Use fallback image instead of cache
       setBackgroundImage('/images/test.jpg');
       setPhotographer({
-        name: 'Error',
+        name: '',
         username: '',
         link: '',
         photoLink: '',
-        description: 'Failed to load background image'
+        description: ''
       });
     }
   };
@@ -314,6 +248,7 @@ function App() {
 
     // Always fetch fresh images (no caching)
     fetchBackgroundImage(unsplashTheme, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unsplashTheme]);
 
   const handleFreeFlowClick = async () => {
@@ -540,12 +475,13 @@ function App() {
       setShowMusicPlayer(savedSession.showMusicPlayer);
       setSessionInputValue(savedSession.sessionInputValue);
       setSessionStarted(savedSession.sessionStarted);
-      
+
       // If session was active, automatically restart it
       if (savedSession.sessionStarted && savedSession.timerActive) {
         handleBeginClick(savedSession.text, savedSession.projectId);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Separate beforeunload handler effect

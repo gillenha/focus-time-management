@@ -1,12 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const Project = require('../models/Project');
+const { readData, writeData, generateId, findIndexById } = require('../utils/jsonStorage');
+
+const PROJECTS_FILE = 'projects.json';
 
 // Get all projects
 router.get('/', async (req, res) => {
     try {
-        const projects = await Project.find().sort({ createdAt: -1 });
-        res.json({ projects });
+        const projects = readData(PROJECTS_FILE);
+        // Sort by createdAt (newest first)
+        const sortedProjects = projects.sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        res.json({ projects: sortedProjects });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch projects' });
     }
@@ -16,13 +22,19 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { name, projectDetails } = req.body;
-        const project = new Project({
+        const projects = readData(PROJECTS_FILE);
+
+        const newProject = {
+            _id: generateId(),
             name,
             projectDetails: projectDetails || '',
-            createdAt: new Date()
-        });
-        await project.save();
-        res.status(201).json({ project });
+            createdAt: new Date().toISOString()
+        };
+
+        projects.push(newProject);
+        writeData(PROJECTS_FILE, projects);
+
+        res.status(201).json({ project: newProject });
     } catch (error) {
         res.status(500).json({ error: 'Failed to create project' });
     }
@@ -32,19 +44,21 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { name, projectDetails } = req.body;
-        const project = await Project.findByIdAndUpdate(
-            req.params.id,
-            { 
-                name,
-                projectDetails: projectDetails || '',
-                // createdAt will be preserved
-            },
-            { new: true }
-        );
-        if (!project) {
+        const projects = readData(PROJECTS_FILE);
+        const index = findIndexById(projects, req.params.id);
+
+        if (index === -1) {
             return res.status(404).json({ error: 'Project not found' });
         }
-        res.json({ project });
+
+        projects[index] = {
+            ...projects[index],
+            name: name !== undefined ? name : projects[index].name,
+            projectDetails: projectDetails !== undefined ? projectDetails : projects[index].projectDetails
+        };
+
+        writeData(PROJECTS_FILE, projects);
+        res.json({ project: projects[index] });
     } catch (error) {
         res.status(500).json({ error: 'Failed to update project' });
     }
@@ -53,14 +67,20 @@ router.put('/:id', async (req, res) => {
 // Delete a project
 router.delete('/:id', async (req, res) => {
     try {
-        const project = await Project.findByIdAndDelete(req.params.id);
-        if (!project) {
+        const projects = readData(PROJECTS_FILE);
+        const index = findIndexById(projects, req.params.id);
+
+        if (index === -1) {
             return res.status(404).json({ error: 'Project not found' });
         }
+
+        projects.splice(index, 1);
+        writeData(PROJECTS_FILE, projects);
+
         res.json({ message: 'Project deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete project' });
     }
 });
 
-module.exports = router; 
+module.exports = router;

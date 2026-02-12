@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const Session = require('../models/Session');
+const { readData, writeData, generateId, findById, findIndexById } = require('../utils/jsonStorage');
+
+const SESSIONS_FILE = 'sessions.json';
+const PROJECTS_FILE = 'projects.json';
 
 // Helper function to format duration
 function formatDuration(duration) {
@@ -17,13 +20,28 @@ function formatDuration(duration) {
     }
 }
 
+// Helper function to populate project info
+function populateProject(session) {
+    if (session.project) {
+        const projects = readData(PROJECTS_FILE);
+        const project = findById(projects, session.project);
+        return {
+            ...session,
+            project: project ? { _id: project._id, name: project.name } : null
+        };
+    }
+    return session;
+}
+
 // Get all sessions with project information
 router.get('/', async (req, res) => {
     try {
-        const sessions = await Session.find()
-            .populate('project', 'name') // Only populate the project name
-            .sort({ date: -1 });
-        res.json(sessions);
+        const sessions = readData(SESSIONS_FILE);
+        // Populate projects and sort by date (newest first)
+        const populatedSessions = sessions
+            .map(populateProject)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        res.json(populatedSessions);
     } catch (err) {
         console.error('Error fetching sessions:', err);
         res.status(500).json({ error: 'Failed to fetch sessions' });
@@ -34,16 +52,24 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { date, time, duration, text, project } = req.body;
-        const session = new Session({
-            date,
+        const sessions = readData(SESSIONS_FILE);
+
+        const newSession = {
+            _id: generateId(),
+            date: date || new Date().toISOString(),
             time,
             duration,
-            text,
-            project // Include project ID if provided
-        });
-        const savedSession = await session.save();
-        const populatedSession = await Session.findById(savedSession._id)
-            .populate('project', 'name');
+            text: text || '',
+            project: project || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        sessions.push(newSession);
+        writeData(SESSIONS_FILE, sessions);
+
+        // Return populated session
+        const populatedSession = populateProject(newSession);
         res.status(201).json(populatedSession);
     } catch (err) {
         console.error('Error creating session:', err);
@@ -54,13 +80,53 @@ router.post('/', async (req, res) => {
 // Update session
 router.put('/:id', async (req, res) => {
     try {
-        const { text, project } = req.body;
-        const updatedSession = await Session.findByIdAndUpdate(
-            req.params.id,
-            { text, project },
-            { new: true }
-        ).populate('project', 'name');
-        res.json(updatedSession);
+        const { text, project, date, time, duration } = req.body;
+        const sessions = readData(SESSIONS_FILE);
+        const index = findIndexById(sessions, req.params.id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        // Validate date if provided
+        if (date !== undefined) {
+            const parsed = new Date(date);
+            if (isNaN(parsed.getTime())) {
+                return res.status(400).json({ error: 'Invalid date format' });
+            }
+        }
+
+        // Validate time if provided (HH:MM format)
+        if (time !== undefined && !/^\d{1,2}:\d{2}$/.test(time)) {
+            return res.status(400).json({ error: 'Invalid time format. Use HH:MM' });
+        }
+
+        // Validate duration if provided (MM:SS or H:MM:SS format)
+        if (duration !== undefined) {
+            const durationParts = duration.split(':').map(Number);
+            if (durationParts.some(isNaN) || durationParts.length < 2 || durationParts.length > 3) {
+                return res.status(400).json({ error: 'Invalid duration format. Use MM:SS or HH:MM:SS' });
+            }
+            if (durationParts.every(p => p === 0)) {
+                return res.status(400).json({ error: 'Duration cannot be zero' });
+            }
+        }
+
+        sessions[index] = {
+            ...sessions[index],
+            text: text !== undefined ? text : sessions[index].text,
+            project: project !== undefined ? project : sessions[index].project,
+            date: date !== undefined ? date : sessions[index].date,
+            time: time !== undefined ? time : sessions[index].time,
+            duration: duration !== undefined ? duration : sessions[index].duration,
+            updatedAt: new Date().toISOString()
+        };
+
+        writeData(SESSIONS_FILE, sessions);
+
+        // Return populated session
+        const populatedSession = populateProject(sessions[index]);
+        res.json(populatedSession);
     } catch (err) {
         console.error('Error updating session:', err);
         res.status(500).json({ error: 'Failed to update session' });
@@ -70,7 +136,16 @@ router.put('/:id', async (req, res) => {
 // Delete session
 router.delete('/:id', async (req, res) => {
     try {
-        await Session.findByIdAndDelete(req.params.id);
+        const sessions = readData(SESSIONS_FILE);
+        const index = findIndexById(sessions, req.params.id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        sessions.splice(index, 1);
+        writeData(SESSIONS_FILE, sessions);
+
         res.json({ message: 'Session deleted successfully' });
     } catch (err) {
         console.error('Error deleting session:', err);
@@ -81,7 +156,7 @@ router.delete('/:id', async (req, res) => {
 // Clear all sessions
 router.delete('/clear', async (req, res) => {
     try {
-        await Session.deleteMany({});
+        writeData(SESSIONS_FILE, []);
         res.status(200).json({ message: 'All sessions cleared successfully' });
     } catch (err) {
         console.error('Error clearing sessions:', err);
@@ -92,13 +167,25 @@ router.delete('/clear', async (req, res) => {
 // Restore sessions (for import functionality)
 router.post('/restore', async (req, res) => {
     try {
-        const sessions = req.body;
-        const result = await Session.insertMany(sessions);
-        res.status(200).json({ count: result.length, message: 'Sessions restored successfully' });
+        const newSessions = req.body;
+        const sessions = readData(SESSIONS_FILE);
+
+        // Add _id to sessions that don't have one
+        const sessionsToAdd = newSessions.map(session => ({
+            ...session,
+            _id: session._id || generateId(),
+            createdAt: session.createdAt || new Date().toISOString(),
+            updatedAt: session.updatedAt || new Date().toISOString()
+        }));
+
+        sessions.push(...sessionsToAdd);
+        writeData(SESSIONS_FILE, sessions);
+
+        res.status(200).json({ count: sessionsToAdd.length, message: 'Sessions restored successfully' });
     } catch (err) {
         console.error('Error restoring sessions:', err);
         res.status(500).json({ error: 'Failed to restore sessions' });
     }
 });
 
-module.exports = router; 
+module.exports = router;

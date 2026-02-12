@@ -35,6 +35,10 @@ build/
 # Other large files or directories
 # Add any other large files or directories here
 
+# Local data storage (JSON files and uploads)
+/data/
+data/
+
 # Environment Variables
 .env
 .env.development
@@ -46,3 +50,5 @@ temp/
 *.temp
 
 sessions_backup.json
+npn-debug.log*
+*.log

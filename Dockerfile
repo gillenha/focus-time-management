@@ -2,9 +2,7 @@
 FROM node:18 AS build
 WORKDIR /app
 
-# Add cache busting
-ARG CACHE_BUST=1
-ARG REACT_APP_API_URL
+ARG REACT_APP_API_URL=http://devpigh.local:8082
 ARG REACT_APP_UNSPLASH_ACCESS_KEY
 
 # Set environment variables for the build
@@ -19,10 +17,10 @@ RUN npm install
 COPY . .
 
 # Build the app
-RUN REACT_APP_API_URL=$REACT_APP_API_URL REACT_APP_UNSPLASH_ACCESS_KEY=$REACT_APP_UNSPLASH_ACCESS_KEY npm run build
+RUN npm run build
 
 # Step 2: Set up Node.js server with the React Build
-FROM node:18
+FROM node:18-slim
 WORKDIR /app
 
 # Copy only necessary files for production
@@ -33,13 +31,16 @@ RUN npm install --production
 COPY --from=build /app/build ./build
 COPY server.js .
 COPY server ./server
-COPY utils ./utils
 COPY public ./public
+
+# Create data directory for persistent storage
+RUN mkdir -p /app/data/uploads/tracks /app/data/uploads/test /app/data/uploads/my-images
 
 # Set production environment variables
 ENV NODE_ENV=production
-ENV PORT=8080
+ENV PORT=8082
+ENV HOST=0.0.0.0
 
 # Expose port and start server
-EXPOSE 8080
+EXPOSE 8082
 CMD ["node", "server.js"]

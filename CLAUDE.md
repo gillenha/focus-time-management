@@ -6,16 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Development
 - `npm run dev` - Start both frontend and backend in development mode (recommended)
-  - Frontend runs on http://localhost:3000
-  - Backend API runs on http://localhost:8080  
-  - Automatically handles environment variable conflicts
+  - Frontend runs on http://devpigh.local:3000 (bound to 0.0.0.0)
+  - Backend API runs on http://devpigh.local:8082
 - `npm start` - Start React development server only (port 3000)
-- `npm run start:dev` - Start React with NODE_ENV=development
-- `npm run start:server:dev` - Start Express server only in development with nodemon
-- `node server.js` - Start production server (port 8080)
+- `npm run start:dev` - Start React with development config for Pi network
+- `npm run start:server:dev` - Start Express server only in development with nodemon (port 8082)
+- `npm run serve` - Start production server (port 8082)
 
 ### Building
-- `npm run build` - Build production React bundle
+- `npm run build` - Build production React bundle for Pi
+- `npm run build:production` - Build with explicit production env
 - `npm run dist` - Build Electron distribution
 
 ### Testing
@@ -24,9 +24,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Single test file: `npm test App.test.js`
 - Test file located at `src/App.test.js`
 
-### Deployment
+### Docker (Production on Raspberry Pi)
+- `docker compose up -d` - Build and start as daemon
+- `docker compose down` - Stop the daemon
+- `docker compose logs -f` - View logs
+- `docker compose up -d --build` - Rebuild and restart
+- Container auto-restarts on boot via `restart: unless-stopped`
+- Data persisted in `focus-data` Docker volume
+
+### Deployment (Legacy GCP)
 - `npm run deploy` - Deploy to Google Cloud Platform using gcloud
-- Docker builds use multi-stage process (React build → Node.js server)
+- Docker builds use multi-stage process (React build -> Node.js server)
 
 ## Architecture Overview
 
@@ -42,71 +50,85 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **State Persistence**: localStorage for sessions, settings, and playlists
 
 ### Backend (Express.js)
-- **Server** (`server.js`) - Main server with file uploads, session logging, Notion integration
-- **Database**: MongoDB with Mongoose (models: Session, Project, Quote)
-- **Routes**: 
+- **Server** (`server.js`) - Main server with file uploads, session logging
+- **Database**: Local JSON file storage (in `data/` directory)
+- **Routes**:
   - `/api/sessions` - Focus session CRUD
   - `/api/projects` - Project management
   - `/api/quotes` - Inspirational quotes
   - `/api/files` - MP3 file management
-  - `/api/notion` - Notion database integration
-- **File Storage**: Local filesystem (dev) or Google Cloud Storage (production)
+  - `/api/favorites` - Background image favorites
+- **File Storage**: Local filesystem (`data/uploads/`)
 
 ### Key Features
 - **Focus Sessions**: Freeflow timer with project association and session notes
-- **Audio System**: Shuffled playlist with MP3 upload/management via GCS
+- **Audio System**: Shuffled playlist with MP3 upload/management
 - **Background Images**: Unsplash API integration + custom image upload
 - **Session Persistence**: Survives page refresh, warns on navigation during active sessions
-- **Notion Integration**: Optional session logging to Notion database
 
 ### Environment Configuration
-- Development: Uses local MongoDB, filesystem storage, localhost URLs
-- Production: MongoDB Atlas, Google Cloud Storage, Cloud Run deployment
-- Environment files: `.env.development` and `.env.production` (not `.env.local`)
+- **Host**: devpigh.local (Raspberry Pi on local network)
+- **Ports**: 8082 (backend/production), 3000 (frontend dev only)
+- **Ports 8080 and 8081 are reserved** - do not use
+- Development: Local JSON storage, local filesystem, devpigh.local URLs
+- Production: Same stack, served from Docker container as daemon
+- Environment files: `.env.development` and `.env.production` (gitignored)
 
 ### Deployment Infrastructure
-- **Google Cloud Platform**: Cloud Run, Container Registry, Cloud Storage
-- **Build Process**: Cloud Build with `cloudbuild.yaml`
-- **Container**: Multi-stage Docker build optimized for production
+- **Raspberry Pi**: Docker container with `restart: unless-stopped`
+- **Data Persistence**: Docker named volume `focus-data` mounted to `/app/data`
+- **Health Check**: `/api/health` endpoint monitored by Docker
+- **Legacy GCP**: Cloud Run config retained in `cloudbuild.yaml`
 
-## Database Models
+## Data Storage
+
+### JSON File Storage (in `data/` directory)
+- `sessions.json` - Focus session history
+- `projects.json` - User projects
+- `quotes.json` - Inspirational quotes
+- `favorites.json` - Favorite background images
+- `uploads/tracks/` - MP3 audio files (production)
+- `uploads/test/` - MP3 audio files (development)
+- `uploads/my-images/` - Custom background images
 
 ### Session Schema
 ```javascript
 {
+  _id: String,
   date: String (ISO format),
-  time: String (formatted time),
-  duration: String (MM:SS format),
+  time: String (HH:MM format),
+  duration: String (MM:SS or HH:MM:SS format),
   text: String (session notes),
-  project: ObjectId (optional reference)
+  project: String (project ID, optional)
 }
 ```
 
 ### Project Schema
 ```javascript
 {
+  _id: String,
   name: String,
   description: String,
-  createdAt: Date
+  createdAt: String (ISO format)
 }
 ```
 
 ## Audio System
-- Tracks stored in `mp3s/` directory (dev) or GCS bucket (prod)
+- Tracks stored in `data/uploads/tracks/` (prod) or `data/uploads/test/` (dev)
 - Playlist managed in localStorage as `focusPlaylist`
 - Audio context provides shuffled playback with auto-advance
 - Volume settings persisted in localStorage
 
 ## Session Flow
-1. User clicks "Enter Flow State" → shows MusicPlayer
-2. User enters session notes → clicks "Begin" → starts timer + audio
-3. Timer runs with session state auto-saved to localStorage  
-4. User clicks "Exit Flow State" → saves session to database + localStorage
+1. User clicks "Enter Flow State" -> shows MusicPlayer
+2. User enters session notes -> clicks "Begin" -> starts timer + audio
+3. Timer runs with session state auto-saved to localStorage
+4. User clicks "Exit Flow State" -> saves session to database + localStorage
 5. Session appears in history with project association
 
 ## Important Notes
 - Session state persists across page refreshes during active sessions
 - Audio files must be .mp3 format for upload
-- Notion integration requires NOTION_API_KEY and NOTION_DATABASE_ID
 - Background images cached for 1 hour to avoid API rate limits
-- Test server health with `/api/health` endpoint (if implemented)
+- Test server health with `/api/health` endpoint
+- Server binds to 0.0.0.0 for network access from other devices

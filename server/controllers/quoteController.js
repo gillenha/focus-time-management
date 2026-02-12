@@ -1,13 +1,19 @@
-const Quote = require('../models/Quote');
+const { readData, writeData, generateId, findById, findIndexById } = require('../utils/jsonStorage');
+
+const QUOTES_FILE = 'quotes.json';
 
 // Get all quotes
 exports.getQuotes = async (req, res) => {
     console.log('GET /api/quotes called');
     try {
-        console.log('Attempting to fetch quotes from MongoDB...');
-        const quotes = await Quote.find().sort({ createdAt: -1 });
-        console.log('Quotes fetched successfully:', quotes);
-        res.json({ quotes });
+        console.log('Fetching quotes from JSON file...');
+        const quotes = readData(QUOTES_FILE);
+        // Sort by createdAt (newest first)
+        const sortedQuotes = quotes.sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        console.log('Quotes fetched successfully:', sortedQuotes);
+        res.json({ quotes: sortedQuotes });
     } catch (error) {
         console.error('Error fetching quotes:', error);
         res.status(500).json({ error: 'Failed to fetch quotes', details: error.message });
@@ -19,27 +25,34 @@ exports.addQuote = async (req, res) => {
     console.log('POST /api/quotes called with body:', req.body);
     try {
         const { text, author = 'Unknown' } = req.body;
-        
+
         if (!text) {
             console.log('Quote text is missing');
             return res.status(400).json({ error: 'Quote text is required' });
         }
 
         console.log('Creating new quote:', { text, author });
-        const quote = new Quote({
+        const quotes = readData(QUOTES_FILE);
+
+        const newQuote = {
+            _id: generateId(),
             text,
             author,
-            isDefault: false
-        });
+            isDefault: false,
+            createdAt: new Date().toISOString()
+        };
 
-        console.log('Saving quote to MongoDB...');
-        await quote.save();
-        
+        quotes.push(newQuote);
+        writeData(QUOTES_FILE, quotes);
+
         // Return all quotes after adding new one
         console.log('Fetching updated quotes list...');
-        const quotes = await Quote.find().sort({ createdAt: -1 });
-        console.log('Quotes fetched successfully:', quotes);
-        res.json({ quotes });
+        const updatedQuotes = readData(QUOTES_FILE);
+        const sortedQuotes = updatedQuotes.sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        console.log('Quotes fetched successfully:', sortedQuotes);
+        res.json({ quotes: sortedQuotes });
     } catch (error) {
         console.error('Error adding quote:', error);
         res.status(500).json({ error: 'Failed to add quote', details: error.message });
@@ -53,7 +66,9 @@ exports.deleteQuote = async (req, res) => {
         const { id } = req.params;
 
         console.log('Finding quote by ID:', id);
-        const quote = await Quote.findById(id);
+        const quotes = readData(QUOTES_FILE);
+        const quote = findById(quotes, id);
+
         if (!quote) {
             console.log('Quote not found');
             return res.status(404).json({ error: 'Quote not found' });
@@ -66,13 +81,18 @@ exports.deleteQuote = async (req, res) => {
         }
 
         console.log('Deleting quote...');
-        await quote.deleteOne();
+        const index = findIndexById(quotes, id);
+        quotes.splice(index, 1);
+        writeData(QUOTES_FILE, quotes);
 
         // Return remaining quotes
         console.log('Fetching updated quotes list...');
-        const quotes = await Quote.find().sort({ createdAt: -1 });
-        console.log('Quotes fetched successfully:', quotes);
-        res.json({ quotes });
+        const updatedQuotes = readData(QUOTES_FILE);
+        const sortedQuotes = updatedQuotes.sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        console.log('Quotes fetched successfully:', sortedQuotes);
+        res.json({ quotes: sortedQuotes });
     } catch (error) {
         console.error('Error deleting quote:', error);
         res.status(500).json({ error: 'Failed to delete quote', details: error.message });
@@ -92,8 +112,9 @@ exports.updateQuote = async (req, res) => {
         }
 
         console.log('Finding and updating quote:', { id, text, author });
-        const quote = await Quote.findById(id);
-        
+        const quotes = readData(QUOTES_FILE);
+        const quote = findById(quotes, id);
+
         if (!quote) {
             console.log('Quote not found');
             return res.status(404).json({ error: 'Quote not found' });
@@ -105,17 +126,24 @@ exports.updateQuote = async (req, res) => {
             return res.status(403).json({ error: 'Cannot update default quotes' });
         }
 
-        quote.text = text;
-        quote.author = author;
-        await quote.save();
+        const index = findIndexById(quotes, id);
+        quotes[index] = {
+            ...quotes[index],
+            text,
+            author
+        };
+        writeData(QUOTES_FILE, quotes);
 
         // Return all quotes after update
         console.log('Fetching updated quotes list...');
-        const quotes = await Quote.find().sort({ createdAt: -1 });
-        console.log('Quotes updated successfully:', quotes);
-        res.json({ quotes });
+        const updatedQuotes = readData(QUOTES_FILE);
+        const sortedQuotes = updatedQuotes.sort((a, b) =>
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        console.log('Quotes updated successfully:', sortedQuotes);
+        res.json({ quotes: sortedQuotes });
     } catch (error) {
         console.error('Error updating quote:', error);
         res.status(500).json({ error: 'Failed to update quote', details: error.message });
     }
-}; 
+};

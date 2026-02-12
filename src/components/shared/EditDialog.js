@@ -49,7 +49,9 @@ const EditDialog = ({
                                         {field.label}
                                         {!field.required && <span className="tw-text-gray-500"> (Optional)</span>}
                                     </label>
-                                    {field.type === 'textarea' ? (
+                                    {field.type === 'custom' && field.renderInput ? (
+                                        field.renderInput({ value: field.value, onChange: field.onChange, error: field.error })
+                                    ) : field.type === 'textarea' ? (
                                         <textarea
                                             value={field.value}
                                             onChange={(e) => field.onChange(e.target.value)}
@@ -66,6 +68,9 @@ const EditDialog = ({
                                             required={field.required}
                                             className={baseClasses.input}
                                         />
+                                    )}
+                                    {field.error && (
+                                        <span className="tw-text-red-500 tw-text-sm">{field.error}</span>
                                     )}
                                 </div>
                             ))}

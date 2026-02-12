@@ -1,8 +1,8 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
-import { ListItemActions, EditDialog, DeleteDialog, CreateDialog, DurationInput } from './shared';
+import { ListItemActions, EditDialog, DeleteDialog, DurationInput } from './shared';
 import { toast } from 'react-toastify';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://devpigh.local:8082';
 
 const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref) => {
     const [sessionHistory, setSessionHistory] = useState([]);
@@ -18,8 +18,18 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         duration: ''
     });
     const [showCreateDialog, setShowCreateDialog] = useState(false);
-    const [durationValue, setDurationValue] = useState('00:00:00');
     const [durationError, setDurationError] = useState('');
+    const [dateError, setDateError] = useState('');
+    const [timeError, setTimeError] = useState('');
+    const [createFields, setCreateFields] = useState({
+        text: '',
+        date: '',
+        time: '',
+        duration: '00:00:00'
+    });
+    const [createDateError, setCreateDateError] = useState('');
+    const [createTimeError, setCreateTimeError] = useState('');
+    const [createDurationError, setCreateDurationError] = useState('');
     const fileInputRef = useRef(null);
 
     const fetchSessions = async () => {
@@ -46,7 +56,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         if (editingSession) {
             setEditingFields({
                 text: editingSession.text || '',
-                date: new Date(editingSession.date).toISOString().split('T')[0],
+                date: editingSession.date.split('T')[0],
                 time: editingSession.time || '',
                 duration: editingSession.duration || ''
             });
@@ -144,49 +154,51 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         return '';
     };
 
-    // Add duration formatting helper
-    const formatDurationInput = (input, showError) => {
-        // Remove non-numeric characters
-        const numbers = input.replace(/[^\d]/g, '');
-        
-        if (numbers.length <= 2) {
-            // Just seconds
-            return numbers;
-        } else if (numbers.length <= 4) {
-            // MM:SS
-            return `${numbers.slice(0, -2)}:${numbers.slice(-2)}`;
-        } else {
-            // HH:MM:SS
-            return `${numbers.slice(0, -4)}:${numbers.slice(-4, -2)}:${numbers.slice(-2)}`;
-        }
-    };
-
-    const handleDurationChange = (value) => {
-        const showError = () => {
-            toast.error('Please enter a valid time');
-            setDurationError('Please enter a valid time');
-        };
-        const formatted = formatDurationInput(value, showError);
-        setDurationValue(formatted);
-        setDurationError(validateDuration(formatted));
-        return formatted;
-    };
-
     const handleSaveEdit = async () => {
         if (!editingSession) return;
 
-        // Validate duration before saving
+        // Validate all fields
+        let hasErrors = false;
+
+        // Validate date
+        if (!editingFields.date) {
+            setDateError('Date is required');
+            hasErrors = true;
+        } else if (isNaN(new Date(editingFields.date).getTime())) {
+            setDateError('Invalid date');
+            hasErrors = true;
+        } else {
+            setDateError('');
+        }
+
+        // Validate time
+        if (!editingFields.time) {
+            setTimeError('Time is required');
+            hasErrors = true;
+        } else if (!/^\d{1,2}:\d{2}$/.test(editingFields.time)) {
+            setTimeError('Invalid time format');
+            hasErrors = true;
+        } else {
+            setTimeError('');
+        }
+
+        // Validate duration
         const durationValidationError = validateDuration(editingFields.duration);
         if (durationValidationError) {
-            toast.error(durationValidationError);
+            setDurationError(durationValidationError);
+            hasErrors = true;
+        } else {
+            setDurationError('');
+        }
+
+        if (hasErrors) {
             return;
         }
 
         try {
-            const updatedSession = {
-                ...editingSession,
+            const updatedData = {
                 text: editingFields.text.trim(),
-                date: new Date(editingFields.date).toISOString(),
+                date: editingFields.date,
                 time: editingFields.time,
                 duration: editingFields.duration
             };
@@ -196,29 +208,29 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(updatedSession),
+                body: JSON.stringify(updatedData),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to update session');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to update session');
             }
 
+            const savedSession = await response.json();
             const updatedSessions = sessionHistory.map(session =>
-                session._id === editingSession._id ? updatedSession : session
+                session._id === editingSession._id ? savedSession : session
             );
             setSessionHistory(updatedSessions);
             toast.success('Session updated successfully');
-            setIsEditDialogOpen(false);  // Close the dialog
-            setEditingSession(null);     // Clear the editing session
-            setEditingFields({           // Reset the fields
-                text: '',
-                date: '',
-                time: '',
-                duration: ''
-            });
+            setIsEditDialogOpen(false);
+            setEditingSession(null);
+            setEditingFields({ text: '', date: '', time: '', duration: '' });
+            setDateError('');
+            setTimeError('');
+            setDurationError('');
         } catch (error) {
             console.error('Error updating session:', error);
-            toast.error('Failed to update session');
+            toast.error(error.message || 'Failed to update session');
         }
     };
 
@@ -303,39 +315,56 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         }
     };
 
-    const handleCreateSession = async (formData) => {
-        const durationValidationError = validateDuration(formData.duration);
-        if (durationValidationError) {
-            toast.error(durationValidationError);
-            return;
+    const handleSaveCreate = async () => {
+        let hasErrors = false;
+
+        if (!createFields.date) {
+            setCreateDateError('Date is required');
+            hasErrors = true;
+        } else if (isNaN(new Date(createFields.date).getTime())) {
+            setCreateDateError('Invalid date');
+            hasErrors = true;
+        } else {
+            setCreateDateError('');
         }
 
+        if (!createFields.time) {
+            setCreateTimeError('Time is required');
+            hasErrors = true;
+        } else if (!/^\d{1,2}:\d{2}$/.test(createFields.time)) {
+            setCreateTimeError('Invalid time format');
+            hasErrors = true;
+        } else {
+            setCreateTimeError('');
+        }
+
+        const durationValidationError = validateDuration(createFields.duration);
+        if (durationValidationError) {
+            setCreateDurationError(durationValidationError);
+            hasErrors = true;
+        } else {
+            setCreateDurationError('');
+        }
+
+        if (hasErrors) return;
+
         try {
-            const [year, month, day] = formData.date.split('-').map(Number);
-            const dateInLocalTimezone = new Date(year, month - 1, day);
-            
             const response = await fetch(`${API_BASE_URL}/api/sessions`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: formData.notes?.trim() || '',
-                    date: dateInLocalTimezone.toISOString(),
-                    time: formData.time,
-                    duration: formData.duration,
-                    project: formData.project || null
+                    text: createFields.text.trim(),
+                    date: createFields.date,
+                    time: createFields.time,
+                    duration: createFields.duration,
+                    project: null
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to create session');
-            }
+            if (!response.ok) throw new Error('Failed to create session');
 
             fetchSessions();
             setShowCreateDialog(false);
-            setDurationValue('00:00:00');
-            setDurationError('');
             toast.success('Session created successfully');
         } catch (error) {
             console.error('Error creating session:', error);
@@ -383,6 +412,9 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                 time: '',
                                 duration: ''
                             });
+                            setDateError('');
+                            setTimeError('');
+                            setDurationError('');
                         }}
                         onConfirm={handleSaveEdit}
                         title="Edit Session"
@@ -392,16 +424,24 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                 label: 'Date',
                                 type: 'date',
                                 value: editingFields.date,
-                                onChange: (value) => setEditingFields(prev => ({ ...prev, date: value })),
-                                required: true
+                                onChange: (value) => {
+                                    setEditingFields(prev => ({ ...prev, date: value }));
+                                    if (value) setDateError('');
+                                },
+                                required: true,
+                                error: dateError
                             },
                             {
                                 id: 'time',
                                 label: 'Time',
                                 type: 'time',
                                 value: editingFields.time,
-                                onChange: (value) => setEditingFields(prev => ({ ...prev, time: value })),
-                                required: true
+                                onChange: (value) => {
+                                    setEditingFields(prev => ({ ...prev, time: value }));
+                                    if (value) setTimeError('');
+                                },
+                                required: true,
+                                error: timeError
                             },
                             {
                                 id: 'duration',
@@ -442,7 +482,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                         }}
                         onConfirm={handleDelete}
                         title="Delete Session"
-                        message={sessionToDelete ? `Are you sure you want to delete this session from ${new Date(sessionToDelete.date).toLocaleDateString()}?` : ''}
+                        message={sessionToDelete ? `Are you sure you want to delete this session from ${sessionToDelete.date.split('T')[0]}?` : ''}
                     />
 
                     {/* Clear History Dialog */}
@@ -457,7 +497,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                     {/* Session List */}
                     <div className="tw-mb-20">
                         <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
-                            {sessionHistory.map((session) => (
+                            {[...sessionHistory].sort((a, b) => new Date(b.date) - new Date(a.date)).map((session) => (
                                 <li key={session._id} 
                                     className="tw-group tw-relative tw-bg-gray-50 tw-rounded-lg tw-p-4 hover:tw-bg-gray-100"
                                 >
@@ -468,7 +508,15 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                                 <div className="tw-flex tw-items-center">
                                                     <span className="tw-text-sm tw-text-gray-500">Date: </span>
                                                     <span className="tw-font-medium tw-ml-1">
-                                                        {new Date(session.date).toLocaleDateString()}
+                                                        {(() => {
+                                                            const d = session.date;
+                                                            // Date-only strings (YYYY-MM-DD) parse as UTC — force local
+                                                            if (d && !d.includes('T')) {
+                                                                const [y, m, day] = d.split('-').map(Number);
+                                                                return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                                            }
+                                                            return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                                        })()}
                                                     </span>
                                                 </div>
                                                 <div className="tw-flex tw-items-center">
@@ -569,7 +617,18 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                             </div>
                             <div className="tw-flex tw-items-center tw-gap-4">
                                 <button
-                                    onClick={() => setShowCreateDialog(true)}
+                                    onClick={() => {
+                                        setCreateFields({
+                                            text: '',
+                                            date: new Date().toISOString().split('T')[0],
+                                            time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                                            duration: '00:00:00'
+                                        });
+                                        setCreateDateError('');
+                                        setCreateTimeError('');
+                                        setCreateDurationError('');
+                                        setShowCreateDialog(true);
+                                    }}
                                     className="primary-button tw-h-10 tw-w-36 tw-flex tw-items-center tw-justify-center tw-text-sm"
                                 >
                                     <svg
@@ -594,38 +653,51 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                 </div>
             </div>
 
-            <CreateDialog
+            <EditDialog
                 isOpen={showCreateDialog}
                 onClose={() => {
                     setShowCreateDialog(false);
-                    setDurationValue('00:00:00');
-                    setDurationError('');
+                    setCreateFields({ text: '', date: '', time: '', duration: '00:00:00' });
+                    setCreateDateError('');
+                    setCreateTimeError('');
+                    setCreateDurationError('');
                 }}
-                onSubmit={handleCreateSession}
+                onConfirm={handleSaveCreate}
                 title="Add New Session"
+                confirmButtonText="Create"
                 fields={[
                     {
-                        name: 'date',
+                        id: 'date',
                         label: 'Date',
                         type: 'date',
+                        value: createFields.date,
+                        onChange: (value) => {
+                            setCreateFields(prev => ({ ...prev, date: value }));
+                            if (value) setCreateDateError('');
+                        },
                         required: true,
-                        value: new Date().toISOString().split('T')[0]
+                        error: createDateError
                     },
                     {
-                        name: 'time',
+                        id: 'time',
                         label: 'Time',
                         type: 'time',
+                        value: createFields.time,
+                        onChange: (value) => {
+                            setCreateFields(prev => ({ ...prev, time: value }));
+                            if (value) setCreateTimeError('');
+                        },
                         required: true,
-                        value: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+                        error: createTimeError
                     },
                     {
-                        name: 'duration',
+                        id: 'duration',
                         label: 'Duration',
                         type: 'custom',
-                        value: durationValue,
+                        value: createFields.duration,
                         onChange: (value) => {
-                            setDurationValue(value);
-                            setDurationError(validateDuration(value));
+                            setCreateFields(prev => ({ ...prev, duration: value }));
+                            setCreateDurationError(validateDuration(value));
                         },
                         renderInput: ({ value, onChange, error }) => (
                             <DurationInput
@@ -635,17 +707,17 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                             />
                         ),
                         required: true,
-                        error: durationError
+                        error: createDurationError
                     },
                     {
-                        name: 'notes',
+                        id: 'notes',
                         label: 'Session Notes',
                         type: 'textarea',
-                        placeholder: 'Enter session notes...',
-                        required: false
+                        value: createFields.text,
+                        onChange: (value) => setCreateFields(prev => ({ ...prev, text: value })),
+                        placeholder: 'Enter session notes...'
                     }
                 ]}
-                submitButtonText="Create"
             />
         </div>
     );

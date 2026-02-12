@@ -12,13 +12,9 @@ try {
     path: envPath,
     debug: process.env.NODE_ENV === 'development'
   });
-  
+
   console.log('Environment loaded successfully');
-  console.log('Loaded environment variables:', {
-    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    NODE_ENV: process.env.NODE_ENV,
-    GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME
-  });
+  console.log('NODE_ENV:', process.env.NODE_ENV);
 } catch (error) {
   console.error('Error loading environment:', error);
 }
@@ -27,50 +23,15 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const helmet = require('helmet');
-const { Client } = require('@notionhq/client');
 const multer = require('multer');
-const { format } = require('util');
-const { Storage } = require('@google-cloud/storage');
-const connectDB = require('./server/config/db');
 const quoteController = require('./server/controllers/quoteController');
 const quotesRouter = require('./server/routes/quotes');
 const filesRouter = require('./server/routes/files');
 const sessionsRouter = require('./server/routes/sessions');
 const projectRoutes = require('./server/routes/projects');
-const favoritesRouter = require('./server/routes/favorites');
-
-// Initialize Google Cloud Storage for both development and production
-let storage;
-let bucket;
-
-const initializeStorage = async () => {
-    try {
-        console.log('Initializing Google Cloud Storage...');
-        
-        storage = new Storage({
-            projectId: process.env.GCLOUD_PROJECT_ID || 'harry-gillen-builder',
-        });
-        bucket = storage.bucket(process.env.GCS_BUCKET_NAME || 'react-app-assets');
-        
-        // Test the connection
-        await bucket.exists();
-        console.log('Successfully initialized Google Cloud Storage');
-        return true;
-    } catch (error) {
-        console.error('Failed to initialize Google Cloud Storage:', error.message);
-        console.log('ERROR: GCP storage is required - no local filesystem fallback');
-        return false;
-    }
-};
-
-// Initialize storage but don't block the server startup
-const storageReady = initializeStorage();
 
 const app = express();
-const PORT = process.env.PORT || 8080;
-
-// Connect to MongoDB
-connectDB();
+const PORT = process.env.SERVER_PORT || 8082;
 
 // Configure multer for file handling
 const multerStorage = multer.memoryStorage();
@@ -84,28 +45,6 @@ const upload = multer({
     }
 });
 
-// Add this near the top of your server.js
-const initializeNotion = () => {
-    if (!process.env.NOTION_API_KEY) {
-        console.error('NOTION_API_KEY missing. Current environment:', process.env.NODE_ENV);
-        return null;
-    }
-    
-    try {
-        const notion = new Client({
-            auth: process.env.NOTION_API_KEY
-        });
-        console.log('Notion client initialized successfully in', process.env.NODE_ENV);
-        return notion;
-    } catch (error) {
-        console.error('Failed to initialize Notion client:', error);
-        return null;
-    }
-};
-
-// Use it when initializing your notion client
-const notion = initializeNotion();
-
 // Add security headers, but disable some that might interfere with audio playback
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -114,15 +53,17 @@ app.use(helmet({
 }));
 
 // Configure CORS
+const allowedOrigins = process.env.NODE_ENV === 'development'
+  ? ['http://devpigh.local:3000', 'http://localhost:3000']
+  : '*';
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:3000' 
-    : '*',  // Allow all origins in production
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
+    'Content-Type',
     'Authorization',
-    'Content-Range',  // Add this for chunked uploads
+    'Content-Range',
     'X-Upload-Content-Type',
     'X-Upload-Content-Length'
   ]
@@ -133,8 +74,8 @@ app.use(bodyParser.json({ limit: '10kb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         environment: process.env.NODE_ENV,
         timestamp: new Date().toISOString(),
         port: PORT
@@ -146,7 +87,6 @@ app.use('/api/quotes', quotesRouter);
 app.use('/api/files', filesRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/projects', projectRoutes);
-app.use('/api/favorites', favoritesRouter);
 
 app.put('/api/freeflow', (req, res) => {
   const { time } = req.body;
@@ -173,23 +113,23 @@ function formatDuration(duration) {
   }
 }
 
-// Route to log session details
+// Route to log session details (kept for backwards compatibility, but sessions should use /api/sessions)
 app.post('/api/log-session', async (req, res) => {
   const sessionDetails = req.body;
-  
+
   // Add debug logging
   console.log('Received session details:', sessionDetails);
-  
+
   // Check required fields, excluding 'text'
   const requiredFields = ['date', 'time', 'duration'];
   const missingFields = requiredFields.filter(field => !sessionDetails?.[field]);
-  
+
   if (missingFields.length > 0) {
     const errorMsg = `Incomplete session details. Missing fields: ${missingFields.join(', ')}`;
     console.error(errorMsg);
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: errorMsg,
-      receivedData: sessionDetails 
+      receivedData: sessionDetails
     });
   }
 
@@ -219,208 +159,13 @@ app.post('/api/log-session', async (req, res) => {
   }
 });
 
-// Add this new endpoint
-app.post('/api/notion-log', async (req, res) => {
-    // Add environment logging
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('Notion API Key exists:', !!process.env.NOTION_API_KEY);
-    console.log('Notion Database ID exists:', !!process.env.NOTION_DATABASE_ID);
-
-    if (!notion) {
-        console.error('Notion client not initialized - check your NOTION_API_KEY');
-        return res.status(500).json({ error: 'Notion client not initialized' });
-    }
-
-    if (!process.env.NOTION_DATABASE_ID) {
-        console.error('NOTION_DATABASE_ID is not defined in environment variables');
-        return res.status(500).json({ error: 'Notion database ID not configured' });
-    }
-
-    try {
-        console.log('Attempting to create Notion page with properties:', req.body.properties);
-        
-        const response = await notion.pages.create({
-            parent: {
-                database_id: process.env.NOTION_DATABASE_ID
-            },
-            properties: req.body.properties
-        });
-
-        console.log('Notion page created successfully');
-        res.json({ success: true, notionResponse: response });
-    } catch (error) {
-        console.error('Detailed Notion error:', error);
-        // Send more detailed error information back to client
-        res.status(500).json({ 
-            error: 'Failed to send to Notion', 
-            details: error.message,
-            code: error.code,
-            statusCode: error.status
-        });
-    }
-});
-
-// Add this test endpoint
-app.get('/api/notion-test', async (req, res) => {
-    // Check environment variables
-    if (!process.env.NOTION_API_KEY || !process.env.NOTION_DATABASE_ID) {
-        return res.status(500).json({ 
-            error: 'Missing configuration',
-            notionKey: !!process.env.NOTION_API_KEY,
-            databaseId: !!process.env.NOTION_DATABASE_ID
-        });
-    }
-
-    if (!notion) {
-        return res.status(500).json({ error: 'Notion client not initialized' });
-    }
-
-    try {
-        // Try to query the database to verify connection
-        const response = await notion.databases.query({
-            database_id: process.env.NOTION_DATABASE_ID
-        });
-        
-        res.json({ 
-            success: true, 
-            message: 'Notion connection successful',
-            databaseInfo: {
-                results: response.results.length,
-                hasMore: response.has_more
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Failed to connect to Notion', 
-            details: error.message,
-            code: error.code
-        });
-    }
-});
-
-// File upload endpoint
-app.post('/upload', upload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        const isStorageReady = await storageReady;
-        
-        if (!isStorageReady || !bucket) {
-            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
-        }
-
-        // Always upload to Google Cloud Storage
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        const blobPath = `${targetFolder}/${req.file.originalname}`;
-        const blob = bucket.file(blobPath);
-        const blobStream = blob.createWriteStream({
-            resumable: false,
-            metadata: {
-                contentType: 'audio/mpeg'
-            }
-        });
-
-        blobStream.on('error', (err) => {
-            console.error('Upload error:', err);
-            res.status(500).json({ error: 'Failed to upload file' });
-        });
-
-        blobStream.on('finish', () => {
-            res.status(200).json({
-                message: 'File uploaded successfully',
-                file: {
-                    name: blobPath,
-                    size: req.file.size
-                }
-            });
-        });
-
-        blobStream.end(req.file.buffer);
-    } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Failed to upload file' });
-    }
-});
-
-// List MP3 files
-app.get('/mp3s', async (req, res) => {
-    try {
-        const isStorageReady = await storageReady;
-        
-        if (!isStorageReady || !bucket) {
-            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
-        }
-
-        // Use environment-specific folder
-        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
-        const [files] = await bucket.getFiles({ prefix: folder });
-        const mp3s = files
-            .filter(file => file.name.endsWith('.mp3'))
-            .map(file => file.name);
-        res.json({ mp3s });
-    } catch (error) {
-        console.error('Error listing files:', error);
-        res.status(500).json({ error: 'Failed to list files' });
-    }
-});
-
-// Delete MP3 file
-app.delete('/mp3s/:filename', async (req, res) => {
-    const filename = req.params.filename;
-
-    try {
-        const isStorageReady = await storageReady;
-        
-        if (!isStorageReady || !bucket) {
-            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
-        }
-
-        await bucket.file(filename).delete();
-        res.json({ message: 'File deleted successfully' });
-    } catch (error) {
-        console.error('Delete error:', error);
-        res.status(500).json({ error: 'Failed to delete file' });
-    }
-});
-
-// Quotes endpoints
+// Quotes endpoints (legacy support)
 app.get('/api/quotes', quoteController.getQuotes);
 app.post('/api/quotes', quoteController.addQuote);
 app.delete('/api/quotes/:id', quoteController.deleteQuote);
 
-// Add endpoint to get file sizes
-app.get('/mp3s/sizes', async (req, res) => {
-    try {
-        const isStorageReady = await storageReady;
-        
-        if (!isStorageReady || !bucket) {
-            return res.status(500).json({ error: 'Google Cloud Storage not initialized' });
-        }
-
-        // Use environment-specific folder
-        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
-        const [files] = await bucket.getFiles({ prefix: folder });
-        const sizes = {};
-        for (const file of files) {
-            if (file.name.endsWith('.mp3')) {
-                const [metadata] = await file.getMetadata();
-                sizes[file.name] = parseInt(metadata.size);
-            }
-        }
-        res.json(sizes);
-    } catch (error) {
-        console.error('Error getting file sizes:', error);
-        res.status(500).json({ error: 'Failed to get file sizes' });
-    }
-});
-
-// Import routers
-const notionRouter = require('./server/routes/notion');
-
-// Mount API routers first
-app.use('/api/notion', notionRouter);
+// Serve static files for uploads
+app.use('/uploads', express.static('/mnt/media/focus-music'));
 
 // Serve static files in both development and production
 app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
@@ -428,13 +173,17 @@ app.use('/effects', express.static(path.join(__dirname, 'public/effects')));
 // Additional static files in production
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'build')));
-    
+
     // Catch-all route for React app routes only (not API routes)
-    app.get(/^(?!\/(api|effects)).*/, (req, res) => {
+    app.get(/^(?!\/(api|effects|uploads)).*/, (req, res) => {
         res.sendFile(path.join(__dirname, 'build', 'index.html'));
     });
 }
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+    console.log(`Server is running on ${HOST}:${PORT} in ${process.env.NODE_ENV} mode`);
+    console.log('Using local JSON file storage (no MongoDB)');
+    console.log('Using local file storage (no Google Cloud Storage)');
 });

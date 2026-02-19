@@ -10,15 +10,27 @@ const DurationInput = ({ value, onChange, error }) => {
     useEffect(() => {
         if (value) {
             const parts = value.split(':').map(Number);
+            let h = 0, m = 0, s = 0;
             if (parts.length === 3) {
-                setHours(parts[0]);
-                setMinutes(parts[1]);
-                setSeconds(parts[2]);
+                h = parts[0];
+                m = parts[1];
+                s = parts[2];
             } else if (parts.length === 2) {
-                setHours(0);
-                setMinutes(parts[0]);
-                setSeconds(parts[1]);
+                m = parts[0];
+                s = parts[1];
             }
+            // Normalize overflow: e.g. "264:43" → 4h 24m 43s
+            if (s >= 60) {
+                m += Math.floor(s / 60);
+                s = s % 60;
+            }
+            if (m >= 60) {
+                h += Math.floor(m / 60);
+                m = m % 60;
+            }
+            setHours(h);
+            setMinutes(m);
+            setSeconds(s);
         }
     }, [value]);
 
@@ -60,10 +72,8 @@ const DurationInput = ({ value, onChange, error }) => {
         setMinutes(m);
         setSeconds(s);
 
-        // Format output as HH:MM:SS or MM:SS
-        const formattedValue = h > 0 
-            ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-            : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        // Always format output as HH:MM:SS
+        const formattedValue = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         
         onChange(formattedValue);
     };

@@ -49,7 +49,19 @@ const EditDialog = ({
                                         {field.label}
                                         {!field.required && <span className="tw-text-gray-500"> (Optional)</span>}
                                     </label>
-                                    {field.type === 'textarea' ? (
+                                    {field.type === 'custom' && field.renderInput ? (
+                                        field.renderInput({ value: field.value, onChange: field.onChange, error: field.error })
+                                    ) : field.type === 'select' ? (
+                                        <select
+                                            value={field.value}
+                                            onChange={(e) => field.onChange(e.target.value)}
+                                            className={baseClasses.input}
+                                        >
+                                            {field.options?.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    ) : field.type === 'textarea' ? (
                                         <textarea
                                             value={field.value}
                                             onChange={(e) => field.onChange(e.target.value)}
@@ -66,6 +78,9 @@ const EditDialog = ({
                                             required={field.required}
                                             className={baseClasses.input}
                                         />
+                                    )}
+                                    {field.error && (
+                                        <span className={darkMode ? "tw-text-red-400 tw-text-sm tw-mt-1 tw-mb-2" : "tw-text-red-500 tw-text-sm tw-mt-1 tw-mb-2"}>{field.error}</span>
                                     )}
                                 </div>
                             ))}

@@ -71,7 +71,29 @@ const CreateDialog = ({
                                 {field.label}
                                 {!field.required && <span className="tw-text-gray-500"> (Optional)</span>}
                             </label>
-                            {field.type === 'textarea' ? (
+                            {field.type === 'custom' && field.renderInput ? (
+                                field.renderInput({ value: field.value || formData[field.name] || '', onChange: (val) => {
+                                    if (field.onChange) {
+                                        field.onChange(val);
+                                    }
+                                    handleInputChange(field.name, val);
+                                }, error: field.error })
+                            ) : field.type === 'select' ? (
+                                <select
+                                    value={field.value || formData[field.name] || ''}
+                                    onChange={(e) => {
+                                        if (field.onChange) {
+                                            field.onChange(e.target.value);
+                                        }
+                                        handleInputChange(field.name, e.target.value);
+                                    }}
+                                    className={`${baseClasses.input} ${field.error ? 'tw-border-red-500 focus:tw-border-red-500 focus:tw-ring-red-500' : ''}`}
+                                >
+                                    {field.options?.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            ) : field.type === 'textarea' ? (
                                 <textarea
                                     value={field.value || formData[field.name] || ''}
                                     onChange={(e) => {

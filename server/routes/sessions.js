@@ -54,10 +54,10 @@ router.post('/', async (req, res) => {
 // Update session
 router.put('/:id', async (req, res) => {
     try {
-        const { text, project } = req.body;
+        const { text, project, date, time, duration } = req.body;
         const updatedSession = await Session.findByIdAndUpdate(
             req.params.id,
-            { text, project },
+            { text, project, date, time, duration },
             { new: true }
         ).populate('project', 'name');
         res.json(updatedSession);

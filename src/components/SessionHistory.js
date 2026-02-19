@@ -20,7 +20,36 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [durationValue, setDurationValue] = useState('00:00:00');
     const [durationError, setDurationError] = useState('');
+    const [projects, setProjects] = useState([]);
+    const [editProjectId, setEditProjectId] = useState('');
+    const [createProjectId, setCreateProjectId] = useState('');
+    const [createDate, setCreateDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [createTime, setCreateTime] = useState(() => new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
     const fileInputRef = useRef(null);
+
+    // Time format helpers
+    const to24Hour = (time12) => {
+        if (!time12) return '';
+        const match = time12.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+        if (!match) return time12; // already 24h or unrecognized
+        let [, h, m, period] = match;
+        h = parseInt(h, 10);
+        if (period.toLowerCase() === 'pm' && h !== 12) h += 12;
+        if (period.toLowerCase() === 'am' && h === 12) h = 0;
+        return `${h.toString().padStart(2, '0')}:${m}`;
+    };
+
+    const to12Hour = (time24) => {
+        if (!time24) return '';
+        const match = time24.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return time24; // already 12h or unrecognized
+        let [, h, m] = match;
+        h = parseInt(h, 10);
+        const period = h >= 12 ? 'pm' : 'am';
+        if (h === 0) h = 12;
+        else if (h > 12) h -= 12;
+        return `${h}:${m} ${period}`;
+    };
 
     const fetchSessions = async () => {
         try {
@@ -41,15 +70,37 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         fetchSessions();
     }, []);
 
+    // Fetch projects for dropdown
+    useEffect(() => {
+        const fetchProjects = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/projects`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setProjects(data.projects || []);
+                }
+            } catch (error) {
+                console.error('Error fetching projects:', error);
+            }
+        };
+        fetchProjects();
+    }, []);
+
     // Update editingFields when editingSession changes
     useEffect(() => {
         if (editingSession) {
+            // Parse date parts to avoid UTC off-by-one
+            const d = new Date(editingSession.date);
+            const year = d.getFullYear();
+            const month = (d.getMonth() + 1).toString().padStart(2, '0');
+            const day = d.getDate().toString().padStart(2, '0');
             setEditingFields({
                 text: editingSession.text || '',
-                date: new Date(editingSession.date).toISOString().split('T')[0],
-                time: editingSession.time || '',
+                date: `${year}-${month}-${day}`,
+                time: to24Hour(editingSession.time || ''),
                 duration: editingSession.duration || ''
             });
+            setEditProjectId(editingSession.project?._id || '');
         }
     }, [editingSession]);
 
@@ -59,17 +110,24 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
     }));
 
     const formatDuration = (duration) => {
-        const [minutes, seconds] = duration.split(':').map(Number);
-        const totalMinutes = minutes + (seconds / 60);
-        const hours = Math.floor(totalMinutes / 60);
-        const remainingMinutes = Math.floor(totalMinutes % 60);
-        const remainingSeconds = Math.round((totalMinutes % 1) * 60);
-
-        if (hours > 0) {
-            return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        if (!duration) return '0:00';
+        const parts = duration.split(':').map(Number);
+        let hours, minutes, seconds;
+        if (parts.length === 3) {
+            // Already HH:MM:SS format
+            [hours, minutes, seconds] = parts;
+        } else if (parts.length === 2) {
+            // Legacy MM:SS — minutes may be > 59
+            hours = Math.floor(parts[0] / 60);
+            minutes = parts[0] % 60;
+            seconds = parts[1];
         } else {
             return duration;
         }
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     };
 
     const handleClearHistoryClick = () => {
@@ -128,19 +186,31 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
 
     // Add duration validation helper
     const validateDuration = (duration) => {
-        if (!duration || duration === '00:00:00') {
+        if (!duration || duration === '00:00:00' || duration === '00:00') {
             return 'Please enter a valid duration';
         }
-        
-        const [hours, minutes, seconds] = duration.split(':').map(Number);
-        if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+
+        const parts = duration.split(':').map(Number);
+        if (parts.length === 3) {
+            const [hours, minutes, seconds] = parts;
+            if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+                return 'Invalid duration format';
+            }
+            if (hours === 0 && minutes === 0 && seconds === 0) {
+                return 'Duration cannot be zero';
+            }
+        } else if (parts.length === 2) {
+            const [minutes, seconds] = parts;
+            if (isNaN(minutes) || isNaN(seconds)) {
+                return 'Invalid duration format';
+            }
+            if (minutes === 0 && seconds === 0) {
+                return 'Duration cannot be zero';
+            }
+        } else {
             return 'Invalid duration format';
         }
-        
-        if (hours === 0 && minutes === 0 && seconds === 0) {
-            return 'Duration cannot be zero';
-        }
-        
+
         return '';
     };
 
@@ -183,12 +253,16 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         }
 
         try {
-            const updatedSession = {
-                ...editingSession,
+            // Parse date parts to create local-timezone Date (avoids UTC off-by-one)
+            const [year, month, day] = editingFields.date.split('-').map(Number);
+            const dateInLocalTimezone = new Date(year, month - 1, day);
+
+            const payload = {
                 text: editingFields.text.trim(),
-                date: new Date(editingFields.date).toISOString(),
-                time: editingFields.time,
-                duration: editingFields.duration
+                date: dateInLocalTimezone.toISOString(),
+                time: to12Hour(editingFields.time),
+                duration: editingFields.duration,
+                project: editProjectId || null
             };
 
             const response = await fetch(`${API_BASE_URL}/api/sessions/${editingSession._id}`, {
@@ -196,26 +270,29 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(updatedSession),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
                 throw new Error('Failed to update session');
             }
 
+            // Use the server response (populated with project name) instead of local object
+            const savedSession = await response.json();
             const updatedSessions = sessionHistory.map(session =>
-                session._id === editingSession._id ? updatedSession : session
+                session._id === editingSession._id ? savedSession : session
             );
             setSessionHistory(updatedSessions);
             toast.success('Session updated successfully');
-            setIsEditDialogOpen(false);  // Close the dialog
-            setEditingSession(null);     // Clear the editing session
-            setEditingFields({           // Reset the fields
+            setIsEditDialogOpen(false);
+            setEditingSession(null);
+            setEditingFields({
                 text: '',
                 date: '',
                 time: '',
                 duration: ''
             });
+            setEditProjectId('');
         } catch (error) {
             console.error('Error updating session:', error);
             toast.error('Failed to update session');
@@ -322,7 +399,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                 body: JSON.stringify({
                     text: formData.notes?.trim() || '',
                     date: dateInLocalTimezone.toISOString(),
-                    time: formData.time,
+                    time: to12Hour(formData.time),
                     duration: formData.duration,
                     project: formData.project || null
                 }),
@@ -336,6 +413,9 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
             setShowCreateDialog(false);
             setDurationValue('00:00:00');
             setDurationError('');
+            setCreateProjectId('');
+            setCreateDate(new Date().toISOString().split('T')[0]);
+            setCreateTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
             toast.success('Session created successfully');
         } catch (error) {
             console.error('Error creating session:', error);
@@ -383,6 +463,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                 time: '',
                                 duration: ''
                             });
+                            setEditProjectId('');
                         }}
                         onConfirm={handleSaveEdit}
                         title="Edit Session"
@@ -423,6 +504,17 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                 error: durationError
                             },
                             {
+                                id: 'project',
+                                label: 'Project',
+                                type: 'select',
+                                value: editProjectId,
+                                onChange: (value) => setEditProjectId(value),
+                                options: [
+                                    { value: '', label: 'No Project' },
+                                    ...projects.map(p => ({ value: p._id, label: p.name }))
+                                ]
+                            },
+                            {
                                 id: 'notes',
                                 label: 'Session Notes',
                                 type: 'textarea',
@@ -457,7 +549,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                     {/* Session List */}
                     <div className="tw-mb-20">
                         <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
-                            {sessionHistory.map((session) => (
+                            {[...sessionHistory].sort((a, b) => new Date(b.date) - new Date(a.date)).map((session) => (
                                 <li key={session._id} 
                                     className="tw-group tw-relative tw-bg-gray-50 tw-rounded-lg tw-p-4 hover:tw-bg-gray-100"
                                 >
@@ -600,6 +692,9 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                     setShowCreateDialog(false);
                     setDurationValue('00:00:00');
                     setDurationError('');
+                    setCreateProjectId('');
+                    setCreateDate(new Date().toISOString().split('T')[0]);
+                    setCreateTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
                 }}
                 onSubmit={handleCreateSession}
                 title="Add New Session"
@@ -609,14 +704,16 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                         label: 'Date',
                         type: 'date',
                         required: true,
-                        value: new Date().toISOString().split('T')[0]
+                        value: createDate,
+                        onChange: (value) => setCreateDate(value)
                     },
                     {
                         name: 'time',
                         label: 'Time',
                         type: 'time',
                         required: true,
-                        value: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+                        value: createTime,
+                        onChange: (value) => setCreateTime(value)
                     },
                     {
                         name: 'duration',
@@ -636,6 +733,17 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                         ),
                         required: true,
                         error: durationError
+                    },
+                    {
+                        name: 'project',
+                        label: 'Project',
+                        type: 'select',
+                        value: createProjectId,
+                        onChange: (value) => setCreateProjectId(value),
+                        options: [
+                            { value: '', label: 'No Project' },
+                            ...projects.map(p => ({ value: p._id, label: p.name }))
+                        ]
                     },
                     {
                         name: 'notes',

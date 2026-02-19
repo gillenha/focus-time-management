@@ -1,6 +1,22 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### install packages
+- `npm install`
+
+### add env files
+- `touch .env.development`
+- Add:
+  `REACT_APP_UNSPLASH_ACCESS_KEY=`
+  `NODE_ENV=`	
+  `NOTION_API_KEY=`	
+  `NOTION_DATABASE_ID=`	
+  `ENABLE_AUTOMATIC_UPDATES=`	
+  `REACT_APP_UNSPLASH_ACCESS_KEY=`	
+  `REACT_APP_UNSPLASH_SECRET_KEY=`	
+  `MONGODB_URI=mongodb+srv://gillenha:<db_password>@focus-music-app.fpp8f.mongodb.net/focus-music-app-dev?retryWrites=true&w=majority`
+- MongoDB points to db `focus-music-app-dev` in MongoDB
+- All production keys are stored in GCP, no need to add production env variables
 
 ## Development Commands
 
@@ -62,7 +78,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Environment Configuration
 - Development: Uses local MongoDB, filesystem storage, localhost URLs
 - Production: MongoDB Atlas, Google Cloud Storage, Cloud Run deployment
-- Environment files: `.env.development` and `.env.production` (not `.env.local`)
+- Environment file: `.env.development` (not `.env.local`)
 
 ### Deployment Infrastructure
 - **Google Cloud Platform**: Cloud Run, Container Registry, Cloud Storage

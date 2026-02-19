@@ -37,6 +37,26 @@ const upload = multer({
     }
 });
 
+const imageUpload = multer({
+    storage: multerStorage,
+    fileFilter: (req, file, cb) => {
+        const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+        if (!allowed.test(file.originalname)) {
+            return cb(new Error('Only image files (.jpg, .jpeg, .png, .gif, .webp) are allowed'));
+        }
+        cb(null, true);
+    }
+});
+
+// Local filesystem storage for development image management
+const localImagesDir = path.join(process.cwd(), 'my-images');
+if (process.env.NODE_ENV !== 'production') {
+    if (!fs.existsSync(localImagesDir)) {
+        fs.mkdirSync(localImagesDir, { recursive: true });
+    }
+    console.log('Development mode: local images directory at', localImagesDir);
+}
+
 // Initialize Google Cloud Storage
 let storage;
 let bucket;
@@ -91,6 +111,11 @@ const ensureStorageInitialized = async (req, res, next) => {
         next();
     }
 };
+
+// Serve local images in development
+if (process.env.NODE_ENV !== 'production') {
+    router.use('/local-images', express.static(localImagesDir));
+}
 
 // Upload file
 router.post('/upload', ensureStorageInitialized, upload.single('file'), async (req, res) => {
@@ -173,6 +198,98 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
         }
         console.error('Upload error:', error);
         res.status(500).json({ error: 'Failed to upload file', details: error.message });
+    }
+});
+
+// Upload image to my-images folder
+router.post('/upload-image', ensureStorageInitialized, (req, res, next) => {
+    imageUpload.single('file')(req, res, (err) => {
+        if (err) {
+            console.error('Multer image upload error:', err);
+            return res.status(400).json({ error: err.message });
+        }
+        next();
+    });
+}, async (req, res) => {
+    console.log('Image upload request received');
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        console.log('Image file received:', {
+            originalname: req.file.originalname,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+
+        // Development: save to local filesystem
+        if (process.env.NODE_ENV !== 'production') {
+            const safeName = path.basename(req.file.originalname);
+            const destPath = path.join(localImagesDir, safeName);
+            fs.renameSync(req.file.path, destPath);
+            const publicUrl = `${req.protocol}://${req.get('host')}/api/files/local-images/${encodeURIComponent(safeName)}`;
+            console.log('Image saved locally:', destPath);
+            return res.status(200).json({
+                message: 'Image uploaded successfully',
+                file: {
+                    name: `my-images/${safeName}`,
+                    size: req.file.size,
+                    url: publicUrl
+                }
+            });
+        }
+
+        // Production: upload to GCS
+        if (!bucket) {
+            throw new Error('Google Cloud Storage not initialized');
+        }
+
+        const blobPath = `my-images/${req.file.originalname}`;
+        console.log('Uploading image to GCS path:', blobPath);
+
+        const blob = bucket.file(blobPath);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            metadata: {
+                contentType: req.file.mimetype
+            },
+            timeout: 120000
+        });
+
+        blobStream.on('error', (err) => {
+            console.error('GCS image upload error:', err);
+            fs.unlink(req.file.path, () => {});
+            res.status(500).json({ error: 'Failed to upload image', details: err.message });
+        });
+
+        blobStream.on('finish', () => {
+            console.log('GCS image upload completed successfully');
+            fs.unlink(req.file.path, () => {});
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blobPath}`;
+            res.status(200).json({
+                message: 'Image uploaded successfully',
+                file: {
+                    name: blobPath,
+                    size: req.file.size,
+                    url: publicUrl
+                }
+            });
+        });
+
+        const fileStream = fs.createReadStream(req.file.path);
+        fileStream.on('error', (err) => {
+            console.error('File read error:', err);
+            res.status(500).json({ error: 'Failed to read file', details: err.message });
+        });
+        fileStream.pipe(blobStream);
+
+    } catch (error) {
+        if (req.file) {
+            fs.unlink(req.file.path, () => {});
+        }
+        console.error('Image upload error:', error);
+        res.status(500).json({ error: 'Failed to upload image', details: error.message });
     }
 });
 
@@ -294,9 +411,33 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
 // List images from my-images folder
 router.get('/list-images', ensureStorageInitialized, async (req, res) => {
     try {
+        // Development: list from local filesystem
+        if (process.env.NODE_ENV !== 'production') {
+            if (!fs.existsSync(localImagesDir)) {
+                return res.json({ items: [] });
+            }
+            const localFiles = fs.readdirSync(localImagesDir);
+            const imageFilter = /\.(jpg|jpeg|png|gif|webp)$/i;
+            const items = localFiles
+                .filter(f => imageFilter.test(f))
+                .map(f => {
+                    const stats = fs.statSync(path.join(localImagesDir, f));
+                    const ext = f.split('.').pop().toLowerCase();
+                    return {
+                        name: `my-images/${f}`,
+                        size: stats.size,
+                        url: `${req.protocol}://${req.get('host')}/api/files/local-images/${encodeURIComponent(f)}`,
+                        contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+                    };
+                });
+            console.log(`Found ${items.length} local images`);
+            return res.json({ items });
+        }
+
+        // Production: list from GCS
         const folder = 'my-images/';
         console.log(`Listing images from bucket: ${bucket.name}, folder: ${folder}`);
-        
+
         const [files] = await bucket.getFiles({ prefix: folder });
         const items = await Promise.all(files
             .filter(file => file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/))
@@ -310,34 +451,49 @@ router.get('/list-images', ensureStorageInitialized, async (req, res) => {
                     contentType: metadata.contentType
                 };
             }));
-            
+
         console.log(`Found ${items.length} images in ${folder}`);
         res.json({ items });
     } catch (error) {
         console.error('Error listing images:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to list images',
             details: error.message
         });
     }
 });
 
-// Delete MP3 file
+// Delete file
 router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
     try {
         const filename = req.params.filename;
         console.log('Attempting to delete file:', filename);
 
+        // Development: handle local image deletion
+        if (process.env.NODE_ENV !== 'production' && filename.startsWith('my-images/')) {
+            const safeName = path.basename(filename);
+            const localFile = path.join(localImagesDir, safeName);
+            if (fs.existsSync(localFile)) {
+                fs.unlinkSync(localFile);
+                console.log(`Deleted local image: ${safeName}`);
+                return res.json({ message: 'File deleted successfully' });
+            }
+            return res.status(404).json({
+                error: 'File not found',
+                details: `File ${filename} does not exist locally`
+            });
+        }
+
+        // Production: delete from GCS
         if (!bucket) {
             throw new Error('Google Cloud Storage not initialized');
         }
 
-        // Delete from GCS (works for both production and development)
         const file = bucket.file(filename);
         const [exists] = await file.exists();
 
         if (!exists) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 error: 'File not found',
                 details: `File ${filename} does not exist in bucket`
             });
@@ -345,12 +501,12 @@ router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
 
         await file.delete();
         console.log(`Successfully deleted file from GCS: ${filename}`);
-        
+
         res.json({ message: 'File deleted successfully' });
 
     } catch (error) {
         console.error('Delete error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to delete file',
             details: error.message
         });

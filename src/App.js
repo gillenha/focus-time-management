@@ -41,7 +41,6 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [unsplashTheme, setUnsplashTheme] = useState('nature');
   const [showProfile, setShowProfile] = useState(false);
-  const [isProfileExiting, setIsProfileExiting] = useState(false);
   const [showChangeBackgroundImage, setShowChangeBackgroundImage] = useState(false);
   const [isChangeBackgroundImageExiting, setIsChangeBackgroundImageExiting] = useState(false);
   const [showTrackList, setShowTrackList] = useState(false);
@@ -492,15 +491,7 @@ function App() {
   window.fetchBackgroundImage = fetchBackgroundImage;
 
   const toggleProfile = () => {
-    if (showProfile) {
-      setIsProfileExiting(true);
-      setTimeout(() => {
-        setShowProfile(false);
-        setIsProfileExiting(false);
-      }, 300); // Match your animation duration
-    } else {
-      setShowProfile(true);
-    }
+    setShowProfile(prev => !prev);
   };
 
   const truncateText = (text, limit = 30) => {
@@ -758,14 +749,10 @@ function App() {
           isExiting={isSessionHistoryExiting}
         />
       )}
-      {(showProfile || isProfileExiting) && (
-        <Profile
-          onClose={toggleProfile}
-          theme={unsplashTheme}
-          setTheme={setUnsplashTheme}
-          isExiting={isProfileExiting}
-        />
-      )}
+      <Profile
+        isOpen={showProfile}
+        onClose={toggleProfile}
+      />
       {showChangeBackgroundImage && (
         <ChangeBackground
           onClose={() => {

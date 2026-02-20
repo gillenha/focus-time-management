@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImage, onTrackList, onQuoteList, onProjects }) {
+  const { logout } = useAuth();
   return (
     <div className={`menu ${isOpen ? 'open' : ''}`}>
       {/* Overlay */}
@@ -17,7 +19,7 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
           isOpen ? 'tw-translate-x-0' : '-tw-translate-x-full'
         }`}
       >
-        <div className="tw-p-4">
+        <div className="tw-p-4 tw-h-full tw-flex tw-flex-col">
           <div className="tw-flex tw-justify-between tw-items-center tw-mb-6">
             <p className="tw-text-xl tw-font-bold tw-text-gray-800">Flow State Music</p>
             <button 
@@ -130,6 +132,19 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 </a>
               </li>
             </ul>
+          </div>
+
+          {/* Sign Out */}
+          <div className="tw-mt-auto tw-pt-4 tw-border-t tw-border-gray-200">
+            <button
+              onClick={() => {
+                logout();
+                onClose();
+              }}
+              className="tw-w-full tw-text-left tw-text-gray-500 tw-py-3 tw-text-sm tw-font-semibold tw-bg-transparent tw-border-0 tw-cursor-pointer hover:tw-text-gray-700 tw-transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </div>

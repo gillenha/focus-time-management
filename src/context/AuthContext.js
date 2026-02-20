@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { setAuthToken, clearAuthToken } from '../utils/api';
+import { setAuthToken, clearAuthToken, getAuthToken } from '../utils/api';
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isAuthenticated, setIsAuthenticated] = useState(() => !!getAuthToken());
+    const [isLoading, setIsLoading] = useState(() => !getAuthToken());
     const [authError, setAuthError] = useState(null);
 
     const logout = useCallback(() => {

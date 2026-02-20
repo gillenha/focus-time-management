@@ -188,7 +188,7 @@ function MusicPlayer({
           tw-ease-out tw--translate-x-1/2 tw-z-10
           ${slideIn ? 'tw-top-1/3 tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
         `}>
-          Time to focus
+          Time to build
         </p>
 
         {!sessionStarted && (

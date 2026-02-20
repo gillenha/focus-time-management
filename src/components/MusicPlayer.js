@@ -181,9 +181,9 @@ function MusicPlayer({
       tw-w-full tw-h-full
       ${isFreeflow ? 'tw-animate-fadeIn' : 'tw-animate-fadeOut'}
     `}>
-      <div className="tw-bg-black/30 tw-backdrop-blur-md tw-rounded-xl tw-p-8 tw-flex tw-flex-col tw-items-center tw-gap-6 tw-w-[90%] tw-max-w-[384px] tw-h-[400px] tw-min-h-[400px] sm:tw-w-96 tw-overflow-hidden tw-relative">
+      <div className="tw-bg-black/30 tw-backdrop-blur-md tw-rounded-xl tw-p-4 sm:tw-p-8 tw-flex tw-flex-col tw-items-center tw-gap-3 sm:tw-gap-6 tw-w-[90%] tw-max-w-[384px] tw-h-[320px] tw-min-h-[320px] sm:tw-h-[400px] sm:tw-min-h-[400px] sm:tw-w-96 tw-overflow-hidden tw-relative">
         <p className={`
-          tw-text-white tw-font-medium tw-text-2xl tw-absolute
+          tw-text-white tw-font-medium tw-text-xl sm:tw-text-2xl tw-absolute
           tw-left-1/2 tw-transform tw-transition-all tw-duration-500
           tw-ease-out tw--translate-x-1/2 tw-z-10
           ${slideIn ? 'tw-top-1/3 tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
@@ -203,9 +203,9 @@ function MusicPlayer({
         {sessionStarted && (
           <>
             <p className={`
-              tw-text-white/80 
-              tw-text-sm 
-              tw-mt-60 
+              tw-text-white/80
+              tw-text-sm
+              tw-mt-44 sm:tw-mt-60
               tw-italic
               tw-transition-opacity 
               tw-duration-1000

@@ -227,10 +227,18 @@ body, html {
 }
 
 @media screen and (max-width: 768px) {
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+
+  .app {
+    grid-column: 1;
+  }
+
   .bottom-navbar {
     padding: 16px;
   }
-  
+
   .freeflow-button {
     width: 80%;
     max-width: 300px;

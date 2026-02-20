@@ -426,9 +426,9 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
     return (
         <div className="tw-fixed tw-inset-0 tw-bg-white tw-z-50">
             <div className="tw-h-full tw-overflow-y-auto">
-                <div className="tw-p-6">
+                <div className="tw-p-2 sm:tw-p-6">
                     {/* Header */}
-                    <div className="tw-flex tw-items-center tw-mb-6">
+                    <div className="tw-flex tw-items-center tw-mb-4 sm:tw-mb-6">
                         <button 
                             onClick={onClose}
                             className="tw-appearance-none tw-bg-transparent tw-border-none tw-p-0 tw-m-0 tw-mr-4 tw-text-gray-500 tw-cursor-pointer"
@@ -548,13 +548,13 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
 
                     {/* Session List */}
                     <div className="tw-mb-20">
-                        <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-4">
+                        <ul className="tw-list-none tw-p-0 tw-m-0 tw-space-y-2 sm:tw-space-y-4">
                             {[...sessionHistory].sort((a, b) => new Date(b.date) - new Date(a.date)).map((session) => (
                                 <li key={session._id} 
-                                    className="tw-group tw-relative tw-bg-gray-50 tw-rounded-lg tw-p-4 hover:tw-bg-gray-100"
+                                    className="tw-group tw-relative tw-bg-gray-50 tw-rounded-lg tw-p-2 sm:tw-p-4 hover:tw-bg-gray-100"
                                 >
                                     <div className="tw-flex tw-justify-between tw-items-start">
-                                        <div className="tw-flex tw-gap-8">
+                                        <div className="tw-flex tw-flex-col sm:tw-flex-row tw-gap-1 sm:tw-gap-8">
                                             {/* Left Column - Date, Time, Duration */}
                                             <div className="tw-space-y-2">
                                                 <div className="tw-flex tw-items-center">
@@ -589,7 +589,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                         <ListItemActions
                                             onEdit={() => handleEdit(session)}
                                             onDelete={() => handleDeleteClick(session)}
-                                            className="tw-opacity-0 group-hover:tw-opacity-100 tw-transition-opacity"
+                                            className="sm:tw-opacity-0 sm:group-hover:tw-opacity-100 tw-transition-opacity"
                                             editIcon={
                                                 <svg xmlns="http://www.w3.org/2000/svg" className="tw-h-4 tw-w-4 tw-text-gray-500 hover:tw-text-gray-700" viewBox="0 0 20 20" fill="currentColor">
                                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -608,9 +608,9 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                     </div>
 
                     {/* Footer Actions - Now fixed at bottom */}
-                    <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-4 tw-border-t tw-border-gray-200">
+                    <div className="tw-fixed tw-bottom-0 tw-left-0 tw-right-0 tw-bg-white tw-p-2 sm:tw-p-4 tw-border-t tw-border-gray-200">
                         <div className="tw-flex tw-justify-between tw-items-center">
-                            <div className="tw-flex tw-items-center tw-gap-4">
+                            <div className="tw-flex tw-items-center tw-gap-2 sm:tw-gap-4">
                                 <button
                                     onClick={handleExport}
                                     className="tw-p-2 tw-rounded-lg tw-bg-gray-100 hover:tw-bg-gray-200 tw-transition-colors"
@@ -659,10 +659,10 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                     className="tw-hidden"
                                 />
                             </div>
-                            <div className="tw-flex tw-items-center tw-gap-4">
+                            <div className="tw-flex tw-items-center tw-gap-2 sm:tw-gap-4">
                                 <button
                                     onClick={() => setShowCreateDialog(true)}
-                                    className="primary-button tw-h-10 tw-w-36 tw-flex tw-items-center tw-justify-center tw-text-sm"
+                                    className="primary-button tw-h-10 tw-w-auto tw-px-3 sm:tw-w-36 sm:tw-px-0 tw-flex tw-items-center tw-justify-center tw-text-sm"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -676,7 +676,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                                 </button>
                                 <button
                                     onClick={handleClearHistoryClick}
-                                    className="danger-button tw-h-10 tw-w-36 tw-flex tw-items-center tw-justify-center tw-text-sm"
+                                    className="danger-button tw-h-10 tw-w-auto tw-px-3 sm:tw-w-36 sm:tw-px-0 tw-flex tw-items-center tw-justify-center tw-text-sm"
                                 >
                                     Clear History
                                 </button>

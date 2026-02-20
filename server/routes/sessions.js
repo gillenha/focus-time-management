@@ -34,6 +34,12 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { date, time, duration, text, project } = req.body;
+
+        // Reject zero-duration sessions
+        if (!duration || duration === '00:00' || duration === '00:00:00' || duration === '0:00') {
+            return res.status(400).json({ error: 'Session duration cannot be zero' });
+        }
+
         const session = new Session({
             date,
             time,

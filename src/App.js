@@ -325,54 +325,57 @@ function App() {
         window.audioCleanup = null;
       }
 
-      const now = new Date();
-      const currentSession = JSON.parse(localStorage.getItem('currentSession'));
-      const newSession = {
-        date: now.toISOString(),
-        time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
-        duration: formatDuration(time),
-        text: currentSessionText,
-        project: currentSession?.projectId || null
-      };
+      // Only save sessions with non-zero duration
+      if (time > 0) {
+        const now = new Date();
+        const currentSession = JSON.parse(localStorage.getItem('currentSession'));
+        const newSession = {
+          date: now.toISOString(),
+          time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
+          duration: formatDuration(time),
+          text: currentSessionText,
+          project: currentSession?.projectId || null
+        };
 
-      try {
-        // Save to MongoDB
-        console.log('Attempting to save session to MongoDB:', newSession);
-        
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(newSession),
-        });
+        try {
+          // Save to MongoDB
+          console.log('Attempting to save session to MongoDB:', newSession);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Server response:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newSession),
           });
-          throw new Error(`Failed to save session to MongoDB: ${response.status} ${response.statusText}`);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Server response:', {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData
+            });
+            throw new Error(`Failed to save session to MongoDB: ${response.status} ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          console.log('Session saved to MongoDB:', result);
+
+          // Update local state with the populated session from the response
+          const updatedHistory = [...sessionHistory, result];
+          setSessionHistory(updatedHistory);
+          localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+        } catch (error) {
+          console.error('Error saving session to MongoDB:', {
+            message: error.message,
+            stack: error.stack
+          });
+          // Still update local storage even if MongoDB save fails
+          const updatedHistory = [...sessionHistory, newSession];
+          setSessionHistory(updatedHistory);
+          localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
         }
-
-        const result = await response.json();
-        console.log('Session saved to MongoDB:', result);
-
-        // Update local state with the populated session from the response
-        const updatedHistory = [...sessionHistory, result];
-        setSessionHistory(updatedHistory);
-        localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
-      } catch (error) {
-        console.error('Error saving session to MongoDB:', {
-          message: error.message,
-          stack: error.stack
-        });
-        // Still update local storage even if MongoDB save fails
-        const updatedHistory = [...sessionHistory, newSession];
-        setSessionHistory(updatedHistory);
-        localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
       }
       
       // First set freeflow to false to trigger fade out animation

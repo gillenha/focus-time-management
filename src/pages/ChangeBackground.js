@@ -67,7 +67,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
     return (
         <div className={`tw-fixed tw-inset-0 tw-bg-white tw-z-50 ${isExiting ? 'slide-out' : 'slide-in'}`}>
             <div className="tw-h-full tw-overflow-y-auto">
-                <div className="tw-p-6">
+                <div className="tw-p-3 sm:tw-p-6">
                     {/* Header */}
                     <div className="tw-flex tw-items-center tw-justify-between tw-mb-8">
                         <div className="tw-flex tw-items-center">
@@ -95,7 +95,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                     </div>
 
                     {/* Theme Selection Container */}
-                    <div className="tw-max-w-md tw-mx-auto tw-space-y-6">
+                    <div className="sm:tw-max-w-md tw-mx-auto tw-space-y-6">
                         {/* Theme Dropdown Group */}
                         <div className="tw-flex tw-flex-col tw-space-y-4">
                             <h3 className="tw-text-lg tw-font-bold tw-text-gray-800">Background Theme</h3>
@@ -108,7 +108,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                 {selectedTheme === theme ? 'Current Theme' : 'Apply Theme'}
                             </button>
                             {/* Replace select with grid */}
-                            <div className="tw-grid tw-grid-cols-2 tw-gap-4 tw-cursor-pointer">
+                            <div className="tw-grid tw-grid-cols-2 tw-gap-2 sm:tw-gap-4 tw-cursor-pointer">
                                 {[
                                     {
                                         value: "my-images",
@@ -190,7 +190,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         key={theme.value}
                                         onClick={() => handleThemeChange({ target: { value: theme.value }})}
                                         className={`
-                                            tw-p-4 tw-rounded-lg tw-text-center tw-transition-all
+                                            tw-p-3 sm:tw-p-4 tw-rounded-lg tw-text-center tw-transition-all
                                             tw-border tw-border-gray-200
                                             hover:tw-border-gray-300 hover:tw-shadow-md
                                             tw-flex tw-flex-col tw-items-center tw-justify-center

@@ -17,8 +17,12 @@ import ChangeBackground from './pages/ChangeBackground';
 import TrackListPage from './pages/TrackListPage';
 import QuoteList from './pages/QuoteList';
 import Projects from './pages/Projects';
+import LoginPage from './pages/LoginPage';
+import { useAuth } from './context/AuthContext';
+import { authFetch } from './utils/api';
 
 function App() {
+  const { isAuthenticated, isLoading } = useAuth();
   const [isFreeflow, setIsFreeflow] = useState(false);
   const [sessionHistory, setSessionHistory] = useState([]);
   const [showMusicPlayer, setShowMusicPlayer] = useState(false);
@@ -63,7 +67,7 @@ function App() {
       if (playlistTracks.length === 0) {
         try {
           console.log('Loading tracks from server...');
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
+          const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
           const data = await response.json();
           
           if (data.items && data.items.length > 0) {
@@ -168,7 +172,7 @@ function App() {
 
       if (theme === 'my-images') {
         // Fetch from our GCS bucket
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
+        const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
         if (!response.ok) throw new Error('Failed to fetch images');
         
         const data = await response.json();
@@ -210,7 +214,7 @@ function App() {
         // If no custom image or custom image failed, try getting from API
         if (!isValidImage) {
           console.log('Fetching favorites from API...');
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/favorites`);
+          const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/favorites`);
           if (response.ok) {
             const favorites = await response.json();
             if (favorites.length > 0) {
@@ -341,7 +345,7 @@ function App() {
           // Save to MongoDB
           console.log('Attempting to save session to MongoDB:', newSession);
 
-          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
+          const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -477,7 +481,7 @@ function App() {
 
   const fetchTotalFocusTime = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/total-focus-time`);
+      const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/total-focus-time`);
       const data = await response.json();
       setTotalFocusedTime(data.totalFocusTime);
     } catch (error) {
@@ -635,6 +639,18 @@ function App() {
       setShowProjects(true);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-gray-900">
+        <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-white tw-border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   return (
     <div className="grid-container">

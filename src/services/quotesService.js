@@ -1,8 +1,10 @@
+import { authFetch } from '../utils/api';
+
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export const fetchQuotes = async () => {
     try {
-        const response = await fetch(`${API_URL}/api/quotes`);
+        const response = await authFetch(`${API_URL}/api/quotes`);
         if (!response.ok) {
             throw new Error('Failed to fetch quotes');
         }
@@ -16,7 +18,7 @@ export const fetchQuotes = async () => {
 
 export const addQuote = async ({ text, author }) => {
     try {
-        const response = await fetch(`${API_URL}/api/quotes`, {
+        const response = await authFetch(`${API_URL}/api/quotes`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -36,7 +38,7 @@ export const addQuote = async ({ text, author }) => {
 
 export const deleteQuote = async (id) => {
     try {
-        const response = await fetch(`${API_URL}/api/quotes/${id}`, {
+        const response = await authFetch(`${API_URL}/api/quotes/${id}`, {
             method: 'DELETE',
         });
         if (!response.ok) {

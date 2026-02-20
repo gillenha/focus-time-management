@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ListItemActions, EditDialog, DeleteDialog, CreateDialog } from '../components/shared';
 import { toast } from 'react-toastify';
+import { authFetch } from '../utils/api';
 
 const Projects = ({ onClose, isExiting }) => {
     const [projects, setProjects] = useState([]);
@@ -14,7 +15,7 @@ const Projects = ({ onClose, isExiting }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await fetch(`${process.env.REACT_APP_API_URL}/api/projects`);
+                const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/projects`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch projects');
                 }
@@ -42,7 +43,7 @@ const Projects = ({ onClose, isExiting }) => {
         };
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/projects`, {
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/projects`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -76,7 +77,7 @@ const Projects = ({ onClose, isExiting }) => {
         }
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/projects/${editingProject._id}`, {
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/projects/${editingProject._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -114,7 +115,7 @@ const Projects = ({ onClose, isExiting }) => {
 
     const handleDelete = async () => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/projects/${projectToDelete._id}`, {
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/projects/${projectToDelete._id}`, {
                 method: 'DELETE',
             });
 

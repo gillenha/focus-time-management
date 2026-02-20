@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authFetch, getAuthToken } from '../utils/api';
 
 const Profile = ({ isOpen, onClose }) => {
     const [images, setImages] = useState([]);
@@ -8,7 +9,7 @@ const Profile = ({ isOpen, onClose }) => {
 
     const fetchImages = async () => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
             if (!response.ok) throw new Error('Failed to fetch images');
             const data = await response.json();
             setImages(data.items || []);
@@ -51,6 +52,10 @@ const Profile = ({ isOpen, onClose }) => {
                 };
                 xhr.onerror = () => reject(new Error('Upload failed'));
                 xhr.open('POST', `${process.env.REACT_APP_API_URL}/api/files/upload-image`);
+                const token = getAuthToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
                 xhr.send(formData);
             });
 
@@ -67,7 +72,7 @@ const Profile = ({ isOpen, onClose }) => {
     const handleDelete = async (filename) => {
         try {
             const encodedPath = filename.split('/').map(encodeURIComponent).join('/');
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/files/${encodedPath}`, {
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/${encodedPath}`, {
                 method: 'DELETE'
             });
             if (!response.ok) throw new Error('Failed to delete image');

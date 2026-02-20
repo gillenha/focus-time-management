@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DeleteDialog } from '../components/shared';
 import uploadManager from '../utils/uploadManager';
+import { authFetch } from '../utils/api';
 
 function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }) {
     const [uploadedTracks, setUploadedTracks] = useState([]);
@@ -23,7 +24,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
             console.log('Fetching tracks from server...');
             console.log('Using API URL:', apiUrl);
-            const response = await fetch(`${apiUrl}/api/files/list-tracks`);
+            const response = await authFetch(`${apiUrl}/api/files/list-tracks`);
             if (!response.ok) {
                 throw new Error('Failed to fetch tracks');
             }
@@ -169,7 +170,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
             // Initialize upload session
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-            const initResponse = await fetch(`${apiUrl}/api/files/init-upload`, {
+            const initResponse = await authFetch(`${apiUrl}/api/files/init-upload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -201,7 +202,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 formData.append('chunkIndex', chunkIndex.toString());
                 formData.append('totalChunks', totalChunks.toString());
 
-                const response = await fetch(`${apiUrl}/api/files/upload-chunk`, {
+                const response = await authFetch(`${apiUrl}/api/files/upload-chunk`, {
                     method: 'POST',
                     body: formData
                 });
@@ -217,7 +218,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
 
             // Finalize upload
             setUploadStatus('Finalizing upload...');
-            const finalizeResponse = await fetch(`${apiUrl}/api/files/finalize-upload`, {
+            const finalizeResponse = await authFetch(`${apiUrl}/api/files/finalize-upload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -509,7 +510,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
                 // Delete from Google Cloud Storage bucket
                 // The fileName should include the folder (test/ or tracks/)
                 const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
-                const response = await fetch(`${apiUrl}/api/files/${track.fileName}`, {
+                const response = await authFetch(`${apiUrl}/api/files/${track.fileName}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'

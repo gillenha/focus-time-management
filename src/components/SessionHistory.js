@@ -1,6 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import { ListItemActions, EditDialog, DeleteDialog, CreateDialog, DurationInput } from './shared';
 import { toast } from 'react-toastify';
+import { authFetch } from '../utils/api';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
@@ -53,7 +54,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
 
     const fetchSessions = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions`);
+            const response = await authFetch(`${API_BASE_URL}/api/sessions`);
             if (!response.ok) {
                 throw new Error('Failed to fetch sessions');
             }
@@ -74,7 +75,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
     useEffect(() => {
         const fetchProjects = async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/projects`);
+                const response = await authFetch(`${API_BASE_URL}/api/projects`);
                 if (response.ok) {
                     const data = await response.json();
                     setProjects(data.projects || []);
@@ -136,7 +137,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
 
     const clearHistory = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions/clear`, {
+            const response = await authFetch(`${API_BASE_URL}/api/sessions/clear`, {
                 method: 'DELETE',
             });
             
@@ -166,7 +167,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
         if (!sessionToDelete) return;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionToDelete._id}`, {
+            const response = await authFetch(`${API_BASE_URL}/api/sessions/${sessionToDelete._id}`, {
                 method: 'DELETE',
             });
 
@@ -265,7 +266,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                 project: editProjectId || null
             };
 
-            const response = await fetch(`${API_BASE_URL}/api/sessions/${editingSession._id}`, {
+            const response = await authFetch(`${API_BASE_URL}/api/sessions/${editingSession._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -301,7 +302,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
 
     const handleExport = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sessions`);
+            const response = await authFetch(`${API_BASE_URL}/api/sessions`);
             if (!response.ok) {
                 throw new Error('Failed to fetch sessions');
             }
@@ -348,7 +349,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
                     
                     const sessions = JSON.parse(result);
                     
-                    const response = await fetch(`${API_BASE_URL}/api/sessions/restore`, {
+                    const response = await authFetch(`${API_BASE_URL}/api/sessions/restore`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -391,7 +392,7 @@ const SessionHistory = forwardRef(({ onClose, onSessionsUpdate, isExiting }, ref
             const [year, month, day] = formData.date.split('-').map(Number);
             const dateInLocalTimezone = new Date(year, month - 1, day);
             
-            const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+            const response = await authFetch(`${API_BASE_URL}/api/sessions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

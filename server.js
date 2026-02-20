@@ -38,6 +38,7 @@ const filesRouter = require('./server/routes/files');
 const sessionsRouter = require('./server/routes/sessions');
 const projectRoutes = require('./server/routes/projects');
 const favoritesRouter = require('./server/routes/favorites');
+const authMiddleware = require('./server/middleware/auth');
 
 // Initialize Google Cloud Storage for both development and production
 let storage;
@@ -131,15 +132,18 @@ app.use(cors({
 // Limit JSON body size
 app.use(bodyParser.json({ limit: '10kb' }));
 
-// Health check endpoint
+// Health check endpoint (before auth middleware)
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         environment: process.env.NODE_ENV,
         timestamp: new Date().toISOString(),
         port: PORT
     });
 });
+
+// Apply auth middleware to all /api routes (except health check above)
+app.use('/api', authMiddleware);
 
 // API Routes
 app.use('/api/quotes', quotesRouter);
@@ -299,7 +303,7 @@ app.get('/api/notion-test', async (req, res) => {
 });
 
 // File upload endpoint
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -345,7 +349,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // List MP3 files
-app.get('/mp3s', async (req, res) => {
+app.get('/mp3s', authMiddleware, async (req, res) => {
     try {
         const isStorageReady = await storageReady;
         
@@ -367,7 +371,7 @@ app.get('/mp3s', async (req, res) => {
 });
 
 // Delete MP3 file
-app.delete('/mp3s/:filename', async (req, res) => {
+app.delete('/mp3s/:filename', authMiddleware, async (req, res) => {
     const filename = req.params.filename;
 
     try {
@@ -391,7 +395,7 @@ app.post('/api/quotes', quoteController.addQuote);
 app.delete('/api/quotes/:id', quoteController.deleteQuote);
 
 // Add endpoint to get file sizes
-app.get('/mp3s/sizes', async (req, res) => {
+app.get('/mp3s/sizes', authMiddleware, async (req, res) => {
     try {
         const isStorageReady = await storageReady;
         

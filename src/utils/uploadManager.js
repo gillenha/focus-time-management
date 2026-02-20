@@ -1,3 +1,5 @@
+import { getAuthToken } from './api';
+
 // Upload Manager - Handles background uploads with Web Workers
 class UploadManager {
     constructor() {
@@ -36,8 +38,10 @@ class UploadManager {
                     }
                 };
 
-                async function handleStartUpload({ id, file, apiUrl }) {
+                async function handleStartUpload({ id, file, apiUrl, authToken }) {
                     try {
+                        const authHeaders = authToken ? { 'Authorization': 'Bearer ' + authToken } : {};
+
                         self.postMessage({
                             type: 'UPLOAD_PROGRESS',
                             payload: { id, status: 'uploading', progress: 0, statusText: 'Initializing upload...' }
@@ -49,7 +53,7 @@ class UploadManager {
 
                         const initResponse = await fetch(apiUrl + '/api/files/init-upload', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 'Content-Type': 'application/json', ...authHeaders },
                             body: JSON.stringify({
                                 fileName: file.name,
                                 fileSize: file.size,
@@ -94,6 +98,7 @@ class UploadManager {
 
                             const response = await fetch(apiUrl + '/api/files/upload-chunk', {
                                 method: 'POST',
+                                headers: { ...authHeaders },
                                 body: formData
                             });
 
@@ -108,7 +113,7 @@ class UploadManager {
 
                         const finalizeResponse = await fetch(apiUrl + '/api/files/finalize-upload', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 'Content-Type': 'application/json', ...authHeaders },
                             body: JSON.stringify({ uploadId, fileName: file.name, totalChunks })
                         });
 
@@ -232,7 +237,8 @@ class UploadManager {
                 payload: {
                     id: uploadItem.id,
                     file: uploadItem.file,
-                    apiUrl: uploadItem.apiUrl
+                    apiUrl: uploadItem.apiUrl,
+                    authToken: getAuthToken()
                 }
             });
         } else {
@@ -278,7 +284,9 @@ class UploadManager {
     async fallbackUpload(uploadItem) {
         try {
             const { file, apiUrl } = uploadItem;
-            
+            const token = getAuthToken();
+            const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+
             // Update progress
             this.handleUploadProgress({
                 id: uploadItem.id,
@@ -289,11 +297,11 @@ class UploadManager {
 
             const CHUNK_SIZE = 25 * 1024 * 1024;
             const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-            
+
             // Initialize upload
             const initResponse = await fetch(`${apiUrl}/api/files/init-upload`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({
                     fileName: file.name,
                     fileSize: file.size,
@@ -324,6 +332,7 @@ class UploadManager {
 
                 const response = await fetch(`${apiUrl}/api/files/upload-chunk`, {
                     method: 'POST',
+                    headers: { ...authHeaders },
                     body: formData
                 });
 
@@ -340,7 +349,7 @@ class UploadManager {
 
             const finalizeResponse = await fetch(`${apiUrl}/api/files/finalize-upload`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify({ uploadId, fileName: file.name, totalChunks })
             });
 

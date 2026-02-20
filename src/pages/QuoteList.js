@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchQuotes, addQuote, deleteQuote } from '../services/quotesService';
 import { toast } from 'react-toastify';
 import { ListItemActions, CreateDialog, EditDialog, DeleteDialog } from '../components/shared';
+import { authFetch } from '../utils/api';
 
 const QuoteList = ({ onClose, isExiting }) => {
     const [quotes, setQuotes] = useState([]);
@@ -66,7 +67,7 @@ const QuoteList = ({ onClose, isExiting }) => {
 
     const handleUpdateQuote = async () => {
         try {
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/quotes/${editingQuote._id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

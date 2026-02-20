@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import CustomDropdown from './CustomDropdown';
+import { authFetch } from '../utils/api';
 
 const SessionInput = ({ inputValue, onInputChange, onBeginClick, fadeOut }) => {
   const [projects, setProjects] = useState([]);
@@ -9,7 +10,7 @@ const SessionInput = ({ inputValue, onInputChange, onBeginClick, fadeOut }) => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/projects`);
+        const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/projects`);
         if (!response.ok) {
           throw new Error('Failed to fetch projects');
         }

@@ -1,8 +1,10 @@
+import { authFetch } from '../utils/api';
+
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export const fetchFavorites = async () => {
     try {
-        const response = await fetch(`${API_URL}/api/favorites`);
+        const response = await authFetch(`${API_URL}/api/favorites`);
         if (!response.ok) {
             throw new Error('Failed to fetch favorites');
         }
@@ -16,7 +18,7 @@ export const fetchFavorites = async () => {
 
 export const addFavorite = async ({ title, imageUrl, source = 'custom', tags = [] }) => {
     try {
-        const response = await fetch(`${API_URL}/api/favorites`, {
+        const response = await authFetch(`${API_URL}/api/favorites`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -36,7 +38,7 @@ export const addFavorite = async ({ title, imageUrl, source = 'custom', tags = [
 
 export const deleteFavorite = async (id) => {
     try {
-        const response = await fetch(`${API_URL}/api/favorites/${id}`, {
+        const response = await authFetch(`${API_URL}/api/favorites/${id}`, {
             method: 'DELETE',
         });
         if (!response.ok) {

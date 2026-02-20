@@ -1,3 +1,5 @@
+import { getAuthToken } from './api';
+
 class AudioManager {
     static manifestCache = null;
     static manifestPromise = null;
@@ -41,7 +43,12 @@ class AudioManager {
                     
                 } else {
                     // In development, use GCP test folder
-                    const response = await fetch(`${apiUrl}/api/files/list-tracks`);
+                    const headers = {};
+                    const token = getAuthToken();
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    const response = await fetch(`${apiUrl}/api/files/list-tracks`, { headers });
                     if (!response.ok) {
                         throw new Error('Failed to fetch audio manifest');
                     }

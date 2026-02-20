@@ -13,6 +13,8 @@ steps:
       - '--build-arg'
       - 'REACT_APP_UNSPLASH_ACCESS_KEY=_GJARTSuiQMs3WhAexgyH7u_T2hKry5jOKzjL6xhLfE'
       - '--build-arg'
+      - 'REACT_APP_GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
+      - '--build-arg'
       - 'CACHE_BUST=$BUILD_ID'
       - '.'
 
@@ -34,7 +36,7 @@ steps:
           --region=us-central1 \
           --platform=managed \
           --allow-unauthenticated \
-          --update-env-vars=NODE_ENV=production \
+          --update-env-vars=NODE_ENV=production,GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},ALLOWED_EMAIL=${_ALLOWED_EMAIL} \
           --service-account=harry-gillen-builder@appspot.gserviceaccount.com; then
           echo "Deployment successful!"
           

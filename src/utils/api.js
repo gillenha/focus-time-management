@@ -14,6 +14,24 @@ export const clearAuthToken = () => {
     sessionStorage.removeItem(TOKEN_KEY);
 };
 
+export const hasActiveSession = () => {
+    try {
+        const session = JSON.parse(localStorage.getItem('currentSession'));
+        return session && session.timerActive;
+    } catch {
+        return false;
+    }
+};
+
+export const getTokenExpiry = (token) => {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.exp ? payload.exp * 1000 : null;
+    } catch {
+        return null;
+    }
+};
+
 export const authFetch = async (url, options = {}) => {
     const headers = { ...options.headers };
 
@@ -24,7 +42,10 @@ export const authFetch = async (url, options = {}) => {
     const response = await fetch(url, { ...options, headers });
 
     if (response.status === 401 || response.status === 403) {
-        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        // Don't interrupt an active focus session
+        if (!hasActiveSession()) {
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        }
     }
 
     return response;

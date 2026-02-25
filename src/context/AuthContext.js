@@ -5,21 +5,24 @@ const AuthContext = createContext(null);
 
 export const useAuth = () => useContext(AuthContext);
 
+const REFRESH_BUFFER_MS = 5 * 60 * 1000; // Try refreshing 5 min before expiry
+const RETRY_INTERVAL_MS = 60 * 1000;     // Retry every 60s if refresh fails
+
 export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(() => !!getAuthToken());
     const [isLoading, setIsLoading] = useState(() => !getAuthToken());
     const [authError, setAuthError] = useState(null);
     const expiryTimerRef = useRef(null);
-    const pollIntervalRef = useRef(null);
+    const retryTimerRef = useRef(null);
 
     const clearTimers = useCallback(() => {
         if (expiryTimerRef.current) {
             clearTimeout(expiryTimerRef.current);
             expiryTimerRef.current = null;
         }
-        if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
+        if (retryTimerRef.current) {
+            clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = null;
         }
     }, []);
 
@@ -30,53 +33,49 @@ export const AuthProvider = ({ children }) => {
         setAuthError(null);
     }, [clearTimers]);
 
-    // Start polling for session end, then logout
-    const waitForSessionEnd = useCallback(() => {
-        if (pollIntervalRef.current) return;
+    // Try to silently get a fresh token from Google
+    const trySilentRefresh = useCallback(() => {
+        if (!window.google) return;
 
-        pollIntervalRef.current = setInterval(() => {
-            if (!hasActiveSession()) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-                logout();
-                setAuthError('Session expired. Please sign in again.');
+        window.google.accounts.id.prompt((notification) => {
+            const dismissed = notification.isNotDisplayed() || notification.isSkippedMoment();
+            if (dismissed) {
+                // Silent refresh didn't work — decide what to do
+                if (hasActiveSession()) {
+                    // Session running, keep trying
+                    retryTimerRef.current = setTimeout(trySilentRefresh, RETRY_INTERVAL_MS);
+                } else {
+                    // Idle, log out
+                    logout();
+                    setAuthError('Session expired. Please sign in again.');
+                }
             }
-        }, 5000);
+            // If successful, handleCredentialResponse fires via the initialize callback
+        });
     }, [logout]);
 
-    // Schedule proactive logout based on token expiry
+    // Schedule a refresh attempt before token expiry
     const scheduleExpiry = useCallback((token) => {
         clearTimers();
 
         const expiry = getTokenExpiry(token);
         if (!expiry) return;
 
-        const msUntilExpiry = expiry - Date.now();
-        if (msUntilExpiry <= 0) {
-            // Token already expired
-            if (!hasActiveSession()) {
-                logout();
-                setAuthError('Session expired. Please sign in again.');
-            } else {
-                waitForSessionEnd();
-            }
-            return;
-        }
+        const msUntilRefresh = Math.max(expiry - Date.now() - REFRESH_BUFFER_MS, 0);
 
         expiryTimerRef.current = setTimeout(() => {
-            if (!hasActiveSession()) {
+            if (hasActiveSession()) {
+                trySilentRefresh();
+            } else {
                 logout();
                 setAuthError('Session expired. Please sign in again.');
-            } else {
-                waitForSessionEnd();
             }
-        }, msUntilExpiry);
-    }, [clearTimers, logout, waitForSessionEnd]);
+        }, msUntilRefresh);
+    }, [clearTimers, logout, trySilentRefresh]);
 
     // Listen for unauthorized events from authFetch
     useEffect(() => {
         const handleUnauthorized = () => {
-            // Double-check: don't interrupt active focus sessions
             if (hasActiveSession()) return;
             logout();
             setAuthError('Session expired. Please sign in again.');
@@ -90,9 +89,20 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const token = getAuthToken();
         if (token) {
-            scheduleExpiry(token);
+            const expiry = getTokenExpiry(token);
+            if (expiry && expiry <= Date.now()) {
+                // Restored token is already expired
+                if (!hasActiveSession()) {
+                    logout();
+                    setAuthError('Session expired. Please sign in again.');
+                } else {
+                    trySilentRefresh();
+                }
+            } else if (token) {
+                scheduleExpiry(token);
+            }
         }
-    }, [scheduleExpiry]);
+    }, [scheduleExpiry, logout, trySilentRefresh]);
 
     // Load Google Identity Services script
     useEffect(() => {
@@ -111,6 +121,7 @@ export const AuthProvider = ({ children }) => {
             window.google.accounts.id.initialize({
                 client_id: clientId,
                 callback: handleCredentialResponse,
+                auto_select: true,
             });
             setIsLoading(false);
         };
@@ -137,7 +148,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => clearTimers();
     }, [clearTimers]);

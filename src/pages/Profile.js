@@ -122,14 +122,26 @@ const Profile = ({ isOpen, onClose }) => {
         });
     };
 
+    const cleanUrl = (url) => {
+        return url
+            .trim()
+            .replace(/[\u200B\u200C\u200D\uFEFF\u200E\u200F\u00A0\u2028\u2029]/g, '');
+    };
+
     const handleAddFavorite = async () => {
-        if (!favoriteUrl.trim()) {
+        const url = cleanUrl(favoriteUrl);
+        if (!url) {
             setFavoriteError('Please enter an image URL');
             return;
         }
 
-        const urlPattern = /^https?:\/\/.+/i;
-        if (!urlPattern.test(favoriteUrl.trim())) {
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(url);
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+                throw new Error('Invalid protocol');
+            }
+        } catch {
             setFavoriteError('Please enter a valid URL starting with http:// or https://');
             return;
         }
@@ -137,7 +149,7 @@ const Profile = ({ isOpen, onClose }) => {
         setFavoriteError('');
         setValidatingUrl(true);
 
-        const isImage = await testImageLoad(favoriteUrl.trim());
+        const isImage = await testImageLoad(url);
         setValidatingUrl(false);
 
         if (!isImage) {
@@ -147,10 +159,10 @@ const Profile = ({ isOpen, onClose }) => {
 
         setAddingFavorite(true);
         try {
-            const title = favoriteTitle.trim() || new URL(favoriteUrl.trim()).hostname;
+            const title = favoriteTitle.trim() || parsedUrl.hostname;
             const saved = await addFavorite({
                 title,
-                imageUrl: favoriteUrl.trim(),
+                imageUrl: url,
                 source: 'custom',
             });
             setFavorites(prev => [saved, ...prev]);

@@ -234,7 +234,7 @@ const ChangeBackground = ({ onClose, theme, setTheme, isExiting, fetchBackground
                                         ))}
                                     </div>
                                     {favorites.length === 0 && (
-                                        <p className="tw-text-gray-500 tw-text-center tw-py-8">No favorite images yet. Add images via command line!</p>
+                                        <p className="tw-text-gray-500 tw-text-center tw-py-8">No favorite images yet. Add images from Profile Settings.</p>
                                     )}
                                 </div>
                             )}

@@ -217,6 +217,24 @@ body, html {
   border-bottom: 1px solid white;
 }
 
+.favorite-heart-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.favorite-heart-btn:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
 .scale-after-slide {
   transition: transform 0.3s ease-out;
   transform: scale(0.75);

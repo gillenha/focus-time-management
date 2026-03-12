@@ -20,6 +20,8 @@ import Projects from './pages/Projects';
 import LoginPage from './pages/LoginPage';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
+import { Heart } from '@phosphor-icons/react';
+import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -60,6 +62,9 @@ function App() {
   const [isQuoteListExiting, setIsQuoteListExiting] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
   const [isProjectsExiting, setIsProjectsExiting] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favoritedId, setFavoritedId] = useState(null);
+  const [favoritesCache, setFavoritesCache] = useState([]);
 
   // Add effect to load tracks from server if none in localStorage
   useEffect(() => {
@@ -318,6 +323,61 @@ function App() {
     // Always fetch fresh images (no caching)
     fetchBackgroundImage(unsplashTheme, true);
   }, [unsplashTheme]);
+
+  // Check if current background image is already in favorites
+  useEffect(() => {
+    const checkIfFavorited = async () => {
+      if (!backgroundImage || !isAuthenticated) return;
+      try {
+        const favorites = await fetchFavorites();
+        setFavoritesCache(favorites);
+        const match = favorites.find(fav => fav.imageUrl === backgroundImage);
+        if (match) {
+          setIsFavorited(true);
+          setFavoritedId(match._id);
+        } else {
+          setIsFavorited(false);
+          setFavoritedId(null);
+        }
+      } catch (error) {
+        console.error('Error checking favorites:', error);
+      }
+    };
+    checkIfFavorited();
+  }, [backgroundImage, isAuthenticated]);
+
+  const handleToggleFavorite = async () => {
+    if (isFavorited && favoritedId) {
+      // Unfavorite
+      try {
+        await deleteFavorite(favoritedId);
+        setIsFavorited(false);
+        setFavoritedId(null);
+        setFavoritesCache(prev => prev.filter(f => f._id !== favoritedId));
+      } catch (error) {
+        console.error('Error removing favorite:', error);
+      }
+    } else {
+      // Favorite - use the current display image URL and caption
+      try {
+        const title = photographer.description ||
+          photographer.name ||
+          `${unsplashTheme.charAt(0).toUpperCase() + unsplashTheme.slice(1)} photo`;
+        const source = photographer.name === 'Favorites' ? 'custom' : 'unsplash';
+        const result = await addFavorite({
+          title,
+          imageUrl: backgroundImage,
+          source,
+          tags: [unsplashTheme]
+        });
+        setIsFavorited(true);
+        setFavoritedId(result._id);
+        setFavoritesCache(prev => [...prev, result]);
+      } catch (error) {
+        console.error('Error adding favorite:', error);
+      }
+    }
+  };
 
   const handleFreeFlowClick = async () => {
     if (isFreeflow) {
@@ -660,31 +720,45 @@ function App() {
       ></div>
       {photographer.name && photographer.name !== 'My Images' && (
         <div className="photo-attribution">
-          <a 
-            href={photographer.photoLink} 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            <p className="tw-text-right">
-              {truncateText(
-                photographer.description || 
-                `${unsplashTheme.charAt(0).toUpperCase() + unsplashTheme.slice(1)} photo`
-              )}
-            </p>
-          </a>
+          <div className="tw-flex tw-items-start tw-justify-end tw-gap-2">
+            <a
+              href={photographer.photoLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tw-flex-1"
+            >
+              <p className="tw-text-right">
+                {truncateText(
+                  photographer.description ||
+                  `${unsplashTheme.charAt(0).toUpperCase() + unsplashTheme.slice(1)} photo`
+                )}
+              </p>
+            </a>
+            <button
+              onClick={handleToggleFavorite}
+              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+              className="favorite-heart-btn"
+            >
+              <Heart
+                size={16}
+                weight={isFavorited ? 'fill' : 'regular'}
+                className={`tw-transition-all tw-duration-200 ${isFavorited ? 'tw-text-red-500' : 'tw-text-white'}`}
+              />
+            </button>
+          </div>
           <p>
             Photo by{' '}
-            <a 
-              href={photographer.link} 
-              target="_blank" 
+            <a
+              href={photographer.link}
+              target="_blank"
               rel="noopener noreferrer"
             >
               {photographer.name}
             </a>
             {' '}on{' '}
-            <a 
-              href="https://unsplash.com" 
-              target="_blank" 
+            <a
+              href="https://unsplash.com"
+              target="_blank"
               rel="noopener noreferrer"
             >
               Unsplash

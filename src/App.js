@@ -45,7 +45,7 @@ function App() {
     photoLink: ''
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [unsplashTheme, setUnsplashTheme] = useState('nature');
+  const [unsplashTheme, setUnsplashTheme] = useState('favorites');
   const [showProfile, setShowProfile] = useState(false);
   const [showChangeBackgroundImage, setShowChangeBackgroundImage] = useState(false);
   const [isChangeBackgroundImageExiting, setIsChangeBackgroundImageExiting] = useState(false);

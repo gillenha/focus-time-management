@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { Storage } = require('@google-cloud/storage');
+const ImagePreference = require('../models/ImagePreference');
 
 // Store upload metadata
 const uploads = new Map();
@@ -411,48 +412,61 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
 // List images from my-images folder
 router.get('/list-images', ensureStorageInitialized, async (req, res) => {
     try {
+        let items = [];
+
         // Development: list from local filesystem
         if (process.env.NODE_ENV !== 'production') {
-            if (!fs.existsSync(localImagesDir)) {
-                return res.json({ items: [] });
+            if (fs.existsSync(localImagesDir)) {
+                const localFiles = fs.readdirSync(localImagesDir);
+                const imageFilter = /\.(jpg|jpeg|png|gif|webp)$/i;
+                items = localFiles
+                    .filter(f => imageFilter.test(f))
+                    .map(f => {
+                        const stats = fs.statSync(path.join(localImagesDir, f));
+                        const ext = f.split('.').pop().toLowerCase();
+                        return {
+                            name: `my-images/${f}`,
+                            size: stats.size,
+                            url: `${req.protocol}://${req.get('host')}/api/files/local-images/${encodeURIComponent(f)}`,
+                            contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`,
+                            createdAt: (stats.birthtime || stats.mtime).toISOString()
+                        };
+                    });
+                console.log(`Found ${items.length} local images`);
             }
-            const localFiles = fs.readdirSync(localImagesDir);
-            const imageFilter = /\.(jpg|jpeg|png|gif|webp)$/i;
-            const items = localFiles
-                .filter(f => imageFilter.test(f))
-                .map(f => {
-                    const stats = fs.statSync(path.join(localImagesDir, f));
-                    const ext = f.split('.').pop().toLowerCase();
+        } else {
+            // Production: list from GCS
+            const folder = 'my-images/';
+            console.log(`Listing images from bucket: ${bucket.name}, folder: ${folder}`);
+            const [files] = await bucket.getFiles({ prefix: folder });
+            items = await Promise.all(files
+                .filter(file => file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/))
+                .map(async file => {
+                    const [metadata] = await file.getMetadata();
+                    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
                     return {
-                        name: `my-images/${f}`,
-                        size: stats.size,
-                        url: `${req.protocol}://${req.get('host')}/api/files/local-images/${encodeURIComponent(f)}`,
-                        contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+                        name: file.name,
+                        size: parseInt(metadata.size),
+                        url: publicUrl,
+                        contentType: metadata.contentType,
+                        createdAt: metadata.timeCreated || metadata.updated || new Date(0).toISOString()
                     };
-                });
-            console.log(`Found ${items.length} local images`);
-            return res.json({ items });
+                }));
+            console.log(`Found ${items.length} images in ${folder}`);
         }
 
-        // Production: list from GCS
-        const folder = 'my-images/';
-        console.log(`Listing images from bucket: ${bucket.name}, folder: ${folder}`);
+        // Join enabled state from ImagePreference (default true when no record exists)
+        const names = items.map(i => i.name);
+        const prefs = await ImagePreference.find({ name: { $in: names } });
+        const prefByName = new Map(prefs.map(p => [p.name, p.enabled]));
+        items = items.map(item => ({
+            ...item,
+            enabled: prefByName.has(item.name) ? prefByName.get(item.name) : true
+        }));
 
-        const [files] = await bucket.getFiles({ prefix: folder });
-        const items = await Promise.all(files
-            .filter(file => file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/))
-            .map(async file => {
-                const [metadata] = await file.getMetadata();
-                const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
-                return {
-                    name: file.name,
-                    size: parseInt(metadata.size),
-                    url: publicUrl,
-                    contentType: metadata.contentType
-                };
-            }));
+        // Most recently added first so clients can treat items[0] as "most recent"
+        items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        console.log(`Found ${items.length} images in ${folder}`);
         res.json({ items });
     } catch (error) {
         console.error('Error listing images:', error);
@@ -460,6 +474,25 @@ router.get('/list-images', ensureStorageInitialized, async (req, res) => {
             error: 'Failed to list images',
             details: error.message
         });
+    }
+});
+
+// Upsert image preference (toggle enabled state for a my-images file)
+router.post('/image-preferences', async (req, res) => {
+    try {
+        const { name, enabled } = req.body;
+        if (!name || typeof enabled !== 'boolean') {
+            return res.status(400).json({ error: 'name and enabled (boolean) are required' });
+        }
+        const pref = await ImagePreference.findOneAndUpdate(
+            { name },
+            { name, enabled },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        res.json(pref);
+    } catch (error) {
+        console.error('Error updating image preference:', error);
+        res.status(500).json({ error: 'Failed to update image preference' });
     }
 });
 
@@ -476,6 +509,7 @@ router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
             if (fs.existsSync(localFile)) {
                 fs.unlinkSync(localFile);
                 console.log(`Deleted local image: ${safeName}`);
+                await ImagePreference.deleteOne({ name: filename });
                 return res.json({ message: 'File deleted successfully' });
             }
             return res.status(404).json({
@@ -501,6 +535,7 @@ router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
 
         await file.delete();
         console.log(`Successfully deleted file from GCS: ${filename}`);
+        await ImagePreference.deleteOne({ name: filename });
 
         res.json({ message: 'File deleted successfully' });
 

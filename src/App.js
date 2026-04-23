@@ -18,6 +18,7 @@ import TrackListPage from './pages/TrackListPage';
 import QuoteList from './pages/QuoteList';
 import Projects from './pages/Projects';
 import FavoritesPage from './pages/FavoritesPage';
+import MyImagesPage from './pages/MyImagesPage';
 import LoginPage from './pages/LoginPage';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
@@ -65,6 +66,8 @@ function App() {
   const [isProjectsExiting, setIsProjectsExiting] = useState(false);
   const [showFavoritesPage, setShowFavoritesPage] = useState(false);
   const [isFavoritesPageExiting, setIsFavoritesPageExiting] = useState(false);
+  const [showMyImagesPage, setShowMyImagesPage] = useState(false);
+  const [isMyImagesPageExiting, setIsMyImagesPageExiting] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
@@ -182,14 +185,20 @@ function App() {
         // Fetch from our GCS bucket
         const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-images`);
         if (!response.ok) throw new Error('Failed to fetch images');
-        
+
         const data = await response.json();
         if (!data.items || data.items.length === 0) {
           throw new Error('No images found in my-images folder');
         }
 
-        // Pick a random image from the list
-        const randomImage = data.items[Math.floor(Math.random() * data.items.length)];
+        // Only images toggled on are available for random selection.
+        // If none are enabled (edge case, e.g. legacy data), fall back to most recently added.
+        // The server sorts items by createdAt desc, so items[0] is the most recent.
+        let selectable = data.items.filter(i => i.enabled !== false);
+        if (selectable.length === 0) {
+          selectable = [data.items[0]];
+        }
+        const randomImage = selectable[Math.floor(Math.random() * selectable.length)];
         
         setBackgroundImage(randomImage.url);
         setPhotographer({
@@ -721,6 +730,18 @@ function App() {
     }
   };
 
+  const toggleMyImagesPage = () => {
+    if (showMyImagesPage) {
+      setIsMyImagesPageExiting(true);
+      setTimeout(() => {
+        setShowMyImagesPage(false);
+        setIsMyImagesPageExiting(false);
+      }, 300);
+    } else {
+      setShowMyImagesPage(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-gray-900">
@@ -870,6 +891,10 @@ function App() {
           toggleProfile();
           toggleFavoritesPage();
         }}
+        onMyImagesClick={() => {
+          toggleProfile();
+          toggleMyImagesPage();
+        }}
       />
       {showChangeBackgroundImage && (
         <ChangeBackground
@@ -911,6 +936,12 @@ function App() {
         <FavoritesPage
           onClose={toggleFavoritesPage}
           isExiting={isFavoritesPageExiting}
+        />
+      )}
+      {(showMyImagesPage || isMyImagesPageExiting) && (
+        <MyImagesPage
+          onClose={toggleMyImagesPage}
+          isExiting={isMyImagesPageExiting}
         />
       )}
     </div>

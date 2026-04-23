@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 // POST new favorite
 router.post('/', async (req, res) => {
     try {
-        const { title, imageUrl, source = 'custom', tags = [] } = req.body;
+        const { title, imageUrl, source = 'custom', tags = [], enabled = true } = req.body;
 
         if (!title || !imageUrl) {
             return res.status(400).json({ error: 'Title and imageUrl are required' });
@@ -26,7 +26,8 @@ router.post('/', async (req, res) => {
             title,
             imageUrl,
             source,
-            tags
+            tags,
+            enabled
         });
 
         const savedFavorite = await newFavorite.save();
@@ -58,11 +59,16 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, imageUrl, source, tags } = req.body;
+        const updates = {};
+        ['title', 'imageUrl', 'source', 'tags', 'enabled'].forEach((key) => {
+            if (req.body[key] !== undefined) {
+                updates[key] = req.body[key];
+            }
+        });
 
         const updatedFavorite = await Favorite.findByIdAndUpdate(
             id,
-            { title, imageUrl, source, tags },
+            updates,
             { new: true, runValidators: true }
         );
 

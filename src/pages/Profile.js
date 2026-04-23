@@ -1,21 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authFetch, getAuthToken } from '../utils/api';
-import { fetchFavorites, addFavorite, deleteFavorite } from '../services/favoritesService';
 
-const Profile = ({ isOpen, onClose }) => {
+const Profile = ({ isOpen, onClose, onFavoritesClick }) => {
     const [currentView, setCurrentView] = useState('menu');
     // My Images state
     const [images, setImages] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const fileInputRef = useRef(null);
-    // Favorites state
-    const [favorites, setFavorites] = useState([]);
-    const [favoriteUrl, setFavoriteUrl] = useState('');
-    const [favoriteTitle, setFavoriteTitle] = useState('');
-    const [addingFavorite, setAddingFavorite] = useState(false);
-    const [favoriteError, setFavoriteError] = useState('');
-    const [validatingUrl, setValidatingUrl] = useState(false);
 
     const fetchImages = async () => {
         try {
@@ -28,19 +20,9 @@ const Profile = ({ isOpen, onClose }) => {
         }
     };
 
-    const loadFavorites = async () => {
-        try {
-            const data = await fetchFavorites();
-            setFavorites(data);
-        } catch (error) {
-            console.error('Error fetching favorites:', error);
-        }
-    };
-
     useEffect(() => {
         if (isOpen) {
             fetchImages();
-            loadFavorites();
         }
     }, [isOpen]);
 
@@ -48,9 +30,6 @@ const Profile = ({ isOpen, onClose }) => {
     useEffect(() => {
         if (!isOpen) {
             setCurrentView('menu');
-            setFavoriteUrl('');
-            setFavoriteTitle('');
-            setFavoriteError('');
         }
     }, [isOpen]);
 
@@ -112,80 +91,6 @@ const Profile = ({ isOpen, onClose }) => {
         }
     };
 
-    const testImageLoad = (url) => {
-        return new Promise((resolve) => {
-            const img = new window.Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-            img.src = url;
-            setTimeout(() => resolve(false), 5000);
-        });
-    };
-
-    const cleanUrl = (url) => {
-        return url
-            .trim()
-            .replace(/[\u200B\u200C\u200D\uFEFF\u200E\u200F\u00A0\u2028\u2029]/g, '');
-    };
-
-    const handleAddFavorite = async () => {
-        const url = cleanUrl(favoriteUrl);
-        if (!url) {
-            setFavoriteError('Please enter an image URL');
-            return;
-        }
-
-        let parsedUrl;
-        try {
-            parsedUrl = new URL(url);
-            if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-                throw new Error('Invalid protocol');
-            }
-        } catch {
-            setFavoriteError('Please enter a valid URL starting with http:// or https://');
-            return;
-        }
-
-        setFavoriteError('');
-        setValidatingUrl(true);
-
-        const isImage = await testImageLoad(url);
-        setValidatingUrl(false);
-
-        if (!isImage) {
-            setFavoriteError('URL does not point to a valid image, or the image failed to load');
-            return;
-        }
-
-        setAddingFavorite(true);
-        try {
-            const title = favoriteTitle.trim() || parsedUrl.hostname;
-            const saved = await addFavorite({
-                title,
-                imageUrl: url,
-                source: 'custom',
-            });
-            setFavorites(prev => [saved, ...prev]);
-            setFavoriteUrl('');
-            setFavoriteTitle('');
-            setFavoriteError('');
-        } catch (error) {
-            console.error('Error adding favorite:', error);
-            setFavoriteError('Failed to save favorite');
-        } finally {
-            setAddingFavorite(false);
-        }
-    };
-
-    const handleDeleteFavorite = async (id) => {
-        try {
-            await deleteFavorite(id);
-            setFavorites(prev => prev.filter(f => f._id !== id));
-        } catch (error) {
-            console.error('Error deleting favorite:', error);
-        }
-    };
-
     const BackArrow = ({ onClick }) => (
         <button
             onClick={onClick}
@@ -231,7 +136,7 @@ const Profile = ({ isOpen, onClose }) => {
                     </svg>
                 </button>
                 <button
-                    onClick={() => setCurrentView('favorites')}
+                    onClick={onFavoritesClick}
                     className="tw-w-full tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-3 tw-mb-1 tw-bg-transparent tw-border-0 tw-cursor-pointer tw-rounded-lg hover:tw-bg-gray-100 tw-transition-colors"
                 >
                     <span className="tw-text-sm tw-text-gray-700">Favorites</span>
@@ -294,77 +199,6 @@ const Profile = ({ isOpen, onClose }) => {
         </>
     );
 
-    const renderFavorites = () => (
-        <>
-            <div className="tw-flex tw-items-center tw-mb-6">
-                <BackArrow onClick={() => setCurrentView('menu')} />
-                <p className="tw-text-xl tw-font-bold tw-text-gray-800">Favorites</p>
-            </div>
-
-            <div className="tw-flex-1 tw-overflow-y-auto">
-                {/* Add Favorite Form */}
-                <div className="tw-mb-4">
-                    <input
-                        type="text"
-                        value={favoriteTitle}
-                        onChange={(e) => setFavoriteTitle(e.target.value)}
-                        placeholder="Title (optional)"
-                        className="tw-w-full tw-py-2 tw-px-3 tw-mb-2 tw-border tw-border-gray-200 tw-rounded-lg tw-text-sm tw-outline-none focus:tw-border-gray-400"
-                    />
-                    <input
-                        type="text"
-                        value={favoriteUrl}
-                        onChange={(e) => {
-                            setFavoriteUrl(e.target.value);
-                            setFavoriteError('');
-                        }}
-                        placeholder="Image URL (https://...)"
-                        className="tw-w-full tw-py-2 tw-px-3 tw-mb-2 tw-border tw-border-gray-200 tw-rounded-lg tw-text-sm tw-outline-none focus:tw-border-gray-400"
-                    />
-                    {favoriteError && (
-                        <p className="tw-text-red-500 tw-text-xs tw-mb-2">{favoriteError}</p>
-                    )}
-                    <button
-                        onClick={handleAddFavorite}
-                        disabled={addingFavorite || validatingUrl}
-                        className="tw-w-full tw-py-2 tw-px-3 tw-bg-gray-800 tw-text-white tw-rounded-lg tw-border-0 tw-cursor-pointer tw-text-sm tw-font-semibold hover:tw-bg-gray-700 disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
-                    >
-                        {validatingUrl ? 'Checking image...' : addingFavorite ? 'Adding...' : 'Add Image'}
-                    </button>
-                </div>
-
-                {/* Favorites List */}
-                <ul className="tw-list-none tw-p-0 tw-m-0">
-                    {favorites.map((favorite) => (
-                        <li key={favorite._id} className="tw-flex tw-items-center tw-gap-2 tw-py-2 tw-border-b tw-border-gray-100">
-                            <img
-                                src={favorite.imageUrl}
-                                alt={favorite.title}
-                                className="tw-w-10 tw-h-10 tw-object-cover tw-rounded tw-flex-shrink-0"
-                                onError={(e) => {
-                                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiNGM0Y0RjYiLz48dGV4dCB4PSIyMCIgeT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5QjlCQTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCI+PzwvdGV4dD48L3N2Zz4=';
-                                }}
-                            />
-                            <span className="tw-text-xs tw-text-gray-700 tw-flex-1 tw-truncate">
-                                {favorite.title}
-                            </span>
-                            <button
-                                onClick={() => handleDeleteFavorite(favorite._id)}
-                                className="tw-text-gray-400 hover:tw-text-red-500 tw-cursor-pointer tw-bg-transparent tw-border-0 tw-text-lg tw-flex-shrink-0"
-                            >
-                                ✕
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-
-                {favorites.length === 0 && (
-                    <p className="tw-text-center tw-text-gray-400 tw-text-sm tw-py-4">No favorite images yet</p>
-                )}
-            </div>
-        </>
-    );
-
     return (
         <div className={`menu ${isOpen ? 'open' : ''}`} style={{ pointerEvents: isOpen ? 'auto' : 'none' }}>
             {/* Overlay */}
@@ -384,7 +218,6 @@ const Profile = ({ isOpen, onClose }) => {
                 <div className="tw-p-4 tw-h-full tw-flex tw-flex-col">
                     {currentView === 'menu' && renderMenu()}
                     {currentView === 'my-images' && renderMyImages()}
-                    {currentView === 'favorites' && renderFavorites()}
                 </div>
             </div>
         </div>

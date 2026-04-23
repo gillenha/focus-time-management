@@ -17,6 +17,7 @@ import ChangeBackground from './pages/ChangeBackground';
 import TrackListPage from './pages/TrackListPage';
 import QuoteList from './pages/QuoteList';
 import Projects from './pages/Projects';
+import FavoritesPage from './pages/FavoritesPage';
 import LoginPage from './pages/LoginPage';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
@@ -62,6 +63,8 @@ function App() {
   const [isQuoteListExiting, setIsQuoteListExiting] = useState(false);
   const [showProjects, setShowProjects] = useState(false);
   const [isProjectsExiting, setIsProjectsExiting] = useState(false);
+  const [showFavoritesPage, setShowFavoritesPage] = useState(false);
+  const [isFavoritesPageExiting, setIsFavoritesPageExiting] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
@@ -221,9 +224,15 @@ function App() {
           console.log('Fetching favorites from API...');
           const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/favorites`);
           if (response.ok) {
-            const favorites = await response.json();
+            const allFavorites = await response.json();
+            // Only favorites toggled on are available for random selection.
+            // If none are enabled (edge case, e.g. legacy data), fall back to most recently added.
+            let favorites = allFavorites.filter(f => f.enabled !== false);
+            if (favorites.length === 0 && allFavorites.length > 0) {
+              favorites = [allFavorites[0]];
+            }
             if (favorites.length > 0) {
-              console.log(`Found ${favorites.length} favorites, selecting randomly...`);
+              console.log(`Found ${favorites.length} enabled favorites, selecting randomly...`);
 
               // Shuffle the favorites array to randomize selection
               const shuffledFavorites = [...favorites].sort(() => Math.random() - 0.5);
@@ -700,6 +709,18 @@ function App() {
     }
   };
 
+  const toggleFavoritesPage = () => {
+    if (showFavoritesPage) {
+      setIsFavoritesPageExiting(true);
+      setTimeout(() => {
+        setShowFavoritesPage(false);
+        setIsFavoritesPageExiting(false);
+      }, 300);
+    } else {
+      setShowFavoritesPage(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-gray-900">
@@ -845,6 +866,10 @@ function App() {
       <Profile
         isOpen={showProfile}
         onClose={toggleProfile}
+        onFavoritesClick={() => {
+          toggleProfile();
+          toggleFavoritesPage();
+        }}
       />
       {showChangeBackgroundImage && (
         <ChangeBackground
@@ -880,6 +905,12 @@ function App() {
         <Projects
           onClose={toggleProjects}
           isExiting={isProjectsExiting}
+        />
+      )}
+      {(showFavoritesPage || isFavoritesPageExiting) && (
+        <FavoritesPage
+          onClose={toggleFavoritesPage}
+          isExiting={isFavoritesPageExiting}
         />
       )}
     </div>

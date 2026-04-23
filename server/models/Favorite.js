@@ -20,6 +20,10 @@ const favoriteSchema = new mongoose.Schema({
         type: String,
         trim: true
     }],
+    enabled: {
+        type: Boolean,
+        default: true
+    },
     createdAt: {
         type: Date,
         default: Date.now

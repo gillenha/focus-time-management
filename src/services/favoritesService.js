@@ -51,3 +51,23 @@ export const deleteFavorite = async (id) => {
         throw error;
     }
 };
+
+export const updateFavorite = async (id, updates) => {
+    try {
+        const response = await authFetch(`${API_URL}/api/favorites/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updates),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update favorite');
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error updating favorite:', error);
+        throw error;
+    }
+};

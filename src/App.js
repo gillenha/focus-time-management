@@ -24,6 +24,7 @@ import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
 import { Heart } from '@phosphor-icons/react';
 import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
+import { playEffect } from './utils/soundEffects';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -72,35 +73,48 @@ function App() {
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
 
-  // Add effect to load tracks from server if none in localStorage
+  // Reconcile playlist with server on mount: drop stale entries (e.g. tracks
+  // uploaded to GCS in a previous session that no longer exist locally in dev),
+  // then repopulate from the server if the playlist is empty.
   useEffect(() => {
-    const loadTracksFromServer = async () => {
-      if (playlistTracks.length === 0) {
-        try {
-          console.log('Loading tracks from server...');
-          const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
-          const data = await response.json();
-          
-          if (data.items && data.items.length > 0) {
-            console.log('Tracks loaded from server:', data.items);
-            const formattedTracks = data.items.map(item => ({
-              id: `playlist-${item.name.replace(/[^a-zA-Z0-9]/g, '')}`,
-              title: item.name.replace('.mp3', '').replace(/^(test\/|tracks\/)/, ''),
-              fileName: item.name
-            }));
-            
-            setPlaylistTracks(formattedTracks);
-            localStorage.setItem('focusPlaylist', JSON.stringify(formattedTracks));
-          } else {
-            console.error('No tracks found on server');
-          }
-        } catch (error) {
-          console.error('Error loading tracks from server:', error);
+    const syncPlaylistWithServer = async () => {
+      try {
+        console.log('Syncing playlist with server...');
+        const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/files/list-tracks`);
+        if (!response.ok) {
+          console.error('Failed to fetch tracks from server');
+          return;
         }
+        const data = await response.json();
+        const serverItems = data.items || [];
+        const serverNames = new Set(serverItems.map(i => i.name));
+
+        const stored = JSON.parse(localStorage.getItem('focusPlaylist') || '[]');
+        const valid = stored.filter(t => serverNames.has(t.fileName));
+
+        if (valid.length === 0 && serverItems.length > 0) {
+          console.log(`Repopulating playlist from ${serverItems.length} server tracks`);
+          const formatted = serverItems.map(item => ({
+            id: `playlist-${item.name.replace(/[^a-zA-Z0-9]/g, '')}`,
+            title: item.name.replace('.mp3', '').replace(/^(test\/|tracks\/)/, ''),
+            fileName: item.name
+          }));
+          setPlaylistTracks(formatted);
+          localStorage.setItem('focusPlaylist', JSON.stringify(formatted));
+          return;
+        }
+
+        if (valid.length !== stored.length) {
+          console.log(`Dropping ${stored.length - valid.length} stale playlist entries`);
+          setPlaylistTracks(valid);
+          localStorage.setItem('focusPlaylist', JSON.stringify(valid));
+        }
+      } catch (error) {
+        console.error('Error syncing playlist with server:', error);
       }
     };
 
-    loadTracksFromServer();
+    syncPlaylistWithServer();
   }, [playlistTracks.length]);
 
   // Add ref to track session state without causing re-renders
@@ -400,6 +414,7 @@ function App() {
   const handleFreeFlowClick = async () => {
     if (isFreeflow) {
       console.log("Freeflow ended");
+      playEffect('session-end.mp3');
 
       // Clean up audio if cleanup function exists
       if (window.audioCleanup) {
@@ -477,6 +492,7 @@ function App() {
       }, 1000);
     } else {
       console.log("Freeflow started");
+      playEffect('enter-flow-state.mp3');
       // Clear any existing session state AND reset timer when starting new session
       localStorage.removeItem('currentSession');
       setSessionStarted(false);
@@ -503,12 +519,8 @@ function App() {
     setSessionInputValue(inputText);
     setSessionStarted(true);
     
-    // Play bell sound
-    const bell = new Audio(`${process.env.REACT_APP_API_URL}/effects/bell.mp3`);
-    bell.volume = volume;
-    bell.play().catch(error => {
-      console.error('Error playing bell sound:', error);
-    });
+    // Play bell sound (fixed volume, independent of slider)
+    playEffect('bell.mp3');
     
     // Save current session state with project
     const sessionData = {

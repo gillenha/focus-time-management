@@ -33,6 +33,9 @@ build/
 # MP3 files
 /mp3s
 
+# Local dev tracks (served via /dev-files/tracks in npm run dev)
+/tracks
+
 # Other large files or directories
 # Add any other large files or directories here
 

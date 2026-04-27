@@ -143,6 +143,18 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Dev-only: serve uploaded tracks from the local filesystem so the browser
+// audio element (which can't send Authorization headers) can fetch them.
+// Mounted outside /api on purpose — auth middleware does not apply.
+if (process.env.NODE_ENV !== 'production') {
+    const localTracksDir = path.join(process.cwd(), 'tracks');
+    if (!fs.existsSync(localTracksDir)) {
+        fs.mkdirSync(localTracksDir, { recursive: true });
+    }
+    app.use('/dev-files/tracks', express.static(localTracksDir));
+    console.log('Dev mode: serving local tracks from', localTracksDir, 'at /dev-files/tracks');
+}
+
 // Apply auth middleware to all /api routes (except health check above)
 app.use('/api', authMiddleware);
 

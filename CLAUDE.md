@@ -108,7 +108,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 ## Audio System
-- Tracks stored in `mp3s/` directory (dev) or GCS bucket (prod)
+- Tracks stored in `tracks/` directory (dev, gitignored) or GCS bucket `react-app-assets/tracks/` (prod)
+- Dev tracks are served as static files at `/dev-files/tracks/<filename>` (mounted outside `/api`, so the `<audio>` element can fetch without an auth header). No GCS credentials are required to develop or test the audio flow locally.
+- Upload, list, finalize, sizes, and delete endpoints all branch to local FS when `NODE_ENV !== 'production'`.
 - Playlist managed in localStorage as `focusPlaylist`
 - Audio context provides shuffled playback with auto-advance
 - Volume settings persisted in localStorage

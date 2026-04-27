@@ -80,15 +80,19 @@ class AudioManager {
 
     static getFullAudioUrl(relativePath) {
         console.log('Getting full audio URL for:', relativePath);
-        
-        // Remove any leading slashes and 'mp3s/'
+
         const filename = relativePath.split('/').pop();
-        
-        // Get the target folder based on environment
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
-        
-        // Always use GCP storage bucket URL
-        const bucketUrl = `https://storage.googleapis.com/react-app-assets/${targetFolder}/${filename}`;
+
+        // Dev: serve from the local /dev-files/tracks static mount.
+        // (mounted outside /api so the audio element can fetch without auth headers)
+        if (process.env.NODE_ENV !== 'production') {
+            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const localUrl = `${apiUrl}/dev-files/tracks/${encodeURIComponent(filename)}`;
+            console.log('Using local dev URL:', localUrl);
+            return localUrl;
+        }
+
+        const bucketUrl = `https://storage.googleapis.com/react-app-assets/tracks/${filename}`;
         console.log('Using bucket URL:', bucketUrl);
         return bucketUrl;
     }

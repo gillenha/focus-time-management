@@ -51,11 +51,16 @@ const imageUpload = multer({
 
 // Local filesystem storage for development image management
 const localImagesDir = path.join(process.cwd(), 'my-images');
+const localTracksDir = path.join(process.cwd(), 'tracks');
 if (process.env.NODE_ENV !== 'production') {
     if (!fs.existsSync(localImagesDir)) {
         fs.mkdirSync(localImagesDir, { recursive: true });
     }
+    if (!fs.existsSync(localTracksDir)) {
+        fs.mkdirSync(localTracksDir, { recursive: true });
+    }
     console.log('Development mode: local images directory at', localImagesDir);
+    console.log('Development mode: local tracks directory at', localTracksDir);
 }
 
 // Initialize Google Cloud Storage
@@ -96,20 +101,23 @@ initializeStorage().catch(error => {
     console.error('Storage initialization failed:', error);
 });
 
-// Middleware to ensure storage is initialized
+// Middleware to ensure storage is initialized.
+// In dev we let the request through even without GCS — the per-route handlers
+// branch to the local filesystem when NODE_ENV !== 'production'.
 const ensureStorageInitialized = async (req, res, next) => {
-    if (!bucket) {
-        try {
-            await initializeStorage();
-            next();
-        } catch (error) {
-            res.status(500).json({ 
-                error: 'Storage not initialized',
-                details: error.message
-            });
-        }
-    } else {
+    if (bucket) return next();
+    try {
+        await initializeStorage();
         next();
+    } catch (error) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.warn('GCS not initialized in dev — local-FS branches will be used.');
+            return next();
+        }
+        res.status(500).json({
+            error: 'Storage not initialized',
+            details: error.message
+        });
     }
 };
 
@@ -122,11 +130,6 @@ if (process.env.NODE_ENV !== 'production') {
 router.post('/upload', ensureStorageInitialized, upload.single('file'), async (req, res) => {
     console.log('Upload request received');
     try {
-        if (!bucket) {
-            console.error('Upload error: Google Cloud Storage not initialized');
-            throw new Error('Google Cloud Storage not initialized');
-        }
-        
         if (!req.file) {
             console.error('Upload error: No file received');
             return res.status(400).json({ error: 'No file uploaded' });
@@ -139,8 +142,28 @@ router.post('/upload', ensureStorageInitialized, upload.single('file'), async (r
             mimetype: req.file.mimetype
         });
 
-        // Always use GCS for both development and production
-        const targetFolder = process.env.NODE_ENV === 'production' ? 'tracks' : 'test';
+        // Development: save to local filesystem (no GCS required)
+        if (process.env.NODE_ENV !== 'production') {
+            const safeName = path.basename(req.file.originalname);
+            const destPath = path.join(localTracksDir, safeName);
+            fs.renameSync(req.file.path, destPath);
+            const stats = fs.statSync(destPath);
+            console.log('Track saved locally:', destPath);
+            return res.status(200).json({
+                message: 'File uploaded successfully',
+                file: {
+                    name: `test/${safeName}`,
+                    size: stats.size
+                }
+            });
+        }
+
+        if (!bucket) {
+            console.error('Upload error: Google Cloud Storage not initialized');
+            throw new Error('Google Cloud Storage not initialized');
+        }
+
+        const targetFolder = 'tracks';
         const blobPath = `${targetFolder}/${req.file.originalname}`;
         console.log('Uploading to GCS path:', blobPath);
 
@@ -333,12 +356,35 @@ router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
         }
 
         const { fileName, tempDir, totalChunks } = uploadInfo;
-        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
-        const destinationPath = `${folder}${fileName}`;
-        
+
+        // Development: stitch chunks into the local tracks directory
+        if (process.env.NODE_ENV !== 'production') {
+            const safeName = path.basename(fileName);
+            const destPath = path.join(localTracksDir, safeName);
+            const writeStream = fs.createWriteStream(destPath);
+            await new Promise((resolve, reject) => {
+                writeStream.on('error', reject);
+                writeStream.on('finish', resolve);
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunkPath = path.join(tempDir, `chunk-${i}`);
+                    writeStream.write(fs.readFileSync(chunkPath));
+                }
+                writeStream.end();
+            });
+            fs.rmSync(tempDir, { recursive: true, force: true });
+            uploads.delete(uploadId);
+            const localPath = `test/${safeName}`;
+            console.log('Track upload finalized locally:', destPath);
+            return res.json({ success: true, fileName: localPath });
+        }
+
+        if (!bucket) {
+            throw new Error('Google Cloud Storage not initialized');
+        }
+
+        const destinationPath = `tracks/${fileName}`;
         console.log(`Finalizing upload: ${fileName} to ${destinationPath}`);
-        
-        // Create a write stream to GCS
+
         const blob = bucket.file(destinationPath);
         const blobStream = blob.createWriteStream({
             resumable: false,
@@ -347,12 +393,10 @@ router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
             }
         });
 
-        // Handle upload completion
         await new Promise((resolve, reject) => {
             blobStream.on('error', reject);
             blobStream.on('finish', resolve);
 
-            // Combine and stream chunks
             for (let i = 0; i < totalChunks; i++) {
                 const chunkPath = path.join(tempDir, `chunk-${i}`);
                 const chunkData = fs.readFileSync(chunkPath);
@@ -361,10 +405,9 @@ router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
             blobStream.end();
         });
 
-        // Clean up
         fs.rmSync(tempDir, { recursive: true, force: true });
         uploads.delete(uploadId);
-        
+
         console.log(`Upload finalized successfully: ${destinationPath}`);
         res.json({ success: true, fileName: destinationPath });
     } catch (error) {
@@ -379,14 +422,27 @@ router.post('/finalize-upload', ensureStorageInitialized, async (req, res) => {
 // List MP3 files with folder support
 router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
     try {
+        // Development: list from local filesystem
+        if (process.env.NODE_ENV !== 'production') {
+            const items = fs.existsSync(localTracksDir)
+                ? fs.readdirSync(localTracksDir)
+                    .filter(f => f.toLowerCase().endsWith('.mp3'))
+                    .map(f => ({
+                        name: `test/${f}`,
+                        size: fs.statSync(path.join(localTracksDir, f)).size
+                    }))
+                : [];
+            console.log(`Found ${items.length} local tracks`);
+            return res.json({ items });
+        }
+
         if (!bucket) {
             throw new Error('Google Cloud Storage not initialized');
         }
 
-        // Use environment-specific folder
-        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        const folder = 'tracks/';
         console.log(`Listing files from bucket: ${bucket.name}, folder: ${folder}`);
-        
+
         const [files] = await bucket.getFiles({ prefix: folder });
         const items = await Promise.all(files
             .filter(file => file.name.endsWith('.mp3'))
@@ -397,12 +453,12 @@ router.get('/list-tracks', ensureStorageInitialized, async (req, res) => {
                     size: parseInt(metadata.size)
                 };
             }));
-            
+
         console.log(`Found ${items.length} files in ${folder}`);
         res.json({ items });
     } catch (error) {
         console.error('Error listing files:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Failed to list files',
             details: error.message
         });
@@ -518,6 +574,21 @@ router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
             });
         }
 
+        // Development: handle local track deletion
+        if (process.env.NODE_ENV !== 'production' && filename.startsWith('test/')) {
+            const safeName = path.basename(filename);
+            const localFile = path.join(localTracksDir, safeName);
+            if (fs.existsSync(localFile)) {
+                fs.unlinkSync(localFile);
+                console.log(`Deleted local track: ${safeName}`);
+                return res.json({ message: 'File deleted successfully' });
+            }
+            return res.status(404).json({
+                error: 'File not found',
+                details: `File ${filename} does not exist locally`
+            });
+        }
+
         // Production: delete from GCS
         if (!bucket) {
             throw new Error('Google Cloud Storage not initialized');
@@ -551,22 +622,34 @@ router.delete('/:filename(*)', ensureStorageInitialized, async (req, res) => {
 // Get file sizes
 router.get('/sizes', ensureStorageInitialized, async (req, res) => {
     try {
+        // Development: read sizes from the local tracks dir
+        if (process.env.NODE_ENV !== 'production') {
+            const sizes = {};
+            if (fs.existsSync(localTracksDir)) {
+                for (const f of fs.readdirSync(localTracksDir)) {
+                    if (f.toLowerCase().endsWith('.mp3')) {
+                        sizes[`test/${f}`] = fs.statSync(path.join(localTracksDir, f)).size;
+                    }
+                }
+            }
+            return res.json(sizes);
+        }
+
         if (!bucket) {
             throw new Error('Google Cloud Storage not initialized');
         }
 
-        // Use environment-specific folder
-        const folder = process.env.NODE_ENV === 'production' ? 'tracks/' : 'test/';
+        const folder = 'tracks/';
         const [files] = await bucket.getFiles({ prefix: folder });
         const sizes = {};
-        
+
         for (const file of files) {
             if (file.name.endsWith('.mp3')) {
                 const [metadata] = await file.getMetadata();
                 sizes[file.name] = parseInt(metadata.size);
             }
         }
-        
+
         res.json(sizes);
     } catch (error) {
         console.error('Error getting file sizes:', error);

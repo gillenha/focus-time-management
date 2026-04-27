@@ -24,7 +24,7 @@ import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
 import { Heart } from '@phosphor-icons/react';
 import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
-import { playEffect } from './utils/soundEffects';
+import { playEffect, preloadEffects } from './utils/soundEffects';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -583,6 +583,9 @@ function App() {
     console.log('App mounted');
     console.log('Environment:', process.env.NODE_ENV);
     console.log('Public URL:', process.env.PUBLIC_URL);
+    // Pre-fetch and decode click sound effects so the first click in a session
+    // doesn't pay fetch+decode cost; subsequent clicks reuse pooled elements.
+    preloadEffects();
   }, []);
 
   window.fetchBackgroundImage = fetchBackgroundImage;

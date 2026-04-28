@@ -106,7 +106,9 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
     }
   }, [volume]);
 
-  const playAudio = useCallback(async (audioPath, { fadeInOnStart = false } = {}) => {
+  const playAudio = useCallback(async (audioPath, options = {}) => {
+    const { fadeInOnStart = false, _retry = 0 } = options;
+
     if (audioRef.current) {
       stopFade();
       audioRef.current.pause();
@@ -115,6 +117,11 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
     }
 
     const audio = new Audio(AudioManager.getFullAudioUrl(audioPath));
+    // Fetch the full file immediately so play() has data ready and the media
+    // pipeline doesn't sit in its "still classifying" load phase — that's the
+    // window where Chrome can emit a misleading "video-only background media"
+    // AbortError.
+    audio.preload = 'auto';
     const cleanup = setupAudioElement(audio);
 
     try {
@@ -128,6 +135,15 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
       setTimerActive(true);
       return cleanup;
     } catch (error) {
+      // AbortError on initial play() is usually a transient race during load.
+      // Retry once before giving up so the user doesn't end up in a silent
+      // "session started but no audio" state.
+      if (error && error.name === 'AbortError' && _retry === 0) {
+        console.warn(`Play interrupted, retrying: ${audioPath}`);
+        cleanup();
+        await new Promise((r) => setTimeout(r, 150));
+        return playAudio(audioPath, { fadeInOnStart, _retry: 1 });
+      }
       console.error('Playback failed:', error);
       cleanup();
       return null;

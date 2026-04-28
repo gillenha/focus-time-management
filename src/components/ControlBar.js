@@ -117,16 +117,35 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
     }
 
     const audio = new Audio(AudioManager.getFullAudioUrl(audioPath));
-    // Fetch the full file immediately so play() has data ready and the media
-    // pipeline doesn't sit in its "still classifying" load phase — that's the
-    // window where Chrome can emit a misleading "video-only background media"
-    // AbortError.
     audio.preload = 'auto';
     const cleanup = setupAudioElement(audio);
 
     try {
       audioRef.current = audio;
       audio.volume = fadeInOnStart ? 0 : volumeRef.current;
+
+      // Wait for the audio to have enough data to play before calling play().
+      // Chrome's MediaSession classifies an element as "audible" or "video-only"
+      // during the initial load phase; calling play() before there's decoded
+      // audio is the window in which the misleading "video-only background
+      // media was paused" AbortError fires. Waiting for `canplay` (readyState
+      // >= 3) closes that window. We bail after 5s in case the event never
+      // arrives — play() can then surface the real underlying error.
+      if (audio.readyState < 3) {
+        await new Promise((resolve, reject) => {
+          const done = () => {
+            audio.removeEventListener('canplay', onCanPlay);
+            audio.removeEventListener('error', onError);
+            clearTimeout(timer);
+          };
+          const onCanPlay = () => { done(); resolve(); };
+          const onError = () => { done(); reject(new Error('Audio load failed')); };
+          const timer = setTimeout(() => { done(); resolve(); }, 5000);
+          audio.addEventListener('canplay', onCanPlay);
+          audio.addEventListener('error', onError);
+        });
+      }
+
       await audio.play();
       if (fadeInOnStart) {
         fadeIn(audio);

@@ -22,7 +22,7 @@ import MyImagesPage from './pages/MyImagesPage';
 import LoginPage from './pages/LoginPage';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
-import { Heart } from '@phosphor-icons/react';
+import { Heart, ArrowsClockwise } from '@phosphor-icons/react';
 import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
 import { playEffect, preloadEffects } from './utils/soundEffects';
 
@@ -72,6 +72,8 @@ function App() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
+  const [isRefreshingBackground, setIsRefreshingBackground] = useState(false);
+  const [backgroundRefreshCooldown, setBackgroundRefreshCooldown] = useState(false);
 
   // Reconcile playlist with server on mount: drop stale entries (e.g. tracks
   // uploaded to GCS in a previous session that no longer exist locally in dev),
@@ -408,6 +410,18 @@ function App() {
       } catch (error) {
         console.error('Error adding favorite:', error);
       }
+    }
+  };
+
+  const handleRefreshBackground = async () => {
+    if (isRefreshingBackground || backgroundRefreshCooldown) return;
+    setIsRefreshingBackground(true);
+    try {
+      await fetchBackgroundImage(unsplashTheme, true);
+    } finally {
+      setIsRefreshingBackground(false);
+      setBackgroundRefreshCooldown(true);
+      setTimeout(() => setBackgroundRefreshCooldown(false), 3000);
     }
   };
 
@@ -778,6 +792,18 @@ function App() {
       {photographer.name && photographer.name !== 'My Images' && (
         <div className="photo-attribution">
           <div className="tw-flex tw-items-start tw-justify-end tw-gap-2">
+            <button
+              onClick={handleRefreshBackground}
+              disabled={isRefreshingBackground || backgroundRefreshCooldown}
+              title="Refresh background image"
+              className="favorite-heart-btn"
+            >
+              <ArrowsClockwise
+                size={16}
+                weight="regular"
+                className={`tw-text-white tw-transition-transform ${isRefreshingBackground ? 'tw-animate-spin' : ''}`}
+              />
+            </button>
             <a
               href={photographer.photoLink}
               target="_blank"

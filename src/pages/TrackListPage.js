@@ -49,7 +49,7 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             // Create unique IDs using filename hash
             const formattedTracks = tracks.map((track) => ({
                 id: `upload-${track.name.replace(/[^a-zA-Z0-9]/g, '')}`,
-                title: track.name.replace('.mp3', ''),
+                title: track.name.replace(/\.mp3$/i, ''),
                 fileName: track.fullPath, // Use full path for audio playback
                 size: track.size
             }));
@@ -91,9 +91,10 @@ function TrackListPage({ onClose, isExiting, playlistTracks, setPlaylistTracks }
             }
 
             // Check if file already exists in upload queue or uploaded tracks
-            const isDuplicate = uploadQueue.some(queueItem => queueItem.file.name === file.name) ||
-                              uploadedTracks.some(track => track.title === file.name.replace('.mp3', '')) ||
-                              selectedFiles.some(selectedFile => selectedFile.name === file.name);
+            const incomingStem = file.name.replace(/\.mp3$/i, '').toLowerCase();
+            const isDuplicate = uploadQueue.some(queueItem => queueItem.file.name.toLowerCase() === file.name.toLowerCase()) ||
+                              uploadedTracks.some(track => track.title.toLowerCase() === incomingStem) ||
+                              selectedFiles.some(selectedFile => selectedFile.name.toLowerCase() === file.name.toLowerCase());
             
             if (isDuplicate) {
                 errors.push(`${file.name}: File already selected or uploaded`);

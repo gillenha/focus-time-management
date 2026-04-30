@@ -92,7 +92,7 @@ class AudioManager {
             return localUrl;
         }
 
-        const bucketUrl = `https://storage.googleapis.com/react-app-assets/tracks/${filename}`;
+        const bucketUrl = `https://storage.googleapis.com/react-app-assets/tracks/${encodeURIComponent(filename)}`;
         console.log('Using bucket URL:', bucketUrl);
         return bucketUrl;
     }

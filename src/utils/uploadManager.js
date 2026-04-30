@@ -62,8 +62,10 @@ class UploadManager {
                         });
 
                         if (!initResponse.ok) throw new Error('Failed to initialize upload');
-                        const { uploadId } = await initResponse.json();
-                        
+                        const initData = await initResponse.json();
+                        const uploadId = initData.uploadId;
+                        const safeFileName = initData.fileName || file.name;
+
                         uploadSessions.set(id, { uploadId, cancelled: false });
 
                         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -114,7 +116,7 @@ class UploadManager {
                         const finalizeResponse = await fetch(apiUrl + '/api/files/finalize-upload', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...authHeaders },
-                            body: JSON.stringify({ uploadId, fileName: file.name, totalChunks })
+                            body: JSON.stringify({ uploadId, fileName: safeFileName, totalChunks })
                         });
 
                         if (!finalizeResponse.ok) throw new Error('Failed to finalize upload');
@@ -310,7 +312,9 @@ class UploadManager {
             });
 
             if (!initResponse.ok) throw new Error('Failed to initialize upload');
-            const { uploadId } = await initResponse.json();
+            const initData = await initResponse.json();
+            const uploadId = initData.uploadId;
+            const safeFileName = initData.fileName || file.name;
 
             // Upload chunks
             for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -350,7 +354,7 @@ class UploadManager {
             const finalizeResponse = await fetch(`${apiUrl}/api/files/finalize-upload`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders },
-                body: JSON.stringify({ uploadId, fileName: file.name, totalChunks })
+                body: JSON.stringify({ uploadId, fileName: safeFileName, totalChunks })
             });
 
             if (!finalizeResponse.ok) throw new Error('Failed to finalize upload');

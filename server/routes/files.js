@@ -9,6 +9,21 @@ const ImagePreference = require('../models/ImagePreference');
 // Store upload metadata
 const uploads = new Map();
 
+function sanitizeFileName(name) {
+    const base = path.basename(String(name || ''));
+    const hasMp3 = base.toLowerCase().endsWith('.mp3');
+    const stem = hasMp3 ? base.slice(0, -4) : base;
+    const cleaned = stem
+        .normalize('NFKD')
+        .replace(/[^\w.\- ]+/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/\.+/g, '.')
+        .replace(/^[._-]+|[._-]+$/g, '')
+        .slice(0, 120) || `track_${Date.now()}`;
+    return `${cleaned}.mp3`;
+}
+
 // Configure multer for file handling
 const multerStorage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -661,26 +676,27 @@ router.get('/sizes', ensureStorageInitialized, async (req, res) => {
 router.post('/init-upload', ensureStorageInitialized, async (req, res) => {
     try {
         const { fileName, fileSize, totalChunks } = req.body;
+        const safeFileName = sanitizeFileName(fileName);
         const uploadId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
         const tempDir = path.join(process.cwd(), 'temp', uploadId);
-        
+
         // Create temp directory for chunks
         fs.mkdirSync(tempDir, { recursive: true });
-        
+
         // Store upload metadata
         const metadata = {
-            fileName,
+            fileName: safeFileName,
             fileSize,
             totalChunks,
             uploadId,
             tempDir,
             receivedChunks: 0
         };
-        
+
         // Store metadata in memory (in production, use Redis or similar)
         uploads.set(uploadId, metadata);
-        
-        res.json({ uploadId });
+
+        res.json({ uploadId, fileName: safeFileName });
     } catch (error) {
         console.error('Upload initialization error:', error);
         res.status(500).json({ error: 'Failed to initialize upload' });

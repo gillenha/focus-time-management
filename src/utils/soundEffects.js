@@ -1,6 +1,9 @@
 // Effects play at a fixed volume independent of the user's volume slider so that
 // confirmation sounds (bell, button clicks, session start/end) are always audible.
-const EFFECT_VOLUME = 0.5;
+const DEFAULT_VOLUME = 0.25;
+const EFFECT_VOLUMES = {
+    'bell.mp3': 0.5,
+};
 
 // Pre-known effect files. Keep in sync with files dropped into /public/effects.
 const EFFECT_FILES = [
@@ -28,7 +31,7 @@ const getEffect = (filename) => {
     if (!audio) {
         audio = new Audio(getEffectUrl(filename));
         audio.preload = 'auto';
-        audio.volume = EFFECT_VOLUME;
+        audio.volume = EFFECT_VOLUMES[filename] ?? DEFAULT_VOLUME;
         audio.load();
         pool.set(filename, audio);
     }
@@ -43,7 +46,7 @@ export const preloadEffects = () => {
 export const playEffect = (filename) => {
     try {
         const audio = getEffect(filename);
-        audio.volume = EFFECT_VOLUME; // re-assert defensively
+        audio.volume = EFFECT_VOLUMES[filename] ?? DEFAULT_VOLUME; // re-assert defensively
         audio.pause();
         audio.currentTime = 0;
         const result = audio.play();

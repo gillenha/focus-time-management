@@ -1,14 +1,11 @@
-const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export const fetchWeatherByZip = async (zipCode, unit = 'F') => {
-  const apiKey = process.env.REACT_APP_OPENWEATHER_API_KEY;
   const units = unit === 'F' ? 'imperial' : 'metric';
-  const response = await fetch(
-    `${BASE_URL}?zip=${zipCode},us&appid=${apiKey}&units=${units}`
-  );
+  const response = await fetch(`${API_URL}/api/weather?zip=${zipCode}&units=${units}`);
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || `Error ${response.status}`);
+    throw new Error(err.error || `Error ${response.status}`);
   }
   return response.json();
 };

@@ -433,6 +433,28 @@ app.get('/mp3s/sizes', authMiddleware, async (req, res) => {
     }
 });
 
+// Weather proxy endpoint — reads OPENWEATHER_API_KEY at runtime (server-side)
+app.get('/api/weather', async (req, res) => {
+    const { zip, units } = req.query;
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    if (!apiKey) {
+        return res.status(500).json({ error: 'Weather API key not configured' });
+    }
+    try {
+        const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?zip=${zip},us&appid=${apiKey}&units=${units}`
+        );
+        const data = await response.json();
+        if (!response.ok) {
+            return res.status(response.status).json({ error: data.message || `Error ${response.status}` });
+        }
+        res.json(data);
+    } catch (error) {
+        console.error('Weather API error:', error);
+        res.status(500).json({ error: 'Failed to fetch weather data' });
+    }
+});
+
 // Import routers
 const notionRouter = require('./server/routes/notion');
 

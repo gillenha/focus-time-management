@@ -155,7 +155,29 @@ if (process.env.NODE_ENV !== 'production') {
     console.log('Dev mode: serving local tracks from', localTracksDir, 'at /dev-files/tracks');
 }
 
-// Apply auth middleware to all /api routes (except health check above)
+// Weather proxy — public, no auth required (key is server-side only)
+app.get('/api/weather', async (req, res) => {
+    const { zip, units } = req.query;
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    if (!apiKey) {
+        return res.status(500).json({ error: 'Weather API key not configured' });
+    }
+    try {
+        const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?zip=${zip},us&appid=${apiKey}&units=${units}`
+        );
+        const data = await response.json();
+        if (!response.ok) {
+            return res.status(response.status).json({ error: data.message || `Error ${response.status}` });
+        }
+        res.json(data);
+    } catch (error) {
+        console.error('Weather API error:', error);
+        res.status(500).json({ error: 'Failed to fetch weather data' });
+    }
+});
+
+// Apply auth middleware to all /api routes (except health check and weather above)
 app.use('/api', authMiddleware);
 
 // API Routes
@@ -430,28 +452,6 @@ app.get('/mp3s/sizes', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('Error getting file sizes:', error);
         res.status(500).json({ error: 'Failed to get file sizes' });
-    }
-});
-
-// Weather proxy endpoint — reads OPENWEATHER_API_KEY at runtime (server-side)
-app.get('/api/weather', async (req, res) => {
-    const { zip, units } = req.query;
-    const apiKey = process.env.OPENWEATHER_API_KEY;
-    if (!apiKey) {
-        return res.status(500).json({ error: 'Weather API key not configured' });
-    }
-    try {
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?zip=${zip},us&appid=${apiKey}&units=${units}`
-        );
-        const data = await response.json();
-        if (!response.ok) {
-            return res.status(response.status).json({ error: data.message || `Error ${response.status}` });
-        }
-        res.json(data);
-    } catch (error) {
-        console.error('Weather API error:', error);
-        res.status(500).json({ error: 'Failed to fetch weather data' });
     }
 });
 

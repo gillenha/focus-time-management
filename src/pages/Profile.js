@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Profile = ({ isOpen, onClose, onFavoritesClick, onMyImagesClick }) => {
+const Profile = ({ isOpen, onClose, onFavoritesClick, onMyImagesClick, onWeatherClick }) => {
     return (
         <div className={`menu ${isOpen ? 'open' : ''}`} style={{ pointerEvents: isOpen ? 'auto' : 'none' }}>
             {/* Overlay */}
@@ -44,6 +44,15 @@ const Profile = ({ isOpen, onClose, onFavoritesClick, onMyImagesClick }) => {
                             className="tw-w-full tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-3 tw-mb-1 tw-bg-transparent tw-border-0 tw-cursor-pointer tw-rounded-lg hover:tw-bg-gray-100 tw-transition-colors"
                         >
                             <span className="tw-text-sm tw-text-gray-700">Favorites</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="tw-text-gray-400">
+                                <path d="M9 18l6-6-6-6" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={onWeatherClick}
+                            className="tw-w-full tw-flex tw-items-center tw-justify-between tw-py-3 tw-px-3 tw-mb-1 tw-bg-transparent tw-border-0 tw-cursor-pointer tw-rounded-lg hover:tw-bg-gray-100 tw-transition-colors"
+                        >
+                            <span className="tw-text-sm tw-text-gray-700">Weather</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="tw-text-gray-400">
                                 <path d="M9 18l6-6-6-6" />
                             </svg>

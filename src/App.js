@@ -19,7 +19,10 @@ import QuoteList from './pages/QuoteList';
 import Projects from './pages/Projects';
 import FavoritesPage from './pages/FavoritesPage';
 import MyImagesPage from './pages/MyImagesPage';
+import WeatherPage from './pages/WeatherPage';
+import WeatherWidget from './components/WeatherWidget';
 import LoginPage from './pages/LoginPage';
+import { fetchWeatherByZip, getWeatherIconKey } from './services/weatherService';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
 import { Heart, ArrowsClockwise } from '@phosphor-icons/react';
@@ -69,6 +72,11 @@ function App() {
   const [isFavoritesPageExiting, setIsFavoritesPageExiting] = useState(false);
   const [showMyImagesPage, setShowMyImagesPage] = useState(false);
   const [isMyImagesPageExiting, setIsMyImagesPageExiting] = useState(false);
+  const [showWeatherPage, setShowWeatherPage] = useState(false);
+  const [isWeatherPageExiting, setIsWeatherPageExiting] = useState(false);
+  const [weatherZipCode, setWeatherZipCode] = useState(() => localStorage.getItem('weatherZipCode') || '');
+  const [weatherUnit, setWeatherUnit] = useState(() => localStorage.getItem('weatherUnit') || 'F');
+  const [weatherData, setWeatherData] = useState(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
@@ -771,6 +779,52 @@ function App() {
     }
   };
 
+  const toggleWeatherPage = () => {
+    if (showWeatherPage) {
+      setIsWeatherPageExiting(true);
+      setTimeout(() => {
+        setShowWeatherPage(false);
+        setIsWeatherPageExiting(false);
+      }, 300);
+    } else {
+      setShowWeatherPage(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!weatherZipCode) return;
+    const loadWeather = async () => {
+      try {
+        const data = await fetchWeatherByZip(weatherZipCode, weatherUnit);
+        setWeatherData({
+          city: data.name,
+          temp: data.main.temp,
+          iconKey: getWeatherIconKey(data.weather[0].id),
+        });
+      } catch {
+        setWeatherData(null);
+      }
+    };
+    loadWeather();
+  }, [weatherZipCode, weatherUnit]);
+
+  const handleSetWeatherZip = (zip, data) => {
+    setWeatherZipCode(zip);
+    localStorage.setItem('weatherZipCode', zip);
+    if (data) setWeatherData(data);
+  };
+
+  const handleClearWeatherZip = () => {
+    setWeatherZipCode('');
+    setWeatherData(null);
+    localStorage.removeItem('weatherZipCode');
+  };
+
+  const handleSetWeatherUnit = (newUnit) => {
+    setWeatherUnit(newUnit);
+    localStorage.setItem('weatherUnit', newUnit);
+  };
+
   if (isLoading) {
     return (
       <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-gray-900">
@@ -850,8 +904,8 @@ function App() {
         </div>
       )}
       <div className="app">
-        <div className="tw-fixed tw-top-0 tw-left-0 tw-z-50">
-          <button 
+        <div className="tw-fixed tw-top-0 tw-left-0 tw-z-50 tw-flex tw-flex-row tw-items-center">
+          <button
             className="tw-p-4 tw-cursor-pointer tw-transition-all tw-duration-200 tw-ease-in-out tw-bg-transparent tw-border-0"
             onClick={() => setIsMenuOpen(true)}
           >
@@ -861,6 +915,7 @@ function App() {
               <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
             </div>
           </button>
+          <WeatherWidget weatherData={weatherData} unit={weatherUnit} />
         </div>
         <Menu 
           isOpen={isMenuOpen}
@@ -936,6 +991,10 @@ function App() {
           toggleProfile();
           toggleMyImagesPage();
         }}
+        onWeatherClick={() => {
+          toggleProfile();
+          toggleWeatherPage();
+        }}
       />
       {showChangeBackgroundImage && (
         <ChangeBackground
@@ -983,6 +1042,17 @@ function App() {
         <MyImagesPage
           onClose={toggleMyImagesPage}
           isExiting={isMyImagesPageExiting}
+        />
+      )}
+      {(showWeatherPage || isWeatherPageExiting) && (
+        <WeatherPage
+          onClose={toggleWeatherPage}
+          isExiting={isWeatherPageExiting}
+          zipCode={weatherZipCode}
+          unit={weatherUnit}
+          onSetZip={handleSetWeatherZip}
+          onClearZip={handleClearWeatherZip}
+          onSetUnit={handleSetWeatherUnit}
         />
       )}
     </div>

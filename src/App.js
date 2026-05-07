@@ -74,11 +74,18 @@ function App() {
   const [isMyImagesPageExiting, setIsMyImagesPageExiting] = useState(false);
   const [showWeatherPage, setShowWeatherPage] = useState(false);
   const [isWeatherPageExiting, setIsWeatherPageExiting] = useState(false);
-  const [weatherLocation, setWeatherLocation] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('weatherLocation')) || null; } catch { return null; }
+  const [weatherLocations, setWeatherLocations] = useState(() => {
+    try {
+      const saved = localStorage.getItem('weatherLocations');
+      if (saved) return JSON.parse(saved) || [];
+      // migrate from single-location storage
+      const old = localStorage.getItem('weatherLocation');
+      if (old) { const p = JSON.parse(old); if (p?.lat) return [p]; }
+      return [];
+    } catch { return []; }
   });
   const [weatherUnit, setWeatherUnit] = useState(() => localStorage.getItem('weatherUnit') || 'F');
-  const [weatherData, setWeatherData] = useState(null);
+  const [weatherDataList, setWeatherDataList] = useState([]);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
@@ -794,36 +801,48 @@ function App() {
   };
 
   const loadWeather = useCallback(async () => {
-    if (!weatherLocation?.lat) return;
-    try {
-      const data = await fetchWeather(weatherLocation.lat, weatherLocation.lon, weatherUnit);
-      setWeatherData({
-        city: data.name,
-        temp: data.main.temp,
-        iconKey: getWeatherIconKey(data.weather[0].id),
-      });
-    } catch {
-      setWeatherData(null);
-    }
-  }, [weatherLocation, weatherUnit]);
+    if (!weatherLocations.length) return;
+    const results = await Promise.all(
+      weatherLocations.map(async (loc) => {
+        try {
+          const data = await fetchWeather(loc.lat, loc.lon, weatherUnit);
+          return { city: data.name, temp: data.main.temp, iconKey: getWeatherIconKey(data.weather[0].id) };
+        } catch { return null; }
+      })
+    );
+    setWeatherDataList(results);
+  }, [weatherLocations, weatherUnit]);
 
   useEffect(() => {
-    if (!weatherLocation?.lat) return;
+    if (!weatherLocations.length) return;
     loadWeather();
     const interval = setInterval(loadWeather, 30 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [weatherLocation, weatherUnit, loadWeather]);
+  }, [weatherLocations, weatherUnit, loadWeather]);
 
-  const handleSetWeatherLocation = (locationObj, data) => {
-    setWeatherLocation(locationObj);
-    localStorage.setItem('weatherLocation', JSON.stringify(locationObj));
-    if (data) setWeatherData(data);
+  const saveLocations = (locations) => {
+    setWeatherLocations(locations);
+    localStorage.setItem('weatherLocations', JSON.stringify(locations));
+    localStorage.removeItem('weatherLocation');
   };
 
-  const handleClearWeatherLocation = () => {
-    setWeatherLocation(null);
-    setWeatherData(null);
-    localStorage.removeItem('weatherLocation');
+  const handleAddWeatherLocation = (locationObj, data) => {
+    if (weatherLocations.length >= 3) return;
+    const next = [...weatherLocations, locationObj];
+    saveLocations(next);
+    if (data) setWeatherDataList(prev => [...prev, data]);
+  };
+
+  const handleRemoveWeatherLocation = (index) => {
+    const next = weatherLocations.filter((_, i) => i !== index);
+    saveLocations(next);
+    setWeatherDataList(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEditWeatherLocation = (index, locationObj, data) => {
+    const next = weatherLocations.map((loc, i) => i === index ? locationObj : loc);
+    saveLocations(next);
+    if (data) setWeatherDataList(prev => prev.map((d, i) => i === index ? data : d));
   };
 
   const handleSetWeatherUnit = (newUnit) => {
@@ -921,7 +940,12 @@ function App() {
               <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
             </div>
           </button>
-          <WeatherWidget weatherData={weatherData} unit={weatherUnit} onRefresh={loadWeather} />
+          {weatherLocations.map((_, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <span className="tw-block tw-w-px tw-h-6 tw-bg-white tw-opacity-20 tw-self-center" />}
+              <WeatherWidget weatherData={weatherDataList[i] || null} onRefresh={loadWeather} />
+            </React.Fragment>
+          ))}
         </div>
         <Menu 
           isOpen={isMenuOpen}
@@ -1054,10 +1078,11 @@ function App() {
         <WeatherPage
           onClose={toggleWeatherPage}
           isExiting={isWeatherPageExiting}
-          location={weatherLocation}
+          locations={weatherLocations}
           unit={weatherUnit}
-          onSetLocation={handleSetWeatherLocation}
-          onClearLocation={handleClearWeatherLocation}
+          onAddLocation={handleAddWeatherLocation}
+          onRemoveLocation={handleRemoveWeatherLocation}
+          onEditLocation={handleEditWeatherLocation}
           onSetUnit={handleSetWeatherUnit}
         />
       )}

@@ -791,22 +791,26 @@ function App() {
     }
   };
 
+  const loadWeather = useCallback(async () => {
+    if (!weatherZipCode) return;
+    try {
+      const data = await fetchWeatherByZip(weatherZipCode, weatherUnit);
+      setWeatherData({
+        city: data.name,
+        temp: data.main.temp,
+        iconKey: getWeatherIconKey(data.weather[0].id),
+      });
+    } catch {
+      setWeatherData(null);
+    }
+  }, [weatherZipCode, weatherUnit]);
+
   useEffect(() => {
     if (!weatherZipCode) return;
-    const loadWeather = async () => {
-      try {
-        const data = await fetchWeatherByZip(weatherZipCode, weatherUnit);
-        setWeatherData({
-          city: data.name,
-          temp: data.main.temp,
-          iconKey: getWeatherIconKey(data.weather[0].id),
-        });
-      } catch {
-        setWeatherData(null);
-      }
-    };
     loadWeather();
-  }, [weatherZipCode, weatherUnit]);
+    const interval = setInterval(loadWeather, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [weatherZipCode, weatherUnit, loadWeather]);
 
   const handleSetWeatherZip = (zip, data) => {
     setWeatherZipCode(zip);
@@ -915,7 +919,7 @@ function App() {
               <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
             </div>
           </button>
-          <WeatherWidget weatherData={weatherData} unit={weatherUnit} />
+          <WeatherWidget weatherData={weatherData} unit={weatherUnit} onRefresh={loadWeather} />
         </div>
         <Menu 
           isOpen={isMenuOpen}

@@ -155,16 +155,30 @@ if (process.env.NODE_ENV !== 'production') {
     console.log('Dev mode: serving local tracks from', localTracksDir, 'at /dev-files/tracks');
 }
 
-// Weather proxy — public, no auth required (key is server-side only)
-app.get('/api/weather', async (req, res) => {
-    const { zip, units } = req.query;
+// Weather endpoints — public, no auth required (key is server-side only)
+app.get('/api/weather/search', async (req, res) => {
+    const { q } = req.query;
     const apiKey = process.env.OPENWEATHER_API_KEY;
-    if (!apiKey) {
-        return res.status(500).json({ error: 'Weather API key not configured' });
-    }
+    if (!apiKey) return res.status(500).json({ error: 'Weather API key not configured' });
     try {
         const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?zip=${zip},us&appid=${apiKey}&units=${units}`
+            `http://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(q)}&limit=5&appid=${apiKey}`
+        );
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Geocoding API error:', error);
+        res.status(500).json({ error: 'Failed to search locations' });
+    }
+});
+
+app.get('/api/weather', async (req, res) => {
+    const { lat, lon, units } = req.query;
+    const apiKey = process.env.OPENWEATHER_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'Weather API key not configured' });
+    try {
+        const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=${units}`
         );
         const data = await response.json();
         if (!response.ok) {

@@ -22,7 +22,7 @@ import MyImagesPage from './pages/MyImagesPage';
 import WeatherPage from './pages/WeatherPage';
 import WeatherWidget from './components/WeatherWidget';
 import LoginPage from './pages/LoginPage';
-import { fetchWeatherByZip, getWeatherIconKey } from './services/weatherService';
+import { fetchWeather, getWeatherIconKey } from './services/weatherService';
 import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
 import { Heart, ArrowsClockwise } from '@phosphor-icons/react';
@@ -74,7 +74,9 @@ function App() {
   const [isMyImagesPageExiting, setIsMyImagesPageExiting] = useState(false);
   const [showWeatherPage, setShowWeatherPage] = useState(false);
   const [isWeatherPageExiting, setIsWeatherPageExiting] = useState(false);
-  const [weatherZipCode, setWeatherZipCode] = useState(() => localStorage.getItem('weatherZipCode') || '');
+  const [weatherLocation, setWeatherLocation] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('weatherLocation')) || null; } catch { return null; }
+  });
   const [weatherUnit, setWeatherUnit] = useState(() => localStorage.getItem('weatherUnit') || 'F');
   const [weatherData, setWeatherData] = useState(null);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -792,9 +794,9 @@ function App() {
   };
 
   const loadWeather = useCallback(async () => {
-    if (!weatherZipCode) return;
+    if (!weatherLocation?.lat) return;
     try {
-      const data = await fetchWeatherByZip(weatherZipCode, weatherUnit);
+      const data = await fetchWeather(weatherLocation.lat, weatherLocation.lon, weatherUnit);
       setWeatherData({
         city: data.name,
         temp: data.main.temp,
@@ -803,25 +805,25 @@ function App() {
     } catch {
       setWeatherData(null);
     }
-  }, [weatherZipCode, weatherUnit]);
+  }, [weatherLocation, weatherUnit]);
 
   useEffect(() => {
-    if (!weatherZipCode) return;
+    if (!weatherLocation?.lat) return;
     loadWeather();
     const interval = setInterval(loadWeather, 30 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [weatherZipCode, weatherUnit, loadWeather]);
+  }, [weatherLocation, weatherUnit, loadWeather]);
 
-  const handleSetWeatherZip = (zip, data) => {
-    setWeatherZipCode(zip);
-    localStorage.setItem('weatherZipCode', zip);
+  const handleSetWeatherLocation = (locationObj, data) => {
+    setWeatherLocation(locationObj);
+    localStorage.setItem('weatherLocation', JSON.stringify(locationObj));
     if (data) setWeatherData(data);
   };
 
-  const handleClearWeatherZip = () => {
-    setWeatherZipCode('');
+  const handleClearWeatherLocation = () => {
+    setWeatherLocation(null);
     setWeatherData(null);
-    localStorage.removeItem('weatherZipCode');
+    localStorage.removeItem('weatherLocation');
   };
 
   const handleSetWeatherUnit = (newUnit) => {
@@ -1052,10 +1054,10 @@ function App() {
         <WeatherPage
           onClose={toggleWeatherPage}
           isExiting={isWeatherPageExiting}
-          zipCode={weatherZipCode}
+          location={weatherLocation}
           unit={weatherUnit}
-          onSetZip={handleSetWeatherZip}
-          onClearZip={handleClearWeatherZip}
+          onSetLocation={handleSetWeatherLocation}
+          onClearLocation={handleClearWeatherLocation}
           onSetUnit={handleSetWeatherUnit}
         />
       )}

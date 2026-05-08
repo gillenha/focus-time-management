@@ -42,7 +42,7 @@ const WeatherWidget = ({ weatherData, onRefresh }) => {
       onClick={handleRefresh}
       title="Refresh weather"
     >
-      <div className="tw-flex tw-flex-col tw-gap-1">
+      <div className="tw-flex tw-flex-col tw-gap-1 tw-bg-black/30 tw-rounded-lg tw-px-3 tw-py-2">
         <div className="tw-flex tw-items-center tw-gap-3 tw-flex-shrink-0 tw-self-start tw-mt-1">
           {ICONS[iconKey]}
           <span className="tw-text-white tw-text-2xl tw-font-bold tw-leading-none">

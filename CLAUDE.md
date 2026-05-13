@@ -1,130 +1,85 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-### install packages
-- `npm install`
 
-### add env files
-- `touch .env.development`
-- Add:
-  `REACT_APP_UNSPLASH_ACCESS_KEY=`
-  `NODE_ENV=`	
-  `NOTION_API_KEY=`	
-  `NOTION_DATABASE_ID=`	
-  `ENABLE_AUTOMATIC_UPDATES=`	
-  `REACT_APP_UNSPLASH_ACCESS_KEY=`	
-  `REACT_APP_UNSPLASH_SECRET_KEY=`	
-  `MONGODB_URI=mongodb+srv://gillenha:<db_password>@focus-music-app.fpp8f.mongodb.net/focus-music-app-dev?retryWrites=true&w=majority`
-- MongoDB points to db `focus-music-app-dev` in MongoDB
-- All production keys are stored in GCP, no need to add production env variables
+## Setup
+
+### Install packages
+```
+npm install
+```
+
+### Environment file
+Create `.env.development` (not `.env.local`) with:
+```
+REACT_APP_UNSPLASH_ACCESS_KEY=
+REACT_APP_UNSPLASH_SECRET_KEY=
+REACT_APP_GOOGLE_CLIENT_ID=
+NOTION_API_KEY=
+NOTION_DATABASE_ID=
+OPENWEATHER_API_KEY=
+MONGODB_URI=mongodb+srv://gillenha:<db_password>@focus-music-app.fpp8f.mongodb.net/focus-music-app-dev?retryWrites=true&w=majority
+```
+- `NODE_ENV` is set automatically by the npm scripts — do not add it manually
+- MongoDB dev database: `focus-music-app-dev`
+- All production secrets are stored in GCP; never needed locally
 
 ## Development Commands
 
-### Development
-- `npm run dev` - Start both frontend and backend in development mode (recommended)
-  - Frontend runs on http://localhost:3000
-  - Backend API runs on http://localhost:8080  
-  - Automatically handles environment variable conflicts
-- `npm start` - Start React development server only (port 3000)
-- `npm run start:dev` - Start React with NODE_ENV=development
-- `npm run start:server:dev` - Start Express server only in development with nodemon
-- `node server.js` - Start production server (port 8080)
-
-### Building
-- `npm run build` - Build production React bundle
-- `npm run dist` - Build Electron distribution
-
-### Testing
-- Uses Jest and React Testing Library (included with Create React App)
-- Run tests with `npm test` (interactive watch mode)
-- Single test file: `npm test App.test.js`
-- Test file located at `src/App.test.js`
+- `npm run dev` — Start frontend (port 3000) + backend (port 8080) together (recommended)
+- `npm run start:server:dev` — Backend only, with nodemon
+- `npm test` — Jest in watch mode
+- `npm test App.test.js` — Run a single test file
+- `npm run build` — Production React bundle
 
 ### Deployment
-- `npm run deploy` - Deploy to Google Cloud Platform using gcloud
-- Docker builds use multi-stage process (React build → Node.js server)
+- `npm run deploy` — Deploy to GCP via gcloud
+- CI/CD: Cloud Build (`cloudbuild.yaml`) builds a multi-stage Docker image and deploys to Cloud Run
+- `REACT_APP_*` variables are injected as Docker `--build-arg` in `cloudbuild.yaml` and baked into the JS bundle at build time — **they are not available as Cloud Run runtime env vars**. Any secret that should not be public must be read server-side and proxied through Express.
 
-## Architecture Overview
+## Architecture
 
-### Frontend (React SPA)
-- **Main App** (`src/App.js`) - Central state management for focus sessions, audio, UI modals
-- **Components Structure**:
-  - `HandleTimer` - Main timer display and session logic
-  - `MusicPlayer` - Audio controls and session input
-  - `VolumeBar` - Audio volume controls
-  - `Menu` - Navigation sidebar with various features
-- **Pages**: Profile, Projects, Session History, Track List, Quote List, Change Background
-- **Context**: `AudioContext` for audio state management
-- **State Persistence**: localStorage for sessions, settings, and playlists
+### Request / Auth Flow
+All `/api/*` routes except `/api/health` and `/api/weather*` are protected by `server/middleware/auth.js`. This middleware verifies a Google ID token (sent as `Authorization: Bearer <token>`) and checks the email against `ALLOWED_EMAIL` — this is a single-user app. The frontend stores the token in `sessionStorage` and attaches it via `src/utils/api.js:authFetch`.
 
-### Backend (Express.js)
-- **Server** (`server.js`) - Main server with file uploads, session logging, Notion integration
-- **Database**: MongoDB with Mongoose (models: Session, Project, Quote)
-- **Routes**: 
-  - `/api/sessions` - Focus session CRUD
-  - `/api/projects` - Project management
-  - `/api/quotes` - Inspirational quotes
-  - `/api/files` - MP3 file management
-  - `/api/notion` - Notion database integration
-- **File Storage**: Local filesystem (dev) or Google Cloud Storage (production)
+`AuthContext` (`src/context/AuthContext.js`) manages the Google Sign-In lifecycle: loads the GSI script, handles the credential callback, and schedules silent token refresh before expiry. If a focus session is active during expiry it retries rather than logging out.
 
-### Key Features
-- **Focus Sessions**: Freeflow timer with project association and session notes
-- **Audio System**: Shuffled playlist with MP3 upload/management via GCS
-- **Background Images**: Unsplash API integration + custom image upload
-- **Session Persistence**: Survives page refresh, warns on navigation during active sessions
-- **Notion Integration**: Optional session logging to Notion database
+### Frontend State (`src/App.js`)
+`App.js` is the single source of truth for all cross-cutting state: active focus session, audio, background image, weather locations, and which page/modal is open. Page transitions use a paired `show*` / `is*Exiting` boolean pattern with a 300ms exit animation before unmounting.
 
-### Environment Configuration
-- Development: Uses local MongoDB, filesystem storage, localhost URLs
-- Production: MongoDB Atlas, Google Cloud Storage, Cloud Run deployment
-- Environment file: `.env.development` (not `.env.local`)
+### Backend (`server.js`)
+Express server that:
+- Serves the React static build in production (catch-all after API routes)
+- Registers weather endpoints **before** auth middleware (public)
+- Applies `authMiddleware` to all remaining `/api` routes
+- Routes: `/api/sessions`, `/api/projects`, `/api/quotes`, `/api/files`, `/api/favorites`, `/api/notion`, `/api/weather`, `/api/weather/search`
 
-### Deployment Infrastructure
-- **Google Cloud Platform**: Cloud Run, Container Registry, Cloud Storage
-- **Build Process**: Cloud Build with `cloudbuild.yaml`
-- **Container**: Multi-stage Docker build optimized for production
+File storage branches on `NODE_ENV`: local `tracks/` directory in dev, GCS bucket `react-app-assets` in production.
+
+### Weather System
+- `/api/weather/search?q=` — proxies OpenWeatherMap Geocoding API, returns `{ display, lat, lon }` per result
+- `/api/weather?lat=&lon=&units=` — proxies current weather by coordinates
+- Frontend stores up to 3 locations as a JSON array in `localStorage('weatherLocations')`, each `{ display, lat, lon }`
+- `WeatherWidget` auto-refreshes every 30 minutes; click-to-refresh has a 5-second cooldown
+- The `OPENWEATHER_API_KEY` is a **server-side runtime env var** — never a build arg
+
+### Audio System
+- Dev: tracks served as static files at `/dev-files/tracks/<filename>` — mounted outside `/api` so the `<audio>` element can fetch without an auth header
+- Prod: GCS signed URLs via `/api/files`
+- Playlist managed in `localStorage('focusPlaylist')`; shuffled playback with auto-advance via `AudioContext`
+
+### Session Flow
+1. "Enter Flow State" → shows `MusicPlayer` for note input
+2. "Begin" → starts freeflow timer + audio playback
+3. Timer state is auto-saved to localStorage on every tick (survives refresh)
+4. "Exit Flow State" → POSTs session to `/api/sessions`, clears localStorage state
 
 ## Database Models
 
-### Session Schema
 ```javascript
-{
-  date: String (ISO format),
-  time: String (formatted time),
-  duration: String (MM:SS format),
-  text: String (session notes),
-  project: ObjectId (optional reference)
-}
+Session: { date, time, duration, text, project: ObjectId? }
+Project: { name, description, createdAt }
+Quote:   { text, author }
+Favorite: { imageUrl, photographer, ... }
+ImagePreference: { name, enabled }
 ```
-
-### Project Schema
-```javascript
-{
-  name: String,
-  description: String,
-  createdAt: Date
-}
-```
-
-## Audio System
-- Tracks stored in `tracks/` directory (dev, gitignored) or GCS bucket `react-app-assets/tracks/` (prod)
-- Dev tracks are served as static files at `/dev-files/tracks/<filename>` (mounted outside `/api`, so the `<audio>` element can fetch without an auth header). No GCS credentials are required to develop or test the audio flow locally.
-- Upload, list, finalize, sizes, and delete endpoints all branch to local FS when `NODE_ENV !== 'production'`.
-- Playlist managed in localStorage as `focusPlaylist`
-- Audio context provides shuffled playback with auto-advance
-- Volume settings persisted in localStorage
-
-## Session Flow
-1. User clicks "Enter Flow State" → shows MusicPlayer
-2. User enters session notes → clicks "Begin" → starts timer + audio
-3. Timer runs with session state auto-saved to localStorage  
-4. User clicks "Exit Flow State" → saves session to database + localStorage
-5. Session appears in history with project association
-
-## Important Notes
-- Session state persists across page refreshes during active sessions
-- Audio files must be .mp3 format for upload
-- Notion integration requires NOTION_API_KEY and NOTION_DATABASE_ID
-- Background images cached for 1 hour to avoid API rate limits
-- Test server health with `/api/health` endpoint (if implemented)

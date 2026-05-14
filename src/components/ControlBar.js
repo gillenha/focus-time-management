@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import AudioManager from '../utils/audioManager';
-import { playEffect } from '../utils/soundEffects';
+import sfxManager from '../utils/sfxManager';
 
 const FADE_DURATION_MS = 1500;
 const FADE_STEPS = 30;
@@ -194,7 +194,7 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
   // Next track handler — fade out current, fade in next
   const handleNextTrack = useCallback(async () => {
     if (!audioFiles?.length) return;
-    playEffect('next-track.mp3');
+    sfxManager.play('nextTrack');
     if (audioRef.current) {
       await fadeOut(audioRef.current);
     }
@@ -205,7 +205,7 @@ const ControlBar = forwardRef(({ setTimerActive, volume, audioFiles, onCleanup, 
 
   // Play/Pause handler
   const handlePlayPauseClick = useCallback(() => {
-    playEffect('play-pause.mp3');
+    sfxManager.play('playPause');
     if (!audioRef.current) return;
 
     if (isPlaying) {

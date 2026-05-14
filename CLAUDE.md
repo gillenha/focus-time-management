@@ -68,10 +68,47 @@ File storage branches on `NODE_ENV`: local `tracks/` directory in dev, GCS bucke
 - Prod: GCS signed URLs via `/api/files`
 - Playlist managed in `localStorage('focusPlaylist')`; shuffled playback with auto-advance via `AudioContext`
 
+#### Audio Architecture (Target State)
+
+The audio system has two distinct concerns that must be handled separately:
+
+**1. Sound Effects (SFX)**
+All UI sound effects (start, stop, pause, play, next track, begin session, end session) must use the Web Audio API exclusively. `HTMLAudioElement` introduces unacceptable latency for event-triggered sounds.
+
+Target implementation lives in `src/utils/sfxManager.js` — a singleton module (not a React component) that:
+- Creates a single shared `AudioContext` on first use (lazy init to satisfy browser autoplay policy)
+- Pre-fetches and decodes all SFX files into `AudioBuffer` objects at session start via `fetch` + `decodeAudioData`
+- Exposes a `play(sfxName)` function that creates a fresh `BufferSource`, connects it to `destination`, and calls `.start()` — no re-decoding, no new network requests
+- Is imported and called directly in event handlers, **never** triggered via `useEffect` or as a side effect of state updates
+
+SFX files are stored in `public/effects/` and loaded by name from a manifest constant in `sfxManager.js`.
+
+**2. Music Playback**
+Long-form track playback uses `HTMLAudioElement` (the `<audio>` element), which is appropriate for streaming media. The existing GCS signed URL / dev static file approach is correct. Improvement targets:
+- Preload the next track's URL while the current track is playing (fetch signed URL speculatively via `/api/files`)
+- Create a hidden `<audio>` element for the next track and set `preload="auto"` to begin buffering
+
+#### Timer Architecture (Target State)
+
+The session timer must not use `setInterval` as a tick counter. Interval drift accumulates over long sessions and compounds with audio event timing.
+
+Target implementation:
+- Store `sessionStartTimestamp` (epoch ms from `Date.now()`) in state and in `localStorage` on session start
+- Run a single `setInterval` at 250ms resolution **only for UI re-renders** — it does nothing except trigger a re-render
+- Compute elapsed time on every render as `Date.now() - sessionStartTimestamp` — this is always wall-clock accurate regardless of tab visibility, sleep, or drift
+- `localStorage` writes for timer state should be **throttled to once every 5 seconds** minimum, not on every tick
+
+#### Known Latency Issues (Active Work)
+
+1. **SFX lag** — sound effects currently triggered through React state / `useEffect`; target is direct `sfxManager.play()` calls in event handlers
+2. **Timer drift** — interval-based tick accumulation over long sessions
+3. **localStorage write frequency** — timer state written on every tick creates I/O pressure
+4. **Audio object accumulation** — any `new Audio()` calls outside a stable ref will accumulate over session lifetime; audit all audio instantiation sites
+
 ### Session Flow
 1. "Enter Flow State" → shows `MusicPlayer` for note input
 2. "Begin" → starts freeflow timer + audio playback
-3. Timer state is auto-saved to localStorage on every tick (survives refresh)
+3. Timer state is auto-saved to localStorage on every tick (survives refresh) — **target: throttle to 5s intervals**
 4. "Exit Flow State" → POSTs session to `/api/sessions`, clears localStorage state
 
 ## Database Models

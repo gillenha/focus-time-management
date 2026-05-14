@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './styles/tailwind.css';
 import './App.css';
 import './index.css';
@@ -27,15 +27,25 @@ import { useAuth } from './context/AuthContext';
 import { authFetch } from './utils/api';
 import { Heart, ArrowsClockwise } from '@phosphor-icons/react';
 import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
-import { playEffect, preloadEffects } from './utils/soundEffects';
+import sfxManager from './utils/sfxManager';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
   const [isFreeflow, setIsFreeflow] = useState(false);
   const [sessionHistory, setSessionHistory] = useState([]);
   const [showMusicPlayer, setShowMusicPlayer] = useState(false);
-  const [time, setTime] = useState(0);
+  // Timer ledger: timestamps in refs (don't drive re-renders directly), tick state forces re-render
+  const sessionStartTsRef = useRef(null);
+  const accumulatedSecondsRef = useRef(0);
+  const lastResumeAtRef = useRef(null);
+  const prevTimerActiveRef = useRef(false);
+  const lastStorageWriteRef = useRef(0);
+  const [, setTick] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
+  // Derived elapsed seconds — recomputed on every render
+  const time = lastResumeAtRef.current === null
+    ? accumulatedSecondsRef.current
+    : accumulatedSecondsRef.current + Math.floor((Date.now() - lastResumeAtRef.current) / 1000);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [currentSessionText, setCurrentSessionText] = useState('');
   const [volume, setVolume] = useState(0.5);
@@ -161,17 +171,29 @@ function App() {
     setSessionHistory(savedHistory);
   }, []);
 
+  // Tick interval drives UI re-renders at 250ms while the timer is running.
+  // It does NOT track elapsed time — that comes from Date.now() in the derived `time` above.
   useEffect(() => {
-    let timer;
-    if (timerActive) {
-      timer = setInterval(() => {
-        setTime(prevTime => prevTime + 1);
-      }, 1000);
-    } else if (!timerActive && time !== 0) {
-      clearInterval(timer);
+    if (!timerActive) return;
+    const id = setInterval(() => setTick(t => t + 1), 250);
+    return () => clearInterval(id);
+  }, [timerActive]);
+
+  // Transition handler: maintains the ledger refs across timerActive flips.
+  useEffect(() => {
+    const wasActive = prevTimerActiveRef.current;
+    if (!wasActive && timerActive) {
+      // resume / start
+      lastResumeAtRef.current = Date.now();
+    } else if (wasActive && !timerActive) {
+      // pause / stop — accumulate the running span
+      if (lastResumeAtRef.current !== null) {
+        accumulatedSecondsRef.current += Math.floor((Date.now() - lastResumeAtRef.current) / 1000);
+      }
+      lastResumeAtRef.current = null;
     }
-    return () => clearInterval(timer);
-  }, [timerActive, time]);
+    prevTimerActiveRef.current = timerActive;
+  }, [timerActive]);
 
   // Utility function to validate if a URL is a valid image
   const isValidImageUrl = (url) => {
@@ -445,7 +467,7 @@ function App() {
   const handleFreeFlowClick = async () => {
     if (isFreeflow) {
       console.log("Freeflow ended");
-      playEffect('session-end.mp3');
+      sfxManager.play('sessionEnd');
 
       // Clean up audio if cleanup function exists
       if (window.audioCleanup) {
@@ -514,22 +536,24 @@ function App() {
       // Wait for fade out animation before unmounting music player
       setTimeout(() => {
         setShowMusicPlayer(false);
-        // Only reset session state, not the timer
+        // Only reset session state, not the timer ledger — the displayed time
+        // persists until the next "Enter Flow State" begins a new session.
         localStorage.removeItem('currentSession');
         setSessionStarted(false);
         setSessionInputValue('');
         setCurrentSessionText('');
-        // Note: we're not resetting the time here anymore
       }, 1000);
     } else {
       console.log("Freeflow started");
-      playEffect('enter-flow-state.mp3');
+      sfxManager.play('enterFlowState');
       // Clear any existing session state AND reset timer when starting new session
       localStorage.removeItem('currentSession');
       setSessionStarted(false);
       setSessionInputValue('');
       setCurrentSessionText('');
-      setTime(0); // Only reset timer when starting new session
+      sessionStartTsRef.current = null;
+      accumulatedSecondsRef.current = 0;
+      lastResumeAtRef.current = null;
       setTimerActive(false);
       setSessionEnded(false);
       
@@ -545,17 +569,22 @@ function App() {
   };
 
   const handleBeginClick = (inputText, projectId) => {
+    // Seed the ledger for a fresh session. The transition useEffect sets lastResumeAtRef
+    // when timerActive flips to true.
+    sessionStartTsRef.current = Date.now();
+    accumulatedSecondsRef.current = 0;
     setTimerActive(true);
     setCurrentSessionText(inputText);
     setSessionInputValue(inputText);
     setSessionStarted(true);
-    
+
     // Play bell sound (fixed volume, independent of slider)
-    playEffect('bell.mp3');
-    
-    // Save current session state with project
+    sfxManager.play('bell');
+
+    // Save current session state with project (immediate write — bypass throttle)
     const sessionData = {
-      time,
+      sessionStartTimestamp: sessionStartTsRef.current,
+      accumulatedSeconds: 0,
       timerActive: true,
       text: inputText,
       projectId,
@@ -565,6 +594,7 @@ function App() {
       sessionStarted: true
     };
     localStorage.setItem('currentSession', JSON.stringify(sessionData));
+    lastStorageWriteRef.current = Date.now();
   };
 
   const formatDuration = (duration) => {
@@ -614,9 +644,9 @@ function App() {
     console.log('App mounted');
     console.log('Environment:', process.env.NODE_ENV);
     console.log('Public URL:', process.env.PUBLIC_URL);
-    // Pre-fetch and decode click sound effects so the first click in a session
-    // doesn't pay fetch+decode cost; subsequent clicks reuse pooled elements.
-    preloadEffects();
+    // Pre-fetch and decode SFX into AudioBuffers so the first click in a session
+    // is zero-latency. AudioContext stays suspended until first user gesture.
+    sfxManager.init();
   }, []);
 
   window.fetchBackgroundImage = fetchBackgroundImage;
@@ -651,24 +681,28 @@ function App() {
     localStorage.setItem('focusPlaylist', JSON.stringify(playlistTracks));
   }, [playlistTracks]);
 
-  // Session persistence effect (existing)
+  // Session restore on mount
   useEffect(() => {
-    // Load saved session on mount
     const savedSession = JSON.parse(localStorage.getItem('currentSession'));
-    if (savedSession) {
-      setTime(savedSession.time);
-      setTimerActive(savedSession.timerActive);
-      setCurrentSessionText(savedSession.text);
-      setIsFreeflow(savedSession.isFreeflow);
-      setShowMusicPlayer(savedSession.showMusicPlayer);
-      setSessionInputValue(savedSession.sessionInputValue);
-      setSessionStarted(savedSession.sessionStarted);
-      
-      // If session was active, automatically restart it
-      if (savedSession.sessionStarted && savedSession.timerActive) {
-        handleBeginClick(savedSession.text, savedSession.projectId);
-      }
-    }
+    if (!savedSession) return;
+
+    // Restore ledger refs. Support legacy `{ time: N }` saves: treat as accumulatedSeconds.
+    const restoredAccum = savedSession.accumulatedSeconds ?? savedSession.time ?? 0;
+    sessionStartTsRef.current = savedSession.sessionStartTimestamp
+      ?? (Date.now() - restoredAccum * 1000);
+    accumulatedSecondsRef.current = restoredAccum;
+    // If session was running when saved, continue wall-clock from now (preserves continuity).
+    // If paused, leave lastResumeAt null so derived time stays at accumulated value.
+    lastResumeAtRef.current = savedSession.timerActive ? Date.now() : null;
+    // Sync transition tracker so the [timerActive] effect doesn't double-handle on first run.
+    prevTimerActiveRef.current = !!savedSession.timerActive;
+
+    setTimerActive(!!savedSession.timerActive);
+    setCurrentSessionText(savedSession.text || '');
+    setIsFreeflow(!!savedSession.isFreeflow);
+    setShowMusicPlayer(!!savedSession.showMusicPlayer);
+    setSessionInputValue(savedSession.sessionInputValue || '');
+    setSessionStarted(!!savedSession.sessionStarted);
   }, []);
 
   // Separate beforeunload handler effect
@@ -686,24 +720,39 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []); // No dependencies needed as we use ref
 
-  // Auto-save current session
+  // Auto-save current session.
+  // - While running: throttled heartbeat (≤ once per 5s) so the writes don't pile up.
+  // - On every timerActive transition or text/state change: write immediately (bypass throttle).
+  // - When no session in progress: clear localStorage.
   useEffect(() => {
-    if (timerActive || time > 0) {
-      const currentSession = JSON.parse(localStorage.getItem('currentSession'));
-      const sessionData = {
-        time,
-        timerActive,
-        text: currentSessionText,
-        projectId: currentSession?.projectId, // Preserve project ID
-        isFreeflow,
-        showMusicPlayer,
-        sessionInputValue,
-        sessionStarted
-      };
-      localStorage.setItem('currentSession', JSON.stringify(sessionData));
-    } else {
+    const sessionInProgress = timerActive || sessionStartTsRef.current !== null;
+    if (!sessionInProgress) {
       localStorage.removeItem('currentSession');
+      return;
     }
+
+    // Throttle heartbeat writes only while actively running. Non-running writes
+    // (pause snapshot, text edit, etc.) always go through immediately.
+    if (timerActive) {
+      const now = Date.now();
+      if (now - lastStorageWriteRef.current < 5000) return;
+      lastStorageWriteRef.current = now;
+    } else {
+      lastStorageWriteRef.current = Date.now();
+    }
+
+    const existing = JSON.parse(localStorage.getItem('currentSession')) || {};
+    localStorage.setItem('currentSession', JSON.stringify({
+      sessionStartTimestamp: sessionStartTsRef.current,
+      accumulatedSeconds: accumulatedSecondsRef.current,
+      timerActive,
+      text: currentSessionText,
+      projectId: existing.projectId,
+      isFreeflow,
+      showMusicPlayer,
+      sessionInputValue,
+      sessionStarted
+    }));
   }, [time, timerActive, currentSessionText, isFreeflow, showMusicPlayer, sessionInputValue, sessionStarted]);
 
   // Add this new helper function near your other formatting functions

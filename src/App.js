@@ -53,6 +53,7 @@ function App() {
   const [totalFocusedTime, setTotalFocusedTime] = useState(0);
   const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState('');
+  const [backgroundImageReady, setBackgroundImageReady] = useState(false);
   const [photo, setPhoto] = useState({});
   const [photographer, setPhotographer] = useState({
     name: '',
@@ -374,7 +375,6 @@ function App() {
       
     } catch (error) {
       console.error('Error fetching image:', error);
-      // Use fallback image instead of cache
       setBackgroundImage('/images/test.jpg');
       setPhotographer({
         name: 'Error',
@@ -383,19 +383,19 @@ function App() {
         photoLink: '',
         description: 'Failed to load background image'
       });
+    } finally {
+      setBackgroundImageReady(true);
     }
   };
 
   useEffect(() => {
-    // Clear any existing image cache on app load
+    if (!isAuthenticated) return;
     localStorage.removeItem('backgroundImage');
     localStorage.removeItem('photographer');
     localStorage.removeItem('lastImageFetch');
     localStorage.removeItem('customBackgroundImage');
-
-    // Always fetch fresh images (no caching)
     fetchBackgroundImage(unsplashTheme, true);
-  }, [unsplashTheme]);
+  }, [unsplashTheme, isAuthenticated]);
 
   // Check if current background image is already in favorites
   useEffect(() => {
@@ -899,7 +899,7 @@ function App() {
     localStorage.setItem('weatherUnit', newUnit);
   };
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && !backgroundImageReady)) {
     return (
       <div className="tw-min-h-screen tw-flex tw-items-center tw-justify-center tw-bg-gray-900">
         <div className="tw-animate-spin tw-rounded-full tw-h-8 tw-w-8 tw-border-2 tw-border-white tw-border-t-transparent"></div>

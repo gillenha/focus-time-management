@@ -58,6 +58,7 @@ function MusicPlayer({
   const [showControls, setShowControls] = useState(false);
   const [showJumpButton, setShowJumpButton] = useState(false);
   const controlBarRef = useRef(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Load quotes on mount
   useEffect(() => {
@@ -94,6 +95,7 @@ function MusicPlayer({
     if (!sessionStarted || quotes.length === 0) return;
 
     const rotateQuote = () => {
+      setIsExpanded(false);
       setCurrentQuote(prevQuote => {
         const currentIndex = quotes.indexOf(prevQuote);
         const nextIndex = (currentIndex + 1) % quotes.length;
@@ -181,7 +183,7 @@ function MusicPlayer({
       tw-w-full tw-h-full
       ${isFreeflow ? 'tw-animate-fadeIn' : 'tw-animate-fadeOut'}
     `}>
-      <div className="tw-bg-black/30 tw-backdrop-blur-md tw-rounded-xl tw-p-4 sm:tw-p-8 tw-flex tw-flex-col tw-items-center tw-gap-3 sm:tw-gap-6 tw-w-[90%] tw-max-w-[384px] tw-h-[320px] tw-min-h-[320px] sm:tw-h-[400px] sm:tw-min-h-[400px] sm:tw-w-96 tw-overflow-hidden tw-relative">
+      <div className="tw-bg-black/30 tw-backdrop-blur-md tw-rounded-xl tw-p-4 sm:tw-p-8 tw-flex tw-flex-col tw-items-center tw-gap-3 sm:tw-gap-6 tw-w-[90%] tw-max-w-[384px] tw-h-[320px] tw-min-h-[320px] sm:tw-h-[400px] sm:tw-min-h-[400px] sm:tw-w-96 tw-relative">
         <p className={`
           tw-text-white tw-font-medium tw-text-xl sm:tw-text-2xl tw-absolute
           tw-left-1/2 tw-transform tw-transition-all tw-duration-500
@@ -202,21 +204,36 @@ function MusicPlayer({
 
         {sessionStarted && (
           <>
-            <p className={`
-              tw-top-[0%] tw-left-1/2 tw--translate-x-1/2 tw-absolute
-              tw-text-white/80
-              tw-text-sm
-              tw-mt-44 sm:tw-mt-60
-              tw-italic
-              tw-transition-opacity 
-              tw-duration-1000
-              ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
-            `}>
-              "{currentQuote.text}"
-              {currentQuote.author && currentQuote.author !== "Unknown" && (
-                <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
-              )}
-            </p>
+            {(() => {
+              const MAX_LEN = 150;
+              const isTruncated = currentQuote.text?.length > MAX_LEN;
+              const displayText = isTruncated && !isExpanded
+                ? currentQuote.text.slice(0, MAX_LEN).trimEnd() + '…'
+                : currentQuote.text;
+
+              return (
+                <p
+                  onClick={() => isTruncated && setIsExpanded(v => !v)}
+                  className={`
+                    tw-z-20
+                    tw-top-[0%] tw-left-1/2 tw--translate-x-1/2 tw-absolute
+                    tw-w-[90%] tw-text-center
+                    tw-text-white/80 tw-text-sm
+                    tw-mt-44 sm:tw-mt-60
+                    tw-italic
+                    tw-transition-all tw-duration-300
+                    ${isTruncated ? 'tw-cursor-pointer' : ''}
+                    ${isExpanded ? 'tw-bg-black/30 tw-backdrop-blur-sm tw-rounded-lg tw-p-3 tw-max-h-[140px] sm:tw-max-h-[180px] tw-overflow-y-auto' : ''}
+                    ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
+                  `}
+                >
+                  "{displayText}"
+                  {currentQuote.author && currentQuote.author !== 'Unknown' && (
+                    <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
+                  )}
+                </p>
+              );
+            })()}
             <div className={`
               tw-transition-opacity 
               tw-duration-1000

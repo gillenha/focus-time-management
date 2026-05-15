@@ -1039,7 +1039,7 @@ function App() {
             setSessionStarted={setSessionStarted}
           />
         )}
-        <HandleTimer time={time} slideUp={showMusicPlayer} sessionEnded={sessionEnded} />
+        <HandleTimer time={time} position={sessionStarted ? 'in-player' : isFreeflow ? 'top' : 'center'} />
         <nav className="bottom-navbar">
           <button className="freeflow-button" onClick={handleFreeFlowClick}>
             {isFreeflow ? "Exit Flow State" : "Enter Flow State"}

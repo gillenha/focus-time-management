@@ -44,7 +44,7 @@ function VolumeBar({ volume, onVolumeChange }) {
         onChange={handleSliderChange}
         aria-label="Volume Control"
         style={{
-          background: `linear-gradient(to right, #614734 0%, #614734 ${volume * 100}%, #6b7280 ${volume * 100}%, #6b7280 100%)`
+          background: `linear-gradient(to right, #251d17 0%, #251d17 ${volume * 100}%, #6b7280 ${volume * 100}%, #6b7280 100%)`
         }}
       />
     </div>

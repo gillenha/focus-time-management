@@ -23,7 +23,7 @@ function JumpButton({ controlBarRef }) {
     <button
       onClick={handleJump}
       className={`
-        tw-absolute tw-top-[30%] tw-left-1/2 tw--translate-x-1/2
+        tw-absolute tw-bottom-[25%] tw-left-1/2 tw--translate-x-1/2
         tw-bg-gray-600 tw-text-white tw-px-4 tw-py-2 tw-rounded-full
         tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0
         tw-transition-all tw-duration-500 tw-ease-out
@@ -203,6 +203,7 @@ function MusicPlayer({
         {sessionStarted && (
           <>
             <p className={`
+              tw-top-[0%] tw-left-1/2 tw--translate-x-1/2 tw-absolute
               tw-text-white/80
               tw-text-sm
               tw-mt-44 sm:tw-mt-60
@@ -212,7 +213,7 @@ function MusicPlayer({
               ${showQuote ? 'tw-opacity-100' : 'tw-opacity-0'}
             `}>
               "{currentQuote.text}"
-              {currentQuote.author && currentQuote.author !== 'Unknown' && (
+              {currentQuote.author && currentQuote.author !== "Unknown" && (
                 <span className="tw-text-white/60 tw-ml-1">- {currentQuote.author}</span>
               )}
             </p>

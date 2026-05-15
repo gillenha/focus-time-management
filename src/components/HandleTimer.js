@@ -1,7 +1,7 @@
 import React from 'react';
 import './HandleTimer.css';
 
-function HandleTimer({ time, slideUp }) {
+function HandleTimer({ time, position = 'center' }) {
   const formatTime = (time) => {
     const hours = Math.floor(time / 3600);
     const minutes = Math.floor((time % 3600) / 60);
@@ -15,7 +15,7 @@ function HandleTimer({ time, slideUp }) {
   };
 
   return (
-    <div className={`timer ${slideUp ? 'slide-up' : ''}`}>
+    <div className={`timer timer--${position}`}>
       {formatTime(time)}
     </div>
   );

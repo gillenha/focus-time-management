@@ -1,22 +1,35 @@
 .timer {
-    font-size: 48px;
     font-weight: bold;
     color: white;
-    padding: 0; /* Ensure no padding */
-    margin: 0; /* Ensure no margin */
+    padding: 0;
+    margin: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100%; /* Full height of the parent */
-    width: 100%; /* Full width of the parent */
-    position: absolute; /* Position absolutely within the parent */
-    top: 50%; /* Center vertically */
-    left: 50%; /* Center horizontally */
-    transform: translate(-50%, -50%); /* Adjust for the element's own size */
-    transition: top 0.5s ease, transform 0.5s ease; /* Add transition for smooth sliding */
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    left: 50%;
+    transition: top 0.5s ease, transform 0.5s ease, font-size 0.5s ease;
 }
 
-.timer.slide-up {
-    top: 0; /* Move to the top */
-    transform: translate(-50%, 0); /* Adjust transform to align correctly */
+/* center: default resting position, no session active */
+.timer--center {
+    font-size: 96px;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* top: flow state entered, session not yet begun */
+.timer--top {
+    font-size: 56px;
+    top: 0;
+    transform: translate(-50%, 0);
+}
+
+/* in-player: session started, timer sits above "Time to build" inside the card */
+.timer--in-player {
+    font-size: 64px;
+    top: calc(50% - 180px);
+    transform: translate(-50%, 0);
 }

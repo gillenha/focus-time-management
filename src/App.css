@@ -151,23 +151,42 @@ body, html {
   font-size: 36px;
 }
 
-.volume-bar-container {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  align-items: center;
-  z-index: 10; /* Ensure it appears above other elements */
+.vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.volume-icon {
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background-color: #614734;
+  border: 2px solid #e5e7eb;
+  border-radius: 50%;
+  cursor: grab;
 }
 
-.volume-slider {
-  width: 100px;
+.vol-slider::-moz-range-thumb {
+  width: 32px;
+  height: 32px;
+  background-color: #614734;
+  /* border: 2px solid #614734; */
+  border-radius: 50%;
+  cursor: grab;
+  border: none;
+}
+
+.vol-slider::-webkit-slider-runnable-track {
+  height: 16px;
+  background: transparent;
+  border-radius: 4px;
+}
+
+.vol-slider::-moz-range-track {
+  height: 8px;
+  background: transparent;
+  border-radius: 8px;
 }
 
 .top-bar {

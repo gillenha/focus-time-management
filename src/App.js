@@ -7,7 +7,6 @@ import './components/HandleTimer.css';
 import './components/MusicPlayer.css';
 import HandleTimer from './components/HandleTimer';
 import MusicPlayer from './components/MusicPlayer';
-import VolumeBar from './components/VolumeBar';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import SessionHistoryPage from './pages/SessionHistoryPage';
@@ -48,7 +47,10 @@ function App() {
     : accumulatedSecondsRef.current + Math.floor((Date.now() - lastResumeAtRef.current) / 1000);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [currentSessionText, setCurrentSessionText] = useState('');
-  const [volume, setVolume] = useState(0.5);
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('userVolume');
+    return saved !== null ? parseFloat(saved) : 0.5;
+  });
   const [showSessionHistory, setShowSessionHistory] = useState(false);
   const [totalFocusedTime, setTotalFocusedTime] = useState(0);
   const [isSessionHistoryExiting, setIsSessionHistoryExiting] = useState(false);
@@ -606,8 +608,6 @@ function App() {
 
   const handleVolumeChange = useCallback((newVolume) => {
     setVolume(newVolume);
-    // Store in localStorage for persistence
-    localStorage.setItem('userVolume', newVolume.toString());
   }, []);
 
   const toggleSessionHistory = () => {
@@ -1046,10 +1046,6 @@ function App() {
           </button>
         </nav>
       </div>
-      <VolumeBar 
-        volume={volume} 
-        onVolumeChange={handleVolumeChange} 
-      />
       {(showSessionHistory || isSessionHistoryExiting) && (
         <SessionHistoryPage
           sessionHistory={sessionHistory}

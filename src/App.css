@@ -280,6 +280,23 @@ body, html {
     width: 80%;
     max-width: 300px;
   }
+
+  /* Strip the photo attribution down to just the refresh spinner */
+  .photo-attribution {
+    background-color: transparent;
+    padding: 0;
+  }
+
+  .photo-attribution > .tw-flex > a,
+  .photo-attribution > .tw-flex > .favorite-heart-btn:last-child,
+  .photo-attribution > p {
+    display: none;
+  }
+
+  .photo-attribution .favorite-heart-btn svg {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 @keyframes slideIn {

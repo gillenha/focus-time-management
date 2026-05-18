@@ -13,23 +13,32 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
         onClick={onClose}
       />
       
-      {/* Drawer */}
-      <div 
-        className={`tw-fixed tw-top-0 tw-left-0 tw-h-full tw-w-64 tw-bg-white tw-shadow-lg tw-transform tw-transition-transform tw-z-50 tw-rounded-r-xl ${
-          isOpen ? 'tw-translate-x-0' : '-tw-translate-x-full'
-        }`}
+      {/* Drawer — left side on desktop, bottom sheet on mobile */}
+      <div
+        className={`tw-fixed tw-bg-white tw-shadow-lg tw-transform tw-transition-transform tw-z-50
+          tw-left-0 tw-bottom-0 tw-w-full tw-max-h-[85vh] tw-rounded-t-2xl
+          sm:tw-top-0 sm:tw-bottom-auto sm:tw-h-full sm:tw-w-64 sm:tw-rounded-t-none sm:tw-rounded-r-xl sm:tw-max-h-none
+          ${isOpen
+            ? 'tw-translate-y-0 sm:tw-translate-x-0'
+            : 'tw-translate-y-full sm:tw-translate-y-0 sm:-tw-translate-x-full'}
+        `}
       >
-        <div className="tw-p-4 tw-h-full tw-flex tw-flex-col">
+        <div className="tw-p-4 tw-h-full tw-flex tw-flex-col tw-overflow-y-auto">
+          {/* Grabber handle (mobile only) */}
+          <div className="tw-flex tw-justify-center tw-mb-2 sm:tw-hidden">
+            <div className="tw-w-10 tw-h-1 tw-bg-gray-300 tw-rounded-full" />
+          </div>
+
           <div className="tw-flex tw-justify-between tw-items-center tw-mb-6">
             <p className="tw-text-xl tw-font-bold tw-text-gray-800">Flow State Music</p>
-            <button 
+            <button
               onClick={onClose}
-              className="tw-text-gray-500 
-              hover:tw-text-gray-700 
-              tw-cursor-pointer 
-              tw-bg-transparent 
-              tw-border-0 
-              tw-outline-none 
+              className="tw-text-gray-500
+              hover:tw-text-gray-700
+              tw-cursor-pointer
+              tw-bg-transparent
+              tw-border-0
+              tw-outline-none
               tw-appearance-none
               tw-text-2xl
               tw-font-bold
@@ -42,11 +51,11 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
           {/* Account Section */}
           <div className="tw-mb-6">
             <p className="tw-text-xs tw-text-left tw-text-gray-500 tw-mb-2">ACCOUNT</p>
-            <ul className="tw-list-none tw-p-0 tw-m-0">
+            <ul className="tw-list-none tw-p-0 tw-m-0 sm:tw-bg-transparent tw-bg-gray-50 tw-rounded-xl sm:tw-rounded-none tw-overflow-hidden">
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={(e) => {
                     e.preventDefault();
                     onProfileClick();
@@ -60,16 +69,16 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
           </div>
 
           {/* Divider */}
-          <hr className="tw-border-gray-200 tw-my-4" />
+          <hr className="tw-border-gray-200 tw-my-4 sm:tw-block tw-hidden" />
 
           {/* Personalize Section */}
           <div className="tw-mb-6">
             <p className="tw-text-xs tw-text-left tw-text-gray-500 tw-mb-2">PERSONALIZE</p>
-            <ul className="tw-list-none tw-p-0 tw-m-0">
+            <ul className="tw-list-none tw-p-0 tw-m-0 sm:tw-bg-transparent tw-bg-gray-50 tw-rounded-xl sm:tw-rounded-none tw-overflow-hidden tw-divide-y sm:tw-divide-y-0 tw-divide-gray-200">
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onShowHistory();
                     onClose();
@@ -80,9 +89,9 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 </a>
               </li>
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onProjects();
                     onClose();
@@ -93,9 +102,9 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 </a>
               </li>
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onBackgroundImage();
                     onClose();
@@ -106,9 +115,9 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 </a>
               </li>
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onTrackList();
                     onClose();
@@ -119,9 +128,9 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
                 </a>
               </li>
               <li>
-                <a 
-                  href="#" 
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-3 tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                <a
+                  href="#"
+                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onQuoteList();
                     onClose();

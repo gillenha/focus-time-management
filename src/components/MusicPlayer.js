@@ -188,7 +188,7 @@ function MusicPlayer({
           tw-text-white tw-font-medium tw-text-xl sm:tw-text-2xl tw-absolute
           tw-left-1/2 tw-transform tw-transition-all tw-duration-500
           tw-ease-out tw--translate-x-1/2 tw-z-10
-          ${slideIn ? 'tw-top-1/3 tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
+          ${slideIn ? 'tw-top-[8%] sm:tw-top-1/3 tw-scale-125 sm:tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}
         `}>
           Time to build
         </p>
@@ -216,10 +216,12 @@ function MusicPlayer({
                   onClick={() => isTruncated && setIsExpanded(v => !v)}
                   className={`
                     tw-z-20
-                    tw-top-[0%] tw-left-1/2 tw--translate-x-1/2 tw-absolute
+                    tw-left-1/2 tw--translate-x-1/2 tw-absolute
                     tw-w-[90%] tw-text-center
                     tw-text-white/80 tw-text-sm
-                    tw-mt-44 sm:tw-mt-60
+                    tw-top-1/2 sm:tw-top-[0%]
+                    tw--translate-y-1/2 sm:tw-translate-y-0
+                    tw-mt-0 sm:tw-mt-60
                     tw-italic
                     tw-transition-all tw-duration-300
                     ${isTruncated ? 'tw-cursor-pointer' : ''}

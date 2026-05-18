@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './styles/tailwind.css';
 import './App.css';
 import './index.css';
-import './components/HandleFreeFlow.css';
-import './components/HandleTimer.css';
-import './components/MusicPlayer.css';
+import './styles/HandleFreeFlow.css';
+import './styles/HandleTimer.css';
+import './styles/MusicPlayer.css';
 import HandleTimer from './components/HandleTimer';
 import MusicPlayer from './components/MusicPlayer';
 import { ToastContainer } from 'react-toastify';
@@ -27,6 +27,7 @@ import { authFetch } from './utils/api';
 import { Heart, ArrowsClockwise } from '@phosphor-icons/react';
 import { fetchFavorites, addFavorite, deleteFavorite } from './services/favoritesService';
 import sfxManager from './utils/sfxManager';
+import useSpinAction from './utils/useSpinAction';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -102,8 +103,11 @@ function App() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritedId, setFavoritedId] = useState(null);
   const [favoritesCache, setFavoritesCache] = useState([]);
-  const [isRefreshingBackground, setIsRefreshingBackground] = useState(false);
   const [backgroundRefreshCooldown, setBackgroundRefreshCooldown] = useState(false);
+  const [isRefreshingBackground, refreshBackground] = useSpinAction(
+    () => fetchBackgroundImage(unsplashTheme, true),
+    1000
+  );
 
   // Reconcile playlist with server on mount: drop stale entries (e.g. tracks
   // uploaded to GCS in a previous session that no longer exist locally in dev),
@@ -454,16 +458,11 @@ function App() {
     }
   };
 
-  const handleRefreshBackground = async () => {
-    if (isRefreshingBackground || backgroundRefreshCooldown) return;
-    setIsRefreshingBackground(true);
-    try {
-      await fetchBackgroundImage(unsplashTheme, true);
-    } finally {
-      setIsRefreshingBackground(false);
-      setBackgroundRefreshCooldown(true);
-      setTimeout(() => setBackgroundRefreshCooldown(false), 3000);
-    }
+  const handleRefreshBackground = () => {
+    if (backgroundRefreshCooldown) return;
+    refreshBackground();
+    setBackgroundRefreshCooldown(true);
+    setTimeout(() => setBackgroundRefreshCooldown(false), 3000);
   };
 
   const handleFreeFlowClick = async () => {
@@ -989,12 +988,14 @@ function App() {
               <span className="tw-block tw-h-0.5 tw-w-8 tw-bg-white"></span>
             </div>
           </button>
-          {weatherLocations.map((_, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <span className="tw-block tw-w-px tw-h-6 tw-bg-white tw-opacity-20 tw-self-center" />}
-              <WeatherWidget weatherData={weatherDataList[i] || null} onRefresh={loadWeather} />
-            </React.Fragment>
-          ))}
+          <div className="weather-scroll tw-flex tw-flex-row tw-items-center">
+            {weatherLocations.map((_, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span className="tw-block tw-w-px tw-h-6 tw-bg-white tw-opacity-20 tw-self-center" />}
+                <WeatherWidget weatherData={weatherDataList[i] || null} onRefresh={loadWeather} />
+              </React.Fragment>
+            ))}
+          </div>
         </div>
         <Menu 
           isOpen={isMenuOpen}

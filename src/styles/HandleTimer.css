@@ -16,7 +16,7 @@
 /* center: default resting position, no session active */
 .timer--center {
     font-size: 96px;
-    top: 50%;
+    top: 40%;
     transform: translate(-50%, -50%);
 }
 
@@ -24,12 +24,21 @@
 .timer--top {
     font-size: 56px;
     top: 0;
-    transform: translate(-50%, 50%);
+    transform: translate(-50%, 100%);
 }
+
+@media screen and (max-width: 768px) {
+      .timer--top {
+          /* override just the props you want different on mobile */
+          font-size: 60px;
+          transform: translate(-50%, 400%);
+          /* top: 0;  ← omit lines you don't want to change */
+      }
+  }
 
 /* in-player: session started, timer sits above "Time to build" inside the card */
 .timer--in-player {
     font-size: 64px;
     top: calc(50% - 180px);
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 50%);
 }

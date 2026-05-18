@@ -195,21 +195,6 @@ body, html {
   padding: 10px;
 }
 
-.bottom-navbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1rem;
-  padding: 20px;
-  background-color: rgba(200, 200, 200, 0.7);
-  backdrop-filter: blur(5px);
-  z-index: 10;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
 .photo-attribution {
   position: fixed;
   bottom: 70px; /* Positioned above the bottom navbar */
@@ -272,19 +257,25 @@ body, html {
     grid-column: 1;
   }
 
-  .bottom-navbar {
-    padding: 16px;
+
+  /* Horizontal scroll for weather widgets; scrollbar hidden but native
+     overlay scrollbars still appear during active scroll on iOS/macOS. */
+  .weather-scroll {
+    overflow-x: auto;
+    max-width: calc(100vw - 64px);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .freeflow-button {
-    width: 80%;
-    max-width: 300px;
+  .weather-scroll::-webkit-scrollbar {
+    display: none;
   }
 
   /* Strip the photo attribution down to just the refresh spinner */
   .photo-attribution {
     background-color: transparent;
-    padding: 0;
+    padding: 10%;
   }
 
   .photo-attribution > .tw-flex > a,
@@ -294,8 +285,8 @@ body, html {
   }
 
   .photo-attribution .favorite-heart-btn svg {
-    width: 22px;
-    height: 22px;
+    width: 44px;
+    height: 44px;
   }
 }
 

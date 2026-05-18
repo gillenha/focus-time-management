@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   Cloud,
   CloudRain,
@@ -9,6 +9,7 @@ import {
   CloudSun,
   ArrowClockwise,
 } from '@phosphor-icons/react';
+import useSpinAction from '../utils/useSpinAction';
 
 const ICONS = {
   clear:        <Sun size={22} weight="fill" className="tw-text-yellow-300" />,
@@ -24,15 +25,16 @@ const ICONS = {
 const WeatherWidget = ({ weatherData, onRefresh }) => {
   const isEmpty = !weatherData;
   const iconKey = isEmpty ? 'empty' : (weatherData.iconKey || 'cloudy');
-  const [isSpinning, setIsSpinning] = useState(false);
   const cooldownRef = useRef(false);
+  const [isSpinning, triggerSpin] = useSpinAction(
+    () => (onRefresh ? onRefresh() : Promise.resolve()),
+    1000
+  );
 
   const handleRefresh = () => {
     if (cooldownRef.current || !onRefresh) return;
     cooldownRef.current = true;
-    setIsSpinning(true);
-    // Stop spinning once the fetch resolves, but enforce 5s cooldown from click
-    onRefresh().finally(() => setIsSpinning(false));
+    triggerSpin();
     setTimeout(() => { cooldownRef.current = false; }, 5000);
   };
 

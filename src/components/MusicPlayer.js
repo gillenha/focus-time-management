@@ -23,6 +23,7 @@ function JumpButton({ controlBarRef }) {
     <button
       onClick={handleJump}
       className={`
+        tw-hidden sm:tw-block
         tw-absolute tw-bottom-[25%] tw-left-1/2 tw--translate-x-1/2
         tw-bg-gray-600 tw-text-white tw-px-4 tw-py-2 tw-rounded-full
         tw-shadow-[0_4px_8px_rgba(0,0,0,0.25)] tw-border-0
@@ -185,7 +186,7 @@ function MusicPlayer({
     `}>
       <div className="tw-bg-black/30 tw-backdrop-blur-md tw-rounded-xl tw-p-4 sm:tw-p-8 tw-flex tw-flex-col tw-items-center tw-gap-3 sm:tw-gap-6 tw-w-[90%] tw-max-w-[384px] tw-h-[320px] tw-min-h-[320px] sm:tw-h-[400px] sm:tw-min-h-[400px] sm:tw-w-96 tw-relative">
         <p className={`
-          tw-text-white tw-font-medium tw-text-xl sm:tw-text-2xl tw-absolute
+          tw-text-white tw-top-[20%] tw-font-medium tw-text-xl sm:tw-text-2xl tw-absolute
           tw-left-1/2 tw-transform tw-transition-all tw-duration-500
           tw-ease-out tw--translate-x-1/2 tw-z-10
           ${slideIn ? 'tw-top-[8%] sm:tw-top-1/3 tw-scale-125 sm:tw-scale-150 tw-opacity-100' : 'tw-top-0 tw-scale-100 tw-opacity-70'}

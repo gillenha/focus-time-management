@@ -24,7 +24,7 @@
 .timer--top {
     font-size: 56px;
     top: 0;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 50%);
 }
 
 /* in-player: session started, timer sits above "Time to build" inside the card */
@@ -32,14 +32,4 @@
     font-size: 64px;
     top: calc(50% - 180px);
     transform: translate(-50%, 0);
-}
-
-/* On mobile, the 'top' position becomes a centered position — empty state
-   and pre-session flow both show the timer centered on the page. */
-@media screen and (max-width: 768px) {
-    .timer--top {
-        font-size: 96px;
-        top: 50%;
-        transform: translate(-50%, -50%);
-    }
 }

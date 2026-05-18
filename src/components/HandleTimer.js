@@ -1,5 +1,5 @@
 import React from 'react';
-import './HandleTimer.css';
+// import './HandleTimer.css';
 
 function HandleTimer({ time, position = 'center' }) {
   const formatTime = (time) => {

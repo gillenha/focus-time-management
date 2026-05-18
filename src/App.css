@@ -372,3 +372,7 @@ body, html {
 .opacity-100 {
   opacity: 1;
 }
+
+.tw-overflow-y-auto::-webkit-scrollbar { width: 4px; }
+.tw-overflow-y-auto::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
+.tw-overflow-y-auto::-webkit-scrollbar-track { background: transparent; }

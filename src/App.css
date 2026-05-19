@@ -288,6 +288,17 @@ body, html {
     width: 44px;
     height: 44px;
   }
+
+  /* Hide the menu drawer's vertical scrollbar so it doesn't take width and
+     shift centered content off the drawer's true horizontal center. */
+  .menu-content {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .menu-content::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes slideIn {

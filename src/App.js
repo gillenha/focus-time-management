@@ -39,6 +39,7 @@ function App() {
   const accumulatedSecondsRef = useRef(0);
   const lastResumeAtRef = useRef(null);
   const prevTimerActiveRef = useRef(false);
+  const isTransitioningRef = useRef(false);
   const lastStorageWriteRef = useRef(0);
   const [, setTick] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
@@ -466,101 +467,114 @@ function App() {
   };
 
   const handleFreeFlowClick = async () => {
-    if (isFreeflow) {
-      console.log("Freeflow ended");
-      sfxManager.play('sessionEnd');
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
 
-      // Clean up audio if cleanup function exists
-      if (window.audioCleanup) {
-        window.audioCleanup();
-        window.audioCleanup = null;
-      }
+    try {
+      if (isFreeflow) {
+        console.log("Freeflow ended");
+        sfxManager.play('sessionEnd');
 
-      // Only save sessions with non-zero duration
-      if (time > 0) {
-        const now = new Date();
-        const currentSession = JSON.parse(localStorage.getItem('currentSession'));
-        const newSession = {
-          date: now.toISOString(),
-          time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
-          duration: formatDuration(time),
-          text: currentSessionText,
-          project: currentSession?.projectId || null
-        };
-
-        try {
-          // Save to MongoDB
-          console.log('Attempting to save session to MongoDB:', newSession);
-
-          const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(newSession),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Server response:', {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorData
-            });
-            throw new Error(`Failed to save session to MongoDB: ${response.status} ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          console.log('Session saved to MongoDB:', result);
-
-          // Update local state with the populated session from the response
-          const updatedHistory = [...sessionHistory, result];
-          setSessionHistory(updatedHistory);
-          localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
-        } catch (error) {
-          console.error('Error saving session to MongoDB:', {
-            message: error.message,
-            stack: error.stack
-          });
-          // Still update local storage even if MongoDB save fails
-          const updatedHistory = [...sessionHistory, newSession];
-          setSessionHistory(updatedHistory);
-          localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+        // Clean up audio if cleanup function exists
+        if (window.audioCleanup) {
+          window.audioCleanup();
+          window.audioCleanup = null;
         }
-      }
-      
-      // First set freeflow to false to trigger fade out animation
-      setIsFreeflow(false);
-      setTimerActive(false);
-      setSessionEnded(true);
 
-      // Wait for fade out animation before unmounting music player
-      setTimeout(() => {
-        setShowMusicPlayer(false);
-        // Only reset session state, not the timer ledger — the displayed time
-        // persists until the next "Enter Flow State" begins a new session.
+        // Only save sessions with non-zero duration
+        if (time > 0) {
+          const now = new Date();
+          const currentSession = JSON.parse(localStorage.getItem('currentSession'));
+          const newSession = {
+            date: now.toISOString(),
+            time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }).toLowerCase(),
+            duration: formatDuration(time),
+            text: currentSessionText,
+            project: currentSession?.projectId || null
+          };
+
+          try {
+            // Save to MongoDB
+            console.log('Attempting to save session to MongoDB:', newSession);
+
+            const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/sessions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(newSession),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('Server response:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData
+              });
+              throw new Error(`Failed to save session to MongoDB: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('Session saved to MongoDB:', result);
+
+            // Update local state with the populated session from the response
+            const updatedHistory = [...sessionHistory, result];
+            setSessionHistory(updatedHistory);
+            localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+          } catch (error) {
+            console.error('Error saving session to MongoDB:', {
+              message: error.message,
+              stack: error.stack
+            });
+            // Still update local storage even if MongoDB save fails
+            const updatedHistory = [...sessionHistory, newSession];
+            setSessionHistory(updatedHistory);
+            localStorage.setItem('sessionHistory', JSON.stringify(updatedHistory));
+          }
+        }
+
+        // First set freeflow to false to trigger fade out animation
+        setIsFreeflow(false);
+        setTimerActive(false);
+        setSessionEnded(true);
+
+        // Wait for fade out animation before unmounting music player
+        setTimeout(() => {
+          setShowMusicPlayer(false);
+          // Only reset session state, not the timer ledger — the displayed time
+          // persists until the next "Enter Flow State" begins a new session.
+          localStorage.removeItem('currentSession');
+          setSessionStarted(false);
+          setSessionInputValue('');
+          setCurrentSessionText('');
+          isTransitioningRef.current = false;
+        }, 1000);
+      } else {
+        console.log("Freeflow started");
+        sfxManager.play('enterFlowState');
+        // Clear any existing session state AND reset timer when starting new session
         localStorage.removeItem('currentSession');
         setSessionStarted(false);
         setSessionInputValue('');
         setCurrentSessionText('');
-      }, 1000);
-    } else {
-      console.log("Freeflow started");
-      sfxManager.play('enterFlowState');
-      // Clear any existing session state AND reset timer when starting new session
-      localStorage.removeItem('currentSession');
-      setSessionStarted(false);
-      setSessionInputValue('');
-      setCurrentSessionText('');
-      sessionStartTsRef.current = null;
-      accumulatedSecondsRef.current = 0;
-      lastResumeAtRef.current = null;
-      setTimerActive(false);
-      setSessionEnded(false);
-      
-      // Start new session
-      setShowMusicPlayer(true);
-      setIsFreeflow(true);
+        sessionStartTsRef.current = null;
+        accumulatedSecondsRef.current = 0;
+        lastResumeAtRef.current = null;
+        setTimerActive(false);
+        setSessionEnded(false);
+
+        // Start new session
+        setShowMusicPlayer(true);
+        setIsFreeflow(true);
+
+        setTimeout(() => {
+          isTransitioningRef.current = false;
+        }, 500);
+      }
+    } catch (err) {
+      isTransitioningRef.current = false;
+      throw err;
     }
   };
 

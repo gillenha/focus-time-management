@@ -1,8 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+
+const DRAG_CLOSE_THRESHOLD_PX = 100;
 
 function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImage, onTrackList, onQuoteList, onProjects }) {
   const { logout } = useAuth();
+  const [dragOffset, setDragOffset] = useState(0);
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+
+  const handleTouchStart = (e) => {
+    if (window.innerWidth > 768) return;
+    startYRef.current = e.touches[0].clientY;
+    isDraggingRef.current = true;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDraggingRef.current) return;
+    const delta = e.touches[0].clientY - startYRef.current;
+    setDragOffset(Math.max(0, delta));
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    if (dragOffset > DRAG_CLOSE_THRESHOLD_PX) onClose();
+    setDragOffset(0);
+  };
+
   return (
     <div className={`menu ${isOpen ? 'open' : ''}`}>
       {/* Overlay */}
@@ -15,17 +40,41 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
       
       {/* Drawer — left side on desktop, bottom sheet on mobile */}
       <div
-        className={`tw-fixed tw-bg-white tw-shadow-lg tw-transform tw-transition-transform tw-z-50
-          tw-left-0 tw-bottom-0 tw-w-full tw-max-h-[85vh] tw-rounded-t-2xl
-          sm:tw-top-0 sm:tw-bottom-auto sm:tw-h-full sm:tw-w-64 sm:tw-rounded-t-none sm:tw-rounded-r-xl sm:tw-max-h-none
+        style={dragOffset > 0 ? {
+          transform: `translateY(${dragOffset}px)`,
+          transition: 'none',
+        } : undefined}
+        className={`tw-fixed
+                    tw-bg-white
+                    tw-shadow-lg
+                    tw-transform
+                    tw-transition-transform
+                    tw-z-50
+                    tw-left-0
+                    tw-bottom-0
+                    tw-w-full
+                    tw-max-h-[85vh]
+                    tw-rounded-t-2xl
+                    sm:tw-top-0
+                    sm:tw-bottom-auto
+                    sm:tw-h-full
+                    sm:tw-w-64
+                    sm:tw-rounded-t-none
+                    sm:tw-rounded-r-xl
+                    sm:tw-max-h-none
           ${isOpen
             ? 'tw-translate-y-0 sm:tw-translate-x-0'
             : 'tw-translate-y-full sm:tw-translate-y-0 sm:-tw-translate-x-full'}
         `}
       >
-        <div className="tw-p-4 tw-h-full tw-flex tw-flex-col tw-overflow-y-auto">
-          {/* Grabber handle (mobile only) */}
-          <div className="tw-flex tw-justify-center tw-mb-2 sm:tw-hidden">
+        <div className="menu-content tw-p-4 tw-h-full tw-flex tw-flex-col tw-overflow-y-auto">
+          {/* Grabber handle (mobile only) — drag down to close */}
+          <div
+            className="tw-flex tw-justify-center tw-py-3 tw-mb-2 sm:tw-hidden tw-cursor-grab tw-touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <div className="tw-w-10 tw-h-1 tw-bg-gray-300 tw-rounded-full" />
           </div>
 
@@ -50,94 +99,94 @@ function Menu({ isOpen, onClose, onProfileClick, onShowHistory, onBackgroundImag
 
           {/* Account Section */}
           <div className="tw-mb-6">
-            <p className="tw-text-xs tw-text-left tw-text-gray-500 tw-mb-2">ACCOUNT</p>
+            <p className="tw-text-xs tw-text-center sm:tw-text-left tw-text-gray-500 tw-mb-2">ACCOUNT</p>
             <ul className="tw-list-none tw-p-0 tw-m-0 sm:tw-bg-transparent tw-bg-gray-50 tw-rounded-xl sm:tw-rounded-none tw-overflow-hidden">
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={(e) => {
                     e.preventDefault();
                     onProfileClick();
                   }}
                 >
                   <span>Profile</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
             </ul>
           </div>
 
-          {/* Divider */}
-          <hr className="tw-border-gray-200 tw-my-4 sm:tw-block tw-hidden" />
+          {/* Divider — centered narrow line on mobile, full width on desktop */}
+          <hr className="tw-border-gray-200 tw-my-4 tw-w-1/2 sm:tw-w-full tw-mx-auto" />
 
           {/* Personalize Section */}
           <div className="tw-mb-6">
-            <p className="tw-text-xs tw-text-left tw-text-gray-500 tw-mb-2">PERSONALIZE</p>
+            <p className="tw-text-xs tw-text-center sm:tw-text-left tw-text-gray-500 tw-mb-2">PERSONALIZE</p>
             <ul className="tw-list-none tw-p-0 tw-m-0 sm:tw-bg-transparent tw-bg-gray-50 tw-rounded-xl sm:tw-rounded-none tw-overflow-hidden tw-divide-y sm:tw-divide-y-0 tw-divide-gray-200">
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onShowHistory();
                     onClose();
                   }}
                 >
                   <span>Session History</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onProjects();
                     onClose();
                   }}
                 >
                   <span>Projects</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onBackgroundImage();
                     onClose();
                   }}
                 >
                   <span>Background Image</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onTrackList();
                     onClose();
                   }}
                 >
                   <span>Track List</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
               <li>
                 <a
                   href="#"
-                  className="tw-flex tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-base sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
+                  className="tw-flex tw-justify-center sm:tw-justify-between tw-items-center tw-w-full tw-text-gray-700 tw-py-4 sm:tw-py-3 tw-px-4 sm:tw-px-0 tw-text-3xl sm:tw-text-sm tw-hover:bg-gray-100 tw-no-underline tw-font-semibold"
                   onClick={() => {
                     onQuoteList();
                     onClose();
                   }}
                 >
                   <span>Quote List</span>
-                  <span className="tw-text-gray-400"></span>
+                  <span className="tw-text-gray-400 tw-hidden sm:tw-inline"></span>
                 </a>
               </li>
             </ul>
